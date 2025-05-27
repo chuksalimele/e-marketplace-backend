@@ -1,0 +1,14 @@
+description = 'api-gateway'
+
+
+
+dependencies {
+
+    // Spring Cloud Gateway dependency
+    implementation("org.springframework.cloud:spring-cloud-starter-gateway:4.2.1")
+
+    // Spring Cloud Netflix Eureka Client dependency for service discovery
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
+
+}
+

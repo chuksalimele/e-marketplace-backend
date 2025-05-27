@@ -1,0 +1,93 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.springframework.boot' version '3.4.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url "https://repo.spring.io/snapshot" }
+        maven { url "https://repo.spring.io/milestone" }
+        flatDir {
+            dirs rootProject.file('lib') // Load external JARs
+        }
+    }
+
+    ext {
+        springStatemachineVersion = '3.2.1'
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'application'
+    apply plugin: 'eclipse'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+
+    dependencies {
+        implementation fileTree(dir: "${rootProject.projectDir}/lib", include: ["**/*.jar"])
+
+        //implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'                
+        //implementation "org.springframework.statemachine:spring-statemachine-starter:${springStatemachineVersion}"
+	//implementation 'org.springframework.boot:spring-boot-starter-data-couchbase'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-couchbase-reactive'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-mongodb-reactive'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	//implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+	//implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	compileOnly 'org.projectlombok:lombok'
+	//developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	runtimeOnly 'com.h2database:h2'
+	//runtimeOnly 'com.mysql:mysql-connector-j'
+	//runtimeOnly 'org.postgresql:postgresql'
+	annotationProcessor 'org.projectlombok:lombok'
+
+
+                
+        implementation 'org.springframework.boot:spring-boot-starter-validation'        
+        implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+
+        runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+        runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.statemachine:spring-statemachine-bom:${springStatemachineVersion}"
+        }
+    }
+
+    //Apply duplicate handling strategy for jar creation
+    jar {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    //Apply duplicate handling strategy for bootJar creation
+    bootJar {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    //Apply duplicate handling strategy for distTar creation
+    distTar {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    //Apply duplicate handling strategy for distZip creation
+    distZip {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    //And so on - Apply duplicate handling strategy for [ANY TYPE] creation
+
+}

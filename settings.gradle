@@ -1,0 +1,10 @@
+rootProject.name = 'e-marketplace-backend'
+
+include ':eureka-server'
+include ':api-gateway'
+include ':user-service'
+include ':product-catalog-service'
+include ':order-processing-service'
+include ':logistics-media-service'
+include ':mcsv-common-lib'
+

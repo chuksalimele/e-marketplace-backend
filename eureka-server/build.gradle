@@ -1,0 +1,11 @@
+description = 'eureka-server'
+
+
+dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Spring Cloud Netflix Eureka Server dependency
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-server:4.2.1")
+
+}

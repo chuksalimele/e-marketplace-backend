@@ -1,0 +1,12 @@
+description = 'product-catalog-service'
+
+
+
+dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Spring Cloud Netflix Eureka Client dependency for service discovery
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
+
+}

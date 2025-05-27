@@ -1,0 +1,17 @@
+## YAML Template.
+---
+# src/main/resources/application.yml for Product Service
+server:
+  port: 8081 # A unique port for this microservice 
+
+spring:
+  application:
+    name: user-service # The unique name of this service, used by Eureka
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # Pointing to your Eureka Server
+  instance:
+    hostname: localhost # For local development, use localhost
+    prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)

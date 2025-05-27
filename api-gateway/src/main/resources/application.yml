@@ -1,0 +1,68 @@
+## YAML Template.
+---
+# src/main/resources/application.yml
+server:
+  port: 8080 # Default port for the API Gateway
+  
+logging:
+ level:
+  org.springframework.security: DEBUG
+  
+spring: 
+  main:
+    web-application-type: REACTIVE 
+  application:
+    name: api-gateway # Name of the API Gateway service
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true # Enables the DiscoveryClientRouteDefinitionLocator
+          lower-case-service-id: true # Converts service IDs to lowercase for routing
+      routes:
+        # route for 'product-catalog-service'
+        - id: product-catalog-service-route
+          uri: lb://product-catalog-service # The service name should exactly match the spring.application.name defined in each of those microservices' application.yml. 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/products/** # Routes requests starting with /products/ to product-service
+          filters:
+            - RewritePath=/products/(?<segment>.*), /${segment} # Rewrites path to remove /products/
+       
+        # route for 'order-processing-service'
+        - id: order-processing-service-route
+          uri: lb://order-processing-service # The service name should exactly match the spring.application.name defined in each of those microservices' application.yml. 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/orders/**
+          filters:
+            - RewritePath=/orders/(?<segment>.*), /${segment}
+       
+        # route for 'user-service'
+        - id: user-service-route
+          uri: lb://user-service # The service name should exactly match the spring.application.name defined in each of those microservices' application.yml. 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/users/**
+          filters:
+            - RewritePath=/users/(?<segment>.*), /${segment} 
+       
+        # route for 'logistics' part of logistics-media-service
+        - id: logistics-service-route 
+          uri: lb://logistics-media-service # The service name should exactly match the spring.application.name defined in each of those microservices' application.yml. 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/logistics/**
+          filters:
+            - RewritePath=/logistics/(?<segment>.*), /${segment}
+
+        # route for 'media' part of logistics-media-service
+        - id: media-service-route
+          uri: lb://logistics-media-service # The service name should exactly match the spring.application.name defined in each of those microservices' application.yml. 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/media/**
+          filters:
+            - RewritePath=/media/(?<segment>.*), /${segment}           
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # URL of the Eureka Server
+    instance:
+      hostname: localhost # Hostname for this gateway instance

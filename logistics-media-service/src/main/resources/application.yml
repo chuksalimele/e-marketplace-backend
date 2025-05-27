@@ -1,0 +1,25 @@
+## YAML Template.
+---
+# src/main/resources/application.yml for Product Service
+server:
+  port: 8084 # A unique port for this microservice
+ 
+# Set logging level to debug BUT REMOVE IN PRODUCTION      
+logging:
+ level:
+  org.springframework.security: DEBUG
+
+spring:
+  application:
+    name: logistics-media-service # The unique name of this service, used by Eureka
+  autoconfigure:
+    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we dono need it
+    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # Pointing to your Eureka Server
+  instance:
+    hostname: localhost # For local development, use localhost
+    prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)
