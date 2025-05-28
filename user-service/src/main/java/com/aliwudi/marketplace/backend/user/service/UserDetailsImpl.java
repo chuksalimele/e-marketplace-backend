@@ -1,7 +1,7 @@
 // UserDetailsImpl.java
-package com.marketplace.emarketplacebackend.service;
+package com.aliwudi.marketplace.backend.user.service;
 
-import com.marketplace.emarketplacebackend.model.User;
+import com.aliwudi.marketplace.backend.user.model.User;
 import com.fasterxml.jackson.annotation.JsonIgnore; // To ignore password during serialization
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

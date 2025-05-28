@@ -1,4 +1,4 @@
-package com.marketplace.emarketplacebackend.exception;
+package com.aliwudi.marketplace.backend.user.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

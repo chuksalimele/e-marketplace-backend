@@ -1,5 +1,5 @@
 // src/main/java/com/marketplace/emarketplacebackend/dto/ReviewRequest.java
-package com.marketplace.emarketplacebackend.dto;
+package com.aliwudi.marketplace.backend.product.dto;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

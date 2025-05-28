@@ -1,5 +1,5 @@
 // LoginRequest.java
-package com.marketplace.emarketplacebackend.payload.request;
+package com.aliwudi.marketplace.backend.user.dto;
 
 import jakarta.validation.constraints.NotBlank; // For validation (ensures field is not null or empty)
 import lombok.Data; // Lombok for getters/setters

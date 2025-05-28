@@ -1,14 +1,14 @@
-package com.marketplace.emarketplacebackend.service;
+package com.aliwudi.marketplace.backend.product.service;
 
-import com.marketplace.emarketplacebackend.exception.ResourceNotFoundException;
-import com.marketplace.emarketplacebackend.model.Product;
-import com.marketplace.emarketplacebackend.model.Store;
-import com.marketplace.emarketplacebackend.model.Category;
-import com.marketplace.emarketplacebackend.dto.ProductRequest;
-import com.marketplace.emarketplacebackend.repository.CategoryRepository;
-import com.marketplace.emarketplacebackend.repository.ProductRepository;
-import com.marketplace.emarketplacebackend.repository.SellerRepository;
-import com.marketplace.emarketplacebackend.repository.StoreRepository;
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.product.model.Product;
+import com.aliwudi.marketplace.backend.product.model.Store;
+import com.aliwudi.marketplace.backend.product.model.Category;
+import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
+import com.aliwudi.marketplace.backend.product.repository.CategoryRepository;
+import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
+import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
+import com.aliwudi.marketplace.backend.product.repository.StoreRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page; // NEW IMPORT

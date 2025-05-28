@@ -1,9 +1,9 @@
 // WebSecurityConfig.java - UPDATED for H2 Console access
 package com.aliwudi.marketplace.backend.user.config;
 
-import com.marketplace.emarketplacebackend.security.jwt.AuthEntryPointJwt;
-import com.marketplace.emarketplacebackend.security.jwt.AuthTokenFilter;
-import com.marketplace.emarketplacebackend.service.UserDetailsServiceImpl;
+import com.aliwudi.marketplace.backend.user.security.jwt.AuthEntryPointJwt;
+import com.aliwudi.marketplace.backend.user.security.jwt.AuthTokenFilter;
+import com.aliwudi.marketplace.backend.user.service.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

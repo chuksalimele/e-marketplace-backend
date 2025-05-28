@@ -1,9 +1,9 @@
 // ProductController.java
 package com.aliwudi.marketplace.backend.product.controller;
 
-import com.marketplace.emarketplacebackend.dto.ProductRequest;
-import com.marketplace.emarketplacebackend.model.Product;
-import com.marketplace.emarketplacebackend.service.ProductService;
+import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
+import com.aliwudi.marketplace.backend.product.model.Product;
+import com.aliwudi.marketplace.backend.product.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;

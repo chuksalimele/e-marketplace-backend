@@ -2,9 +2,9 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
 
-import com.marketplace.emarketplacebackend.model.Seller;
-import com.marketplace.emarketplacebackend.repository.SellerRepository;
-import com.marketplace.emarketplacebackend.service.SellerService;
+import com.aliwudi.marketplace.backend.product.model.Seller;
+import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
+import com.aliwudi.marketplace.backend.product.service.SellerService;
 import org.springframework.data.domain.Page;    // NEW IMPORT
 import org.springframework.data.domain.Pageable; // NEW IMPORT
 import org.springframework.data.domain.Sort;     // NEW IMPORT

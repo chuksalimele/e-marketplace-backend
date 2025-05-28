@@ -1,7 +1,7 @@
 // AuthTokenFilter.java
-package com.marketplace.emarketplacebackend.security.jwt;
+package com.aliwudi.marketplace.backend.user.security.jwt;
 
-import com.marketplace.emarketplacebackend.service.UserDetailsServiceImpl; // Our custom service to load user details
+import com.aliwudi.marketplace.backend.user.service.UserDetailsServiceImpl; // Our custom service to load user details
 import jakarta.servlet.FilterChain; // For chaining filters
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

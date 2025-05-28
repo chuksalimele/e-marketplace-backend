@@ -2,11 +2,11 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
-import com.marketplace.emarketplacebackend.dto.ReviewRequest;
-import com.marketplace.emarketplacebackend.dto.ReviewResponse;
-import com.marketplace.emarketplacebackend.exception.ResourceNotFoundException;
-import com.marketplace.emarketplacebackend.model.Review;
-import com.marketplace.emarketplacebackend.service.ReviewService;
+import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
+import com.aliwudi.marketplace.backend.product.dto.ReviewResponse;
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.product.model.Review;
+import com.aliwudi.marketplace.backend.product.service.ReviewService;
 import jakarta.validation.Valid; // For @Valid annotation
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

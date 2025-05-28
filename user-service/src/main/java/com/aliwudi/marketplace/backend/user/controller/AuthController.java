@@ -1,17 +1,17 @@
 // AuthController.java
-package com.marketplace.emarketplacebackend.controller;
+package com.aliwudi.marketplace.backend.user.controller;
 
-import com.marketplace.emarketplacebackend.model.Role;
-import com.marketplace.emarketplacebackend.dto.JwtResponse;
-import com.marketplace.emarketplacebackend.dto.MessageResponse;
-import com.marketplace.emarketplacebackend.model.ERole;
-import com.marketplace.emarketplacebackend.model.User;
-import com.marketplace.emarketplacebackend.payload.request.LoginRequest;
-import com.marketplace.emarketplacebackend.payload.request.SignupRequest;
-import com.marketplace.emarketplacebackend.repository.RoleRepository;
-import com.marketplace.emarketplacebackend.repository.UserRepository;
-import com.marketplace.emarketplacebackend.security.jwt.JwtUtils;
-import com.marketplace.emarketplacebackend.service.UserDetailsImpl;
+import com.aliwudi.marketplace.backend.user.model.Role;
+import com.aliwudi.marketplace.backend.user.dto.JwtResponse;
+import com.aliwudi.marketplace.backend.user.dto.MessageResponse;
+import com.aliwudi.marketplace.backend.user.model.ERole;
+import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
+import com.aliwudi.marketplace.backend.user.dto.SignupRequest;
+import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
+import com.aliwudi.marketplace.backend.user.repository.UserRepository;
+import com.aliwudi.marketplace.backend.user.security.jwt.JwtUtils;
+import com.aliwudi.marketplace.backend.user.service.UserDetailsImpl;
 import jakarta.validation.Valid; // For @Valid annotation
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

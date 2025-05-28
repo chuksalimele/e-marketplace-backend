@@ -1,5 +1,5 @@
 // ERole.java
-package com.marketplace.emarketplacebackend.model; // or appropriate 'enums' package
+package com.aliwudi.marketplace.backend.user.model; // or appropriate 'enums' package
 
 public enum ERole {
     ROLE_USER,

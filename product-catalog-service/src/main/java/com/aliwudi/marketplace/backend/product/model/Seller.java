@@ -1,5 +1,5 @@
 // Seller.java
-package com.marketplace.emarketplacebackend.model;
+package com.aliwudi.marketplace.backend.product.model;
 
 import java.util.HashSet;
 import java.util.Set;

@@ -1,7 +1,7 @@
 // UserRepository.java
-package com.marketplace.emarketplacebackend.repository;
+package com.aliwudi.marketplace.backend.user.repository;
 
-import com.marketplace.emarketplacebackend.model.User;
+import com.aliwudi.marketplace.backend.user.model.User;
 import org.springframework.data.jpa.repository.JpaRepository; // Provides basic CRUD operations
 import org.springframework.stereotype.Repository; // Marks this as a Spring Repository component
 

@@ -14,8 +14,8 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     // Custom method to find a CartItem by Cart and Product
     // This is useful for checking if a product is already in the cart
-    Optional<CartItem> findByCartAndProduct(Cart cart, Product product);
+    Optional<CartItem> findByCartAndProductId(Cart cart, Long productId);
 
     // Optional: Delete a CartItem by Cart and Product (if not using orphanRemoval via entity relationship)
-    // int deleteByCartAndProduct(Cart cart, Product product);
+    // int deleteByCartAndProductId(Cart cart, Long productId);
 }

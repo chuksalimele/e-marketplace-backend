@@ -2,7 +2,7 @@
 ---
 # src/main/resources/application.yml for Product Service
 server:
-  port: 8081 # A unique port for this microservice 
+  port: 5001 # A unique port for this microservice 
 
 spring:
   application:

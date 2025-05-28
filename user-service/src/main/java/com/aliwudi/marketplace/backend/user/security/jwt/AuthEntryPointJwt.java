@@ -1,5 +1,5 @@
 // AuthEntryPointJwt.java
-package com.marketplace.emarketplacebackend.security.jwt;
+package com.aliwudi.marketplace.backend.user.security.jwt;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

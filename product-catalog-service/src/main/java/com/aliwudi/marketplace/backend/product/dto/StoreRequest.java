@@ -1,5 +1,5 @@
 // StoreRequest.java
-package com.marketplace.emarketplacebackend.dto; // or payload.request
+package com.aliwudi.marketplace.backend.product.dto; // or payload.request
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

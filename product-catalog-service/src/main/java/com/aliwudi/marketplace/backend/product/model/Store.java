@@ -1,4 +1,4 @@
-package com.marketplace.emarketplacebackend.model;
+package com.aliwudi.marketplace.backend.product.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;

@@ -1,5 +1,4 @@
-// src/main/java/com/marketplace/emarketplacebackend/model/Review.java
-package com.marketplace.emarketplacebackend.model;
+package com.aliwudi.marketplace.backend.product.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -20,9 +19,9 @@ public class Review {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user; // The user who left the review
+    
+    @Column(nullable = false)
+    private Long userId; // The user who left his/her review
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)

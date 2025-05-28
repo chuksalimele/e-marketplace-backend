@@ -1,5 +1,5 @@
 // Role.java
-package com.marketplace.emarketplacebackend.model;
+package com.aliwudi.marketplace.backend.user.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

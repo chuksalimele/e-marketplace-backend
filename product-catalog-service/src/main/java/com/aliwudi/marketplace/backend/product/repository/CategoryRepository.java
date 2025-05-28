@@ -1,6 +1,6 @@
-package com.marketplace.emarketplacebackend.repository;
+package com.aliwudi.marketplace.backend.product.repository;
 
-import com.marketplace.emarketplacebackend.model.Category;
+import com.aliwudi.marketplace.backend.product.model.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

@@ -1,5 +1,5 @@
 // Product.java
-package com.marketplace.emarketplacebackend.model;
+package com.aliwudi.marketplace.backend.product.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonBackReference;   // NEW IMPORT

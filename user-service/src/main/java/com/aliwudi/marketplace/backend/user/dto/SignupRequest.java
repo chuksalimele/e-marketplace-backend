@@ -1,5 +1,5 @@
 // SignupRequest.java
-package com.marketplace.emarketplacebackend.payload.request;
+package com.aliwudi.marketplace.backend.user.dto;
 
 import jakarta.validation.constraints.Email;   // For email format validation
 import jakarta.validation.constraints.NotBlank; // For non-empty fields

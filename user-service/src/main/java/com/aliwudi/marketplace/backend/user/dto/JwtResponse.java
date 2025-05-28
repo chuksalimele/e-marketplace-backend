@@ -1,5 +1,5 @@
 // JwtResponse.java
-package com.marketplace.emarketplacebackend.dto;
+package com.aliwudi.marketplace.backend.user.dto;
 
 import lombok.Data; // Lombok for getters/setters
 

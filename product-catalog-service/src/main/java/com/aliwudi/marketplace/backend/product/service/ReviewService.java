@@ -1,15 +1,13 @@
 // src/main/java/com/marketplace/emarketplacebackend/service/ReviewService.java
-package com.marketplace.emarketplacebackend.service;
+package com.aliwudi.marketplace.backend.product.service;
 
-import com.marketplace.emarketplacebackend.model.Product;
-import com.marketplace.emarketplacebackend.model.Review;
-import com.marketplace.emarketplacebackend.model.User;
-import com.marketplace.emarketplacebackend.repository.ProductRepository;
-import com.marketplace.emarketplacebackend.repository.ReviewRepository;
-import com.marketplace.emarketplacebackend.repository.UserRepository;
-import com.marketplace.emarketplacebackend.dto.ReviewRequest;
-import com.marketplace.emarketplacebackend.exception.ResourceNotFoundException;
-import com.marketplace.emarketplacebackend.exception.DuplicateResourceException; // For preventing multiple reviews
+import com.aliwudi.marketplace.backend.product.model.Product;
+import com.aliwudi.marketplace.backend.product.model.Review;
+import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
+import com.aliwudi.marketplace.backend.product.repository.ReviewRepository;
+import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException; // For preventing multiple reviews
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,19 +32,17 @@ public class ReviewService {
 
     @Transactional
     public Review submitReview(ReviewRequest reviewRequest) {
-        User user = userRepository.findById(reviewRequest.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + reviewRequest.getUserId()));
 
         Product product = productRepository.findById(reviewRequest.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + reviewRequest.getProductId()));
 
         // Check if the user has already reviewed this product (based on unique constraint)
-        if (reviewRepository.findByUserAndProduct(user, product).isPresent()) {
+        if (reviewRepository.findByUserIdAndProduct(reviewRequest.getUserId(), product).isPresent()) {
             throw new DuplicateResourceException("User has already submitted a review for this product.");
         }
 
         Review review = new Review();
-        review.setUser(user);
+        review.setUserId(reviewRequest.getUserId());
         review.setProduct(product);
         review.setRating(reviewRequest.getRating());
         review.setComment(reviewRequest.getComment());
@@ -62,9 +58,9 @@ public class ReviewService {
     }
 
     public List<Review> getReviewsByUserId(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
-        return reviewRepository.findByUser(user);
+       // User user = userRepository.findById(userId)
+       //         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+        return reviewRepository.findByUserId(userId);
     }
 
     public Optional<Review> getReviewById(Long id) {

@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.AllArgsConstructor; // Will be adjusted by Lombok for new fields
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -15,7 +15,8 @@ import java.util.List;
 @Table(name = "orders")
 @Data // Generates getters, setters, equals, hashCode, toString
 @NoArgsConstructor // Generates no-argument constructor
-@AllArgsConstructor // Generates constructor with all fields (use with caution for JPA, default no-arg is critical)
+// @AllArgsConstructor // Lombok will generate an all-args constructor including userId
+// You can remove this annotation if you intend to use the custom constructor below
 @ToString(exclude = {"orderItems"}) // Exclude orderItems to prevent StackOverflowError in toString
 public class Order {
 
@@ -23,9 +24,12 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // --- REFACtORED CHANGE ---
+    // Replaced direct User object reference with its ID.
+    // This userId acts as a foreign key that references the User entity
+    // in the separate User Microservice's database.
+    @Column(name = "user_id", nullable = false)
+    private Long userId; // Changed from 'User user' to 'Long userId'
 
     @Column(nullable = false)
     private LocalDateTime orderDate;
@@ -46,9 +50,21 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    // Custom constructor for convenience, Lombok's @AllArgsConstructor might conflict slightly
-    // but @NoArgsConstructor is crucial for JPA.
-    // We will rely on setters for populating fields in the service.
+    // --- REFACtORED CHANGE ---
+    // Updated custom constructor to take userId instead of User object.
+    // If you're using Lombok's @AllArgsConstructor, it will automatically adjust.
+    // Ensure you align your constructor usage with the Lombok annotation or manual definitions.
+    public Order(Long userId, LocalDateTime orderDate, BigDecimal totalAmount, OrderStatus orderStatus,
+                 String shippingAddress, String paymentMethod) {
+        this.userId = userId;
+        this.orderDate = orderDate;
+        this.totalAmount = totalAmount;
+        this.orderStatus = orderStatus;
+        this.shippingAddress = shippingAddress;
+        this.paymentMethod = paymentMethod;
+        this.orderItems = new ArrayList<>(); // Initialize the list
+    }
+
     @PrePersist
     public void prePersist() {
         if (this.orderDate == null) {

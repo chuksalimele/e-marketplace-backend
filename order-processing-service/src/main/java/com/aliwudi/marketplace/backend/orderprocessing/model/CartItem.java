@@ -1,9 +1,9 @@
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;   // NEW IMPORT
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // NEW IMPORT
+import com.fasterxml.jackson.annotation.JsonBackReference;
+// Removed: import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // No longer needed as Product object is removed
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.AllArgsConstructor; // Will be adjusted for the new constructor
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -12,39 +12,42 @@ import lombok.NoArgsConstructor;
 @Table(name = "cart_items")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode(exclude = {"cart"}) // EXCLUDE 'cart'
+// @AllArgsConstructor // Lombok will generate based on new fields, if you keep this
+@EqualsAndHashCode(exclude = {"cart"}) // 'cart' remains excluded. 'product' was not explicitly excluded.
 public class CartItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Many-to-One relationship with Cart
-    // Multiple CartItems can belong to one Cart.
-    // @JoinColumn specifies the foreign key column in the 'cart_items' table.
-    // nullable = false means a CartItem must always belong to a Cart.
+    // Many-to-One relationship with Cart (remains within the same service)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
     @JsonBackReference // This side prevents infinite loop when serializing Cart -> CartItem
     private Cart cart;
 
-    // Many-to-One relationship with Product
-    // Multiple CartItems can refer to the same Product.
-    // FetchType.LAZY to avoid loading product data unnecessarily.
-    // nullable = false means a CartItem must always refer to a Product.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // NEW ADDITION
-    private Product product;
+    // --- REFACtORED CHANGE ---
+    // Replaced direct Product object reference with its ID.
+    // This productId acts as a foreign key that references the Product entity
+    // in the separate Product Catalog Microservice's database.
+    @Column(name = "product_id", nullable = false)
+    private Long productId; // Changed from 'Product product' to 'Long productId'
 
     @Column(nullable = false)
     private Integer quantity;
 
-    // Optional: Add a constructor for convenience
-    public CartItem(Cart cart, Product product, Integer quantity) {
+    // --- REFACtORED CHANGE ---
+    // Updated constructor to take productId instead of Product object.
+    // If you're using Lombok's @AllArgsConstructor, it will automatically adjust.
+    // If you have other custom constructors, update them similarly.
+    public CartItem(Cart cart, Long productId, Integer quantity) {
         this.cart = cart;
-        this.product = product;
+        this.productId = productId;
         this.quantity = quantity;
     }
+
+    // Lombok's @Data will generate getters and setters for 'id', 'cart', 'productId', and 'quantity'.
+    // If you had any specific logic in custom 'getProduct()' or 'setProduct()' methods,
+    // that logic will need to be moved to your CartService (or a dedicated service layer)
+    // and adapted to use the productId and communicate with the Product Catalog Service.
 }

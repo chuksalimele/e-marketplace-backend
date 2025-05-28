@@ -3,6 +3,35 @@ description = 'api-gateway'
 
 
 dependencies {
+    // Spring Cloud Gateway (reactive web stack)
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    // Spring Boot Starter Web is often pulled by other dependencies,
+    // but we explicitly tell Spring Boot to use reactive type in application.yml
+    implementation 'org.springframework.boot:spring-boot-starter-web' // Keep for compatibility, but WebFlux is primary
+
+    // Spring Cloud Netflix Eureka Client for service discovery
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // Spring Security for JWT validation and authorization
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.security:spring-security-oauth2-resource-server' // For JWT validation
+    implementation 'org.springframework.security:spring-security-oauth2-jose' // For JOSE (JSON Object Signing and Encryption)
+
+    // Resilience4j for Circuit Breaker and Retries
+    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-reactor-resilience4j:3.2.1")
+
+    // Actuator for monitoring and management endpoints
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Prometheus for metrics scraping
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    // Distributed Tracing with Brave (for Zipkin/Jaeger)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+
+    // Redis for Rate Limiting (Spring Cloud Gateway's default implementation uses Redis)
+    // You will need a running Redis instance for rate limiting to work.
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 
     // Spring Cloud Gateway dependency
     implementation("org.springframework.cloud:spring-cloud-starter-gateway:4.2.1")

@@ -1,5 +1,5 @@
 // src/main/java/com/marketplace/emarketplacebackend/exception/DuplicateResourceException.java
-package com.marketplace.emarketplacebackend.exception;
+package com.aliwudi.marketplace.backend.user.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

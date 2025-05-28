@@ -1,8 +1,8 @@
 // SellerService.java
-package com.marketplace.emarketplacebackend.service;
+package com.aliwudi.marketplace.backend.product.service;
 
-import com.marketplace.emarketplacebackend.model.Seller;
-import com.marketplace.emarketplacebackend.repository.SellerRepository;
+import com.aliwudi.marketplace.backend.product.model.Seller;
+import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;    // NEW IMPORT
 import org.springframework.data.domain.Pageable; // NEW IMPORT

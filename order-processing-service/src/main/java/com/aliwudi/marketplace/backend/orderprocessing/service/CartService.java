@@ -18,16 +18,11 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository; // To fetch the full User object
 
     @Autowired
-    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository,
-                       ProductRepository productRepository, UserRepository userRepository) {
+    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
-        this.productRepository = productRepository;
-        this.userRepository = userRepository;
     }
 
     /**
@@ -70,11 +65,11 @@ public class CartService {
 
         Cart userCart = getOrCreateCartForCurrentUser(); // Get or create cart for current user
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+        //Product product = productRepository.findById(productId)
+        //        .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         // Check if the product is already in the cart
-        Optional<CartItem> existingCartItemOptional = cartItemRepository.findByCartAndProduct(userCart, product);
+        Optional<CartItem> existingCartItemOptional = cartItemRepository.findByCartAndProductId(userCart, productId);
 
         CartItem cartItem;
         if (existingCartItemOptional.isPresent()) {
@@ -84,7 +79,7 @@ public class CartService {
             // No need to explicitly save cartItem due to @Transactional and managed entity state
         } else {
             // Product not in cart, create new CartItem
-            cartItem = new CartItem(userCart, product, quantity);
+            cartItem = new CartItem(userCart, productId, quantity);
             userCart.getItems().add(cartItem); // Add to the cart's collection
             // No need to explicitly save cartItem here, as it will be cascaded when cart is saved/merged
         }
@@ -132,10 +127,10 @@ public class CartService {
 
         Cart userCart = getOrCreateCartForCurrentUser();
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+        //Product product = productRepository.findById(productId)
+        //        .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
-        CartItem cartItem = cartItemRepository.findByCartAndProduct(userCart, product)
+        CartItem cartItem = cartItemRepository.findByCartAndProductId(userCart, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product with id " + productId + " not found in cart."));
 
         if (newQuantity == 0) {
@@ -163,10 +158,10 @@ public class CartService {
     public void removeCartItem(Long productId) {
         Cart userCart = getOrCreateCartForCurrentUser();
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+        //Product product = productRepository.findById(productId)
+         //       .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
-        CartItem cartItem = cartItemRepository.findByCartAndProduct(userCart, product)
+        CartItem cartItem = cartItemRepository.findByCartAndProductId(userCart, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product with id " + productId + " not found in cart."));
 
         userCart.getItems().remove(cartItem); // Remove from the cart's collection

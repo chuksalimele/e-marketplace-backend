@@ -1,7 +1,7 @@
 // SellerRepository.java
-package com.marketplace.emarketplacebackend.repository;
+package com.aliwudi.marketplace.backend.product.repository;
 
-import com.marketplace.emarketplacebackend.model.Seller;
+import com.aliwudi.marketplace.backend.product.model.Seller;
 import org.springframework.data.domain.Page;    // NEW IMPORT
 import org.springframework.data.domain.Pageable; // NEW IMPORT
 import org.springframework.data.jpa.repository.JpaRepository;

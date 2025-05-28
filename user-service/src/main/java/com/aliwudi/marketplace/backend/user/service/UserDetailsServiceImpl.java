@@ -1,8 +1,8 @@
 // UserDetailsServiceImpl.java
-package com.marketplace.emarketplacebackend.service;
+package com.aliwudi.marketplace.backend.user.service;
 
-import com.marketplace.emarketplacebackend.model.User;
-import com.marketplace.emarketplacebackend.repository.UserRepository;
+import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

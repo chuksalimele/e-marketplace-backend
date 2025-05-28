@@ -1,7 +1,7 @@
 // JwtUtils.java
-package com.marketplace.emarketplacebackend.security.jwt;
+package com.aliwudi.marketplace.backend.user.security.jwt;
 
-import com.marketplace.emarketplacebackend.service.UserDetailsImpl; // Our custom UserDetails implementation
+import com.aliwudi.marketplace.backend.user.service.UserDetailsImpl; // Our custom UserDetails implementation
 import io.jsonwebtoken.*; // Core JWT classes from jjwt library (e.g., Jwts, Claims, SignatureAlgorithm)
 import io.jsonwebtoken.io.Decoders; // Utility for Base64 decoding
 import io.jsonwebtoken.security.Keys; // Utility for generating secure keys
