@@ -3,7 +3,7 @@ description = 'product-catalog-service'
 
 
 dependencies {
-
+    implementation project(':mcsv-common-lib')
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
     // Spring Cloud Netflix Eureka Client dependency for service discovery

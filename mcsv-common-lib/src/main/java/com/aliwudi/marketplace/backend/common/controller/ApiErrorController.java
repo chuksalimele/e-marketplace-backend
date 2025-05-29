@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.common.controller;
 
-import com.marketplace.emarketplacebackend.exception.ErrorResponse;
+import com.aliwudi.marketplace.backend.common.exception.ErrorResponse;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.web.servlet.error.ErrorController;

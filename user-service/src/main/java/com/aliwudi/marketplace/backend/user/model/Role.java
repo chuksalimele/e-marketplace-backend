@@ -1,6 +1,7 @@
 // Role.java
 package com.aliwudi.marketplace.backend.user.model;
 
+import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

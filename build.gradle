@@ -43,11 +43,17 @@ subprojects {
 	//implementation 'org.springframework.boot:spring-boot-starter-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	compileOnly 'org.projectlombok:lombok'
-	//developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'com.h2database:h2'
 	//runtimeOnly 'com.mysql:mysql-connector-j'
 	//runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
+
+        // Spring Boot Starter WebFlux for WebClient (reactive HTTP client)
+        implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+        // Spring Cloud OpenFeign for declarative REST clients
+        //implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 
 
                 

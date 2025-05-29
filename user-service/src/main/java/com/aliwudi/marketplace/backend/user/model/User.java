@@ -1,68 +1,62 @@
 package com.aliwudi.marketplace.backend.user.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference; // NEW IMPORT
-import jakarta.persistence.*; // Essential JPA annotations
-import lombok.Data;          // Lombok
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor; // Lombok
-import lombok.AllArgsConstructor; // Lombok
+import com.aliwudi.marketplace.backend.common.enumeration.ERole;
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode; // Keep for now, but will remove 'exclude' for cart
 
 import java.time.LocalDateTime;
-import java.util.HashSet;    // For storing roles in a Set
-import java.util.Set;      // For storing roles in a Set
+import java.util.HashSet;
+import java.util.Set;
 
-@Entity // Marks this class as a JPA entity, mapping to a database table
-@Table(name = "users", // Specifies the actual table name in the database as "users"
-                       // (Using "users" instead of default "user" to avoid potential SQL keyword conflicts)
-       uniqueConstraints = { // Ensures that `username` and `email` values are unique across all users
-           @UniqueConstraint(columnNames = "username"),
-           @UniqueConstraint(columnNames = "email")
-       })
-@Data // From Lombok: Generates getters, setters, etc.
-@NoArgsConstructor // From Lombok: Generates an empty constructor
-@AllArgsConstructor // From Lombok: Generates a constructor with all fields
-@EqualsAndHashCode(exclude = {"cart"}) // EXCLUDE 'cart'
+@Entity
+@Table(name = "users",
+        uniqueConstraints = {
+            @UniqueConstraint(columnNames = "username"),
+            @UniqueConstraint(columnNames = "email")
+        })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+// IMPORTANT: Removed 'exclude = {"cart"}' as Cart is no longer part of this entity
+@EqualsAndHashCode // If you have other fields you want to exclude, add them here.
 public class User {
 
-    @Id // Marks this field as the primary key
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increments the ID
-    private Long id; // Unique identifier for each user
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(nullable = false, unique = true) // Username cannot be null and must be unique
+    @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false, unique = true) // Email cannot be null and must be unique
+    @Column(nullable = false, unique = true)
     private String email;
 
     private String firstName;
     private String lastName;
     private String phoneNumber;
-    private String shippingAddress; // Primary shipping address
-    
+    private String shippingAddress;
 
-    @Column(nullable = false) // Password cannot be null
-    private String password; // IMPORTANT: This will store the *hashed* password, never plain text!
+    @Column(nullable = false)
+    private String password; // Stores the *hashed* password
 
-    // Defines a Many-to-Many relationship between User and Role entities.
-    // A user can have multiple roles, and a role can be assigned to multiple users.
-    @ManyToMany(fetch = FetchType.LAZY) // Roles are typically fetched lazily (only when explicitly requested)
-    @JoinTable(name = "user_roles", // Specifies the name of the "junction" or "join" table that links users and roles
-               joinColumns = @JoinColumn(name = "user_id"), // Column in "user_roles" that references the User's ID
-               inverseJoinColumns = @JoinColumn(name = "role_id")) // Column in "user_roles" that references the Role's ID
-    private Set<Role> roles = new HashSet<>(); // A Set is used to store roles, preventing duplicate roles for a user
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<Role> roles = new HashSet<>();
 
-    // NEW ADDITION: One-to-One relationship with Cart
-    // mappedBy refers to the 'user' field in the Cart entity.
-    // CascadeType.ALL ensures that if a User is deleted, their Cart is also deleted.
-    // orphanRemoval = true ensures that if a Cart is detached from the User, it's removed from the DB.
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JsonManagedReference // This side is the "owner" for serialization
-    private Cart cart;
-    
+    // NEW: Instead of a direct @OneToOne relationship, store the ID of the cart.
+    // This allows the User service to reference a cart in the separate Cart microservice.
+    // Use a Long if your Cart IDs are Long, or String if they are UUIDs.
+    @Column(name = "cart_id") // Add a column to store the ID of the user's cart
+    private Long cartId; // Assuming Cart IDs are Longs. Adjust type if UUID (String)
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Lifecycle callbacks to manage creation and update timestamps
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -77,7 +71,6 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    // A convenience constructor for registering a new user (before roles are assigned)
     public User(String username, String email, String password) {
         this.username = username;
         this.email = email;

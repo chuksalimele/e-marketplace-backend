@@ -12,6 +12,15 @@ logging:
 spring:
   application:
     name: logistics-media-service # The unique name of this service, used by Eureka
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # This issuer-uri should match the 'issuer' defined in your Authorization Server
+          # It's used by Spring Security to configure the JWT decoder.
+          issuer-uri: http://localhost:8080 # Replace with your Auth Server's issuer URI
+          # No jwk-set-uri needed here, as the Gateway handles primary validation.
+          # We just need to tell Spring Security how to configure the JWT decoder context.    
   autoconfigure:
     # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we dono need it
     exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration

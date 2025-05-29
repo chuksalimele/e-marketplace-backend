@@ -28,25 +28,22 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final UserRepository userRepository;
-    private final ProductRepository productRepository;
+
 
     @Autowired
-    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                        UserRepository userRepository, ProductRepository productRepository) {
+    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
-        this.userRepository = userRepository;
-        this.productRepository = productRepository;
+
     }
 
     @Transactional
     public Order createOrder(Long userId, List<OrderItemRequest> itemRequests, String shippingAddress, String paymentMethod) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+        //User user = userRepository.findById(userId)
+        //        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
         Order order = new Order();
-        order.setUser(user);
+        order.setUserId(userId);
         order.setShippingAddress(shippingAddress);
         order.setPaymentMethod(paymentMethod);
         // orderDate and orderStatus are set by @PrePersist in Order entity
@@ -89,10 +86,10 @@ public class OrderService {
         return orderRepository.findById(id);
     }
 
-    public List<Order> getOrdersByUser(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
-        return orderRepository.findByUser(user);
+    public List<Order> getOrdersByUserId(Long userId) {
+       // User user = userRepository.findById(userId)
+        //        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+        return orderRepository.findByUserId(userId);
     }
 
     @Transactional

@@ -34,8 +34,7 @@ public class ReviewController {
         dto.setId(review.getId());
         dto.setProductId(review.getProduct().getId());
         dto.setProductName(review.getProduct().getName());
-        dto.setUserId(review.getUser().getId());
-        dto.setUsername(review.getUser().getUsername()); // Assuming username is public
+        dto.setUserId(review.getUserId());        
         dto.setRating(review.getRating());
         dto.setComment(review.getComment());
         dto.setReviewDate(review.getReviewDate());

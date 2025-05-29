@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.product.exception;
+package com.aliwudi.marketplace.backend.common.exception;
 
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;

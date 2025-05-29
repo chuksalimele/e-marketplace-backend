@@ -65,7 +65,7 @@ public class OrderController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<Order>> getOrdersByUserId(@PathVariable Long userId) {
         try {
-            List<Order> orders = orderService.getOrdersByUser(userId);
+            List<Order> orders = orderService.getOrdersByUserId(userId);
             return new ResponseEntity<>(orders, HttpStatus.OK);
         } catch (ResourceNotFoundException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);

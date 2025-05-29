@@ -2,6 +2,7 @@ description = 'logistics-media-service'
 
 
 dependencies {
+    implementation project(':mcsv-common-lib')
 
     implementation 'org.springframework.boot:spring-boot-starter-security'
 

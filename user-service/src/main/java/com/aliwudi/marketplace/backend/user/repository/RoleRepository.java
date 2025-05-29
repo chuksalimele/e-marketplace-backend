@@ -2,7 +2,7 @@
 package com.aliwudi.marketplace.backend.user.repository;
 
 import com.aliwudi.marketplace.backend.user.model.Role;
-import com.aliwudi.marketplace.backend.user.model.ERole; // NEW IMPORT
+import com.aliwudi.marketplace.backend.common.enumeration.ERole; // NEW IMPORT
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
