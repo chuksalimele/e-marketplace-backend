@@ -7,9 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
 @Repository
-public interface RoleRepository extends JpaRepository<Role, Long> {
+public interface RoleRepository extends ReactiveCrudRepository<Role, Long> {
     // Change method signature to accept ERole
-    Optional<Role> findByName(ERole name); // CHANGE HERE
+    Mono<Role> findByName(ERole name); // CHANGE HERE
 }

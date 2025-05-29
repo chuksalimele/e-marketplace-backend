@@ -5,6 +5,7 @@ import com.aliwudi.marketplace.backend.common.dto.CartDto;
 import com.aliwudi.marketplace.backend.common.dto.CartItemDto;
 import com.aliwudi.marketplace.backend.common.dto.ProductDto;
 import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Cart;
 import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem;
@@ -19,22 +20,26 @@ import org.springframework.transaction.annotation.Transactional; // Import Trans
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import reactor.core.publisher.Mono;
 
 @Service
 public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final ProductIntegrationService productIntegrationService;
 
     @Autowired
-    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository) {
+    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository, ProductIntegrationService productIntegrationService) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
+        this.productIntegrationService = productIntegrationService;
     }
 
-
     /**
-     * Finds the cart for the given user ID, or creates a new one if it doesn't exist.
+     * Finds the cart for the given user ID, or creates a new one if it doesn't
+     * exist.
+     *
      * @param userId The ID of the user.
      * @return The user's Cart.
      */
@@ -49,7 +54,9 @@ public class CartService {
     }
 
     /**
-     * Adds a product to the specified user's cart or updates its quantity if already present.
+     * Adds a product to the specified user's cart or updates its quantity if
+     * already present.
+     *
      * @param userId The ID of the user whose cart to modify.
      * @param productId The ID of the product to add.
      * @param quantity The quantity to add/update.
@@ -65,9 +72,9 @@ public class CartService {
 
         Cart userCart = getOrCreateCartForUser(userId); // Use the userId parameter
 
-        // ... (rest of the logic, including productCatalogServiceClient call) ...
-        ProductDto productDto = productCatalogServiceClient.getProductById(productId);
-        if (productDto == null) {
+        Mono<ProductDto> prdMono = productIntegrationService.getProductByIdWebClient(productId);
+        ProductDto productDto = prdMono.block();
+        if (prdMono == null || productDto == null) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
 
@@ -87,8 +94,10 @@ public class CartService {
     }
 
     /**
-     * Retrieves the specified user's cart with all its items, enriched with User and Product details.
-     * Returns a DTO (CartDto) for better API representation.
+     * Retrieves the specified user's cart with all its items, enriched with
+     * User and Product details. Returns a DTO (CartDto) for better API
+     * representation.
+     *
      * @param userId The ID of the user whose cart to retrieve.
      * @return The CartDto object of the user.
      * @throws ResourceNotFoundException if the user or their cart is not found.
@@ -99,46 +108,49 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user ID: " + userId));
 
         UserDto userDto = null;
-        
-                
-        Set<CartItemDto> cartItemDtos =  userCart.getItems().stream()
+
+        Set<CartItemDto> cartItemDtos = userCart.getItems().stream()
                 .map(item -> {
                     CartItemDto cartItemDto = new CartItemDto();
-                    ProductDto productDto = productCatalogServiceClient.getProductById(item.getProductId());
+                    Mono<ProductDto> prdMono
+                            = productIntegrationService
+                                    .getProductByIdWebClient(item.getProductId());
+                    ProductDto productDto = prdMono.block();
                     if (productDto == null) {
                         System.err.println("Product details not found for productId: " + item.getProductId() + " in Product Catalog Service.");
                         return cartItemDto; //COME BACK - SHOULD RETURN ERROR HERE
                     }
-                    
+
                     cartItemDto.setId(item.getId());
                     cartItemDto.setProduct(productDto);
                     cartItemDto.setQuantity(item.getQuantity());
-                    
-                    
+
                     return cartItemDto;
                 })
                 .collect(Collectors.toSet());
-        
+
         BigDecimal totalAmount = cartItemDtos.stream()
-            .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         CartDto cartDto = new CartDto();
         cartDto.setId(userId);
         cartDto.setItems(cartItemDtos);
         cartDto.setUser(userDto);
         cartDto.setTotalAmount(totalAmount);
-        
+
         return cartDto;
     }
 
     /**
      * Updates the quantity of a specific product in the specified user's cart.
+     *
      * @param userId The ID of the user whose cart to modify.
      * @param productId The ID of the product whose quantity to update.
      * @param newQuantity The new quantity for the product.
      * @return The updated CartItem, or null if the item was removed.
-     * @throws ResourceNotFoundException if the product or cart item is not found.
+     * @throws ResourceNotFoundException if the product or cart item is not
+     * found.
      * @throws IllegalArgumentException if newQuantity is negative.
      */
     @Transactional
@@ -149,7 +161,10 @@ public class CartService {
 
         Cart userCart = getOrCreateCartForUser(userId); // Use the userId parameter
 
-        ProductDto productDto = productCatalogServiceClient.getProductById(productId);
+        Mono<ProductDto> prdMono 
+                = productIntegrationService
+                        .getProductByIdWebClient(productId);
+        ProductDto productDto = prdMono.block();
         if (productDto == null) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
@@ -170,9 +185,11 @@ public class CartService {
 
     /**
      * Removes a specific product from the specified user's cart.
+     *
      * @param userId The ID of the user whose cart to modify.
      * @param productId The ID of the product to remove.
-     * @throws ResourceNotFoundException if the product or cart item is not found.
+     * @throws ResourceNotFoundException if the product or cart item is not
+     * found.
      */
     @Transactional
     public void removeCartItem(Long userId, Long productId) { // Added userId parameter

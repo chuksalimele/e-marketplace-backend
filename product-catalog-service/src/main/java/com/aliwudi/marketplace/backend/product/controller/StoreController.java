@@ -5,17 +5,15 @@ import com.aliwudi.marketplace.backend.product.model.Store;
 import com.aliwudi.marketplace.backend.product.service.StoreService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.data.web.SortDefault;
+// Removed Page and Pageable imports as they are not typically used with reactive repositories
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
+import reactor.core.publisher.Mono; // NEW: Import Mono for reactive single results
+import java.util.List; // Still useful for collecting Flux into a List
+import org.springframework.web.server.ResponseStatusException; // For reactive error handling
 
 @RestController
 @RequestMapping("/api/stores")
@@ -30,43 +28,58 @@ public class StoreController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')") // Only sellers/admins can create stores
-    public ResponseEntity<Store> createStore(@Valid @RequestBody StoreRequest storeRequest) {
-        Store createdStore = storeService.createStore(storeRequest);
-        return new ResponseEntity<>(createdStore, HttpStatus.CREATED);
+    public Mono<ResponseEntity<Store>> createStore(@Valid @RequestBody StoreRequest storeRequest) {
+        return storeService.createStore(storeRequest)
+                .map(createdStore -> new ResponseEntity<>(createdStore, HttpStatus.CREATED))
+                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     @GetMapping
-    public ResponseEntity<List<Store>> getAllStores() {
-        List<Store> stores = storeService.getAllStores();
-        return new ResponseEntity<>(stores, HttpStatus.OK);
+    public Mono<ResponseEntity<List<Store>>> getAllStores() {
+        return storeService.getAllStores()
+                .collectList() // Collect Flux of stores into a List
+                .map(stores -> new ResponseEntity<>(stores, HttpStatus.OK));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Store> getStoreById(@PathVariable Long id) {
+    public Mono<ResponseEntity<Store>> getStoreById(@PathVariable Long id) {
         return storeService.getStoreById(id)
                 .map(store -> new ResponseEntity<>(store, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND)); // Handle not found case
     }
 
-    @GetMapping("/{sellerId}")
-    public ResponseEntity<Page<Store>> getStoresBySeller(@PathVariable Long sellerId , 
-            @PageableDefault(page = 0, size = 20)
-            Pageable pageable) {
-        Page<Store> stores = storeService.getStoresBySeller(sellerId, pageable);
-        return new ResponseEntity<>(stores, HttpStatus.OK);
+    // MODIFIED: getStoresBySeller to use reactive pagination parameters
+    @GetMapping("/by-seller/{sellerId}") // Changed path to avoid ambiguity with getStoreById
+    public Mono<ResponseEntity<List<Store>>> getStoresBySeller(
+            @PathVariable Long sellerId,
+            @RequestParam(defaultValue = "0") Long offset, // Reactive pagination: offset
+            @RequestParam(defaultValue = "20") Integer limit) { // Reactive pagination: limit
+
+        return storeService.getStoresBySeller(sellerId, offset, limit)
+                .collectList() // Collect Flux of stores into a List
+                .map(stores -> new ResponseEntity<>(stores, HttpStatus.OK));
+    }
+
+    // NEW: Endpoint to get the total count of stores for a specific seller
+    @GetMapping("/by-seller/{sellerId}/count")
+    public Mono<ResponseEntity<Long>> countStoresBySeller(@PathVariable Long sellerId) {
+        return storeService.countStoresBySeller(sellerId)
+                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    public ResponseEntity<Store> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
-        Store updatedStore = storeService.updateStore(id, storeRequest);
-        return new ResponseEntity<>(updatedStore, HttpStatus.OK);
+    public Mono<ResponseEntity<Store>> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
+        return storeService.updateStore(id, storeRequest)
+                .map(updatedStore -> new ResponseEntity<>(updatedStore, HttpStatus.OK))
+                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteStore(@PathVariable Long id) {
-        storeService.deleteStore(id);
+    @ResponseStatus(HttpStatus.NO_CONTENT) // Sets 204 No Content on successful deletion
+    public Mono<Void> deleteStore(@PathVariable Long id) {
+        return storeService.deleteStore(id)
+                .onErrorResume(e -> Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting store", e)));
     }
 }

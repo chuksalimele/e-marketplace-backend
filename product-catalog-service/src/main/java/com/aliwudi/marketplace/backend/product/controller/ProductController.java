@@ -1,22 +1,20 @@
-// ProductController.java
 package com.aliwudi.marketplace.backend.product.controller;
 
 import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
 import com.aliwudi.marketplace.backend.product.model.Product;
 import com.aliwudi.marketplace.backend.product.service.ProductService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.data.web.SortDefault;
+// Remove Page and Pageable imports
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
+import reactor.core.publisher.Mono; // NEW: Import Mono for reactive single results
 
-import java.util.List; // Keep this if other methods return List, or remove if all return Page
+// Remove List import
 
 @RestController
 @RequestMapping("/api/products")
@@ -31,110 +29,154 @@ public class ProductController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    public ResponseEntity<Product> createProduct(@Valid @RequestBody ProductRequest productRequest) {
-        Product createdProduct = productService.createProduct(productRequest);
-        return new ResponseEntity<>(createdProduct, HttpStatus.CREATED);
+    public Mono<ResponseEntity<Product>> createProduct(@Valid @RequestBody ProductRequest productRequest) {
+        return productService.createProduct(productRequest)
+                .map(createdProduct -> new ResponseEntity<>(createdProduct, HttpStatus.CREATED));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest productRequest) {
-        Product updatedProduct = productService.updateProduct(id, productRequest);
-        return new ResponseEntity<>(updatedProduct, HttpStatus.OK);
+    public Mono<ResponseEntity<Product>> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest productRequest) {
+        return productService.updateProduct(id, productRequest)
+                .map(updatedProduct -> new ResponseEntity<>(updatedProduct, HttpStatus.OK));
     }
 
-    // MODIFIED: getAllProducts to support pagination, sorting, and optional location filter
-    // Example usage: GET /api/products?page=0&size=10&sort=name,asc&location=NewYork
-    // Default: page=0, size=20, sort by id ascending
     @GetMapping
-    public ResponseEntity<Page<Product>> getAllProducts(
-            @RequestParam(required = false) String location, // Optional location parameter
-            @PageableDefault(page = 0, size = 20) // Default page 0, size 20
-            @SortDefault(sort = "id", direction = Sort.Direction.ASC) // Default sort by id ascending
-            Pageable pageable) {
+    public Mono<ResponseEntity<List<Product>>> getAllProducts(
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") Long offset, // Reactive pagination: offset
+            @RequestParam(defaultValue = "20") Integer limit) { // Reactive pagination: limit
+        Flux<Product> productsFlux;
 
-        Page<Product> products;
         if (location != null && !location.trim().isEmpty()) {
-            products = productService.getAllProductsByLocation(location, pageable);
+            productsFlux = productService.getAllProductsByLocation(location, offset, limit);
         } else {
-            products = productService.getAllProducts(pageable);
+            productsFlux = productService.getAllProducts(offset, limit);
         }
-        return new ResponseEntity<>(products, HttpStatus.OK);
+
+        // Collect Flux into a List and wrap in ResponseEntity
+        return productsFlux.collectList()
+                .map(products -> new ResponseEntity<>(products, HttpStatus.OK));
+    }
+
+    // NEW: Endpoint to get total count for all products (useful for pagination metadata)
+    @GetMapping("/count")
+    public Mono<ResponseEntity<Long>> countAllProducts(@RequestParam(required = false) String location) {
+        Mono<Long> countMono;
+        if (location != null && !location.trim().isEmpty()) {
+            countMono = productService.countProductsByLocation(location);
+        } else {
+            countMono = productService.countAllProducts();
+        }
+        return countMono.map(count -> new ResponseEntity<>(count, HttpStatus.OK));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
-        Product product = productService.getProductById(id);
-        return new ResponseEntity<>(product, HttpStatus.OK);
+    public Mono<ResponseEntity<Product>> getProductById(@PathVariable Long id) {
+        return productService.getProductById(id)
+                .map(product -> new ResponseEntity<>(product, HttpStatus.OK));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteProduct(@PathVariable Long id) {
-        productService.deleteProduct(id);
+    @ResponseStatus(HttpStatus.NO_CONTENT) // This will set the status code for success
+    public Mono<Void> deleteProduct(@PathVariable Long id) {
+        return productService.deleteProduct(id);
     }
 
-    // MODIFIED: Endpoint to get products by category with pagination, sorting, and optional location
-    // Example usage: GET /api/products/category/Electronics?location=London&page=0&size=10
     @GetMapping("/category/{categoryName}")
-    public ResponseEntity<Page<Product>> getProductsByCategory(
+    public Mono<ResponseEntity<List<Product>>> getProductsByCategory(
             @PathVariable String categoryName,
-            @RequestParam(required = false) String location, // NEW: Optional location parameter
-            @PageableDefault(page = 0, size = 20)
-            @SortDefault(sort = "name", direction = Sort.Direction.ASC)
-            Pageable pageable) {
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        Flux<Product> productsFlux;
 
-        Page<Product> products;
         if (location != null && !location.trim().isEmpty()) {
-            // Call a new service method that handles both category and location
-            products = productService.getProductsByCategoryAndLocation(categoryName, location, pageable);
+            productsFlux = productService.getProductsByCategoryAndLocation(categoryName, location, offset, limit);
         } else {
-            // Existing behavior: search by category only
-            products = productService.getProductsByCategory(categoryName, pageable);
+            productsFlux = productService.getProductsByCategory(categoryName, offset, limit);
         }
-        return new ResponseEntity<>(products, HttpStatus.OK);
+
+        return productsFlux.collectList()
+                .map(products -> new ResponseEntity<>(products, HttpStatus.OK));
     }
 
-    // MODIFIED: Endpoint to get products by seller store with pagination, sorting, and optional location
-    // Example usage: GET /api/products/seller/store/123?location=Paris&page=0&size=10
+    // NEW: Endpoint to get total count for products by category
+    @GetMapping("/category/{categoryName}/count")
+    public Mono<ResponseEntity<Long>> countProductsByCategory(
+            @PathVariable String categoryName,
+            @RequestParam(required = false) String location) {
+        Mono<Long> countMono;
+        if (location != null && !location.trim().isEmpty()) {
+            countMono = productService.countProductsByCategoryAndLocation(categoryName, location);
+        } else {
+            countMono = productService.countProductsByCategory(categoryName);
+        }
+        return countMono.map(count -> new ResponseEntity<>(count, HttpStatus.OK));
+    }
+
     @GetMapping("/store/{storeId}")
-    public ResponseEntity<Page<Product>> getProductsByStore(
+    public Mono<ResponseEntity<List<Product>>> getProductsByStore(
             @PathVariable Long storeId,
-            @RequestParam(required = false) String location, // NEW: Optional location parameter
-            @PageableDefault(page = 0, size = 20)
-            @SortDefault(sort = "name", direction = Sort.Direction.ASC)
-            Pageable pageable) {
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        Flux<Product> productsFlux;
 
-        Page<Product> products;
         if (location != null && !location.trim().isEmpty()) {
-            // Call a new service method that handles both store and location
-            products = productService.getProductsByStoreAndLocation(storeId, location, pageable);
+            productsFlux = productService.getProductsByStoreAndLocation(storeId, location, offset, limit);
         } else {
-            // Existing behavior: search by seller only
-            products = productService.getProductsByStore(storeId, pageable);
+            productsFlux = productService.getProductsByStore(storeId, offset, limit);
         }
-        return new ResponseEntity<>(products, HttpStatus.OK);
+
+        return productsFlux.collectList()
+                .map(products -> new ResponseEntity<>(products, HttpStatus.OK));
     }
 
-    // MODIFIED: Endpoint to search products by query AND optional location
-    // Example usage: GET /api/products/search?query=laptop&location=NewYork&page=0&size=10
-    @GetMapping("/search")
-    public ResponseEntity<Page<Product>> searchProducts(
-            @RequestParam String product_name,
-            @RequestParam(required = false) String location, // NEW: Optional location parameter
-            @PageableDefault(page = 0, size = 20)
-            @SortDefault(sort = "name", direction = Sort.Direction.ASC)
-            Pageable pageable) {
-
-        Page<Product> products;
+    // NEW: Endpoint to get total count for products by store
+    @GetMapping("/store/{storeId}/count")
+    public Mono<ResponseEntity<Long>> countProductsByStore(
+            @PathVariable Long storeId,
+            @RequestParam(required = false) String location) {
+        Mono<Long> countMono;
         if (location != null && !location.trim().isEmpty()) {
-            // Call a new service method that handles both query and location
-            products = productService.searchProductsByNameAndLocation(product_name, location, pageable);
+            countMono = productService.countProductsByStoreAndLocation(storeId, location);
         } else {
-            // Existing behavior: search by query only
-            products = productService.searchProducts(product_name, pageable);
+            countMono = productService.countProductsByStore(storeId);
         }
-        return new ResponseEntity<>(products, HttpStatus.OK);
+        return countMono.map(count -> new ResponseEntity<>(count, HttpStatus.OK));
+    }
+
+    @GetMapping("/search")
+    public Mono<ResponseEntity<List<Product>>> searchProducts(
+            @RequestParam String product_name,
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        Flux<Product> productsFlux;
+
+        if (location != null && !location.trim().isEmpty()) {
+            productsFlux = productService.searchProductsByNameAndLocation(product_name, location, offset, limit);
+        } else {
+            productsFlux = productService.searchProducts(product_name, offset, limit);
+        }
+
+        return productsFlux.collectList()
+                .map(products -> new ResponseEntity<>(products, HttpStatus.OK));
+    }
+
+    // NEW: Endpoint to get total count for search results
+    @GetMapping("/search/count")
+    public Mono<ResponseEntity<Long>> countSearchProducts(
+            @RequestParam String product_name,
+            @RequestParam(required = false) String location) {
+        Mono<Long> countMono;
+        if (location != null && !location.trim().isEmpty()) {
+            countMono = productService.countSearchProductsByNameAndLocation(product_name, location);
+        } else {
+            countMono = productService.countSearchProducts(product_name);
+        }
+        return countMono.map(count -> new ResponseEntity<>(count, HttpStatus.OK));
     }
 }

@@ -2,21 +2,27 @@
 package com.aliwudi.marketplace.backend.user.repository;
 
 import com.aliwudi.marketplace.backend.user.model.User;
-import org.springframework.data.jpa.repository.JpaRepository; // Provides basic CRUD operations
-import org.springframework.stereotype.Repository; // Marks this as a Spring Repository component
+import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
+import org.springframework.stereotype.Repository;
 
-import java.util.Optional; // Used for methods that might return no result
+import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
+
+// Remove old JpaRepository import and Optional import
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-    // JpaRepository automatically provides methods like save(), findById(), findAll(), deleteById().
+// NEW: Extend ReactiveCrudRepository instead of JpaRepository
+public interface UserRepository extends ReactiveCrudRepository<User, Long> {
+    // ReactiveCrudRepository automatically provides reactive versions of save(), findById(), findAll(), deleteById().
 
-    // Custom query method: Find a User by their username. Returns Optional to handle cases where user is not found.
-    Optional<User> findByUsername(String username);
+    // Old: Optional<User> findByUsername(String username);
+    // NEW: Returns Mono for zero or one result. An empty Mono means no user found.
+    Mono<User> findByUsername(String username);
 
-    // Custom query method: Check if a user with the given username already exists.
-    Boolean existsByUsername(String username);
+    // Old: Boolean existsByUsername(String username);
+    // NEW: Returns Mono<Boolean> for the existence check.
+    Mono<Boolean> existsByUsername(String username);
 
-    // Custom query method: Check if a user with the given email already exists.
-    Boolean existsByEmail(String email);
+    // Old: Boolean existsByEmail(String email);
+    // NEW: Returns Mono<Boolean> for the existence check.
+    Mono<Boolean> existsByEmail(String email);
 }

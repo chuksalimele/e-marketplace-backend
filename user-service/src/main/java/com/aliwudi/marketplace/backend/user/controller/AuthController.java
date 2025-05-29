@@ -1,139 +1,112 @@
-// AuthController.java
 package com.aliwudi.marketplace.backend.user.controller;
 
 import com.aliwudi.marketplace.backend.user.model.Role;
-import com.aliwudi.marketplace.backend.user.dto.JwtResponse;
 import com.aliwudi.marketplace.backend.user.dto.MessageResponse;
 import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import com.aliwudi.marketplace.backend.user.model.User;
-import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
 import com.aliwudi.marketplace.backend.user.dto.SignupRequest;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
-import com.aliwudi.marketplace.backend.user.security.jwt.JwtUtils;
-import com.aliwudi.marketplace.backend.user.service.UserDetailsImpl;
-import jakarta.validation.Valid; // For @Valid annotation
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Collectors; // Needed for collectList if you use it directly after map
 
-@CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port if different!
-                                                                // For example, "http://localhost:50000" or similar
-@RestController // Marks this as a REST controller
-@RequestMapping("/api/auth") // Base path for authentication endpoints
+@CrossOrigin(origins = "http://localhost:8080", maxAge = 3600)
+@RestController
+@RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    AuthenticationManager authenticationManager; // To authenticate users
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder encoder;
 
     @Autowired
-    UserRepository userRepository; // To save/check users in DB
-
-    @Autowired
-    RoleRepository roleRepository; // To get roles from DB
-
-    @Autowired
-    PasswordEncoder encoder; // To hash passwords
-
-    @Autowired
-    JwtUtils jwtUtils; // To generate JWTs
-
-    // --- User Sign-In (Login) ---
-    // Handles POST requests to /api/auth/signin
-    @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-
-        // Authenticate the user using Spring Security's AuthenticationManager
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
-
-        // If authentication is successful, set the authenticated user in the SecurityContext
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // Generate a JWT token for the authenticated user
-        String jwt = jwtUtils.generateJwtToken(authentication);
-
-        // Get the UserDetails (our custom UserDetailsImpl) from the authentication object
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        // Extract user roles and convert them to a list of strings
-        List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority())
-                .collect(Collectors.toList());
-
-        // Return the JWT token and user info in the response
-        return ResponseEntity.ok(new JwtResponse(jwt,
-                                                userDetails.getId(),
-                                                userDetails.getUsername(),
-                                                userDetails.getEmail(),
-                                                roles));
+    public AuthController(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder encoder) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.encoder = encoder;
     }
 
-    // --- User Sign-Up (Registration) ---
-    // Handles POST requests to /api/auth/signup
     @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
-        // Check if username already exists
-        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
-            return ResponseEntity
-                    .badRequest()
-                    .body(new MessageResponse("Error: Username is already taken!"));
-        }
+    public Mono<ResponseEntity<MessageResponse>> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+        // Check if username already exists reactively
+        return userRepository.existsByUsername(signUpRequest.getUsername())
+                .flatMap(usernameExists -> {
+                    if (usernameExists) {
+                        return Mono.just(new ResponseEntity<>(new MessageResponse("Error: Username is already taken!"), HttpStatus.BAD_REQUEST));
+                    }
+                    // If username does not exist, then check email existence.
+                    // This is the correct way to chain an asynchronous check.
+                    return userRepository.existsByEmail(signUpRequest.getEmail())
+                            .flatMap(emailExists -> { // <-- Correctly unwrap emailExists Mono<Boolean>
+                                if (emailExists) { // Now emailExists is a boolean
+                                    return Mono.just(new ResponseEntity<>(new MessageResponse("Error: Email is already in use!"), HttpStatus.BAD_REQUEST));
+                                }
 
-        // Check if email already exists
-        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            return ResponseEntity
-                    .badRequest()
-                    .body(new MessageResponse("Error: Email is already in use!"));
-        }
+                                // Create new user's account
+                                User user = new User(signUpRequest.getUsername(),
+                                        signUpRequest.getEmail(),
+                                        encoder.encode(signUpRequest.getPassword())); // Hash the password!
 
-        // Create new user's account
-        User user = new User(signUpRequest.getUsername(),
-                             signUpRequest.getEmail(),
-                             encoder.encode(signUpRequest.getPassword())); // Hash the password!
+                                Set<String> strRoles = signUpRequest.getRole();
+                                Set<Role> roles = new HashSet<>();
 
-        Set<String> strRoles = signUpRequest.getRole();
-        Set<Role> roles = new HashSet<>();
+                                // Logic to assign roles.
+                                // We need to ensure that the roles are fetched reactively and
+                                // the `roles` Set is populated before `userRepository.save(user)` is called.
 
-        if (strRoles == null) {
-            // If no role is specified, default to ROLE_USER
-            Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                    .orElseThrow(() -> new RuntimeException("Error: Role 'ROLE_USER' is not found."));
-            roles.add(userRole);
-        } else {
-            strRoles.forEach(role -> {
-                switch (role) {
-                    case "admin":
-                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                                .orElseThrow(() -> new RuntimeException("Error: Role 'ROLE_ADMIN' is not found."));
-                        roles.add(adminRole);
-                        break;
-                    case "seller":
-                        Role sellerRole = roleRepository.findByName(ERole.ROLE_SELLER)
-                                .orElseThrow(() -> new RuntimeException("Error: Role 'ROLE_SELLER' is not found."));
-                        roles.add(sellerRole);
-                        break;
-                    default: // Default to user role if unknown or "user" is specified
-                        Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                                .orElseThrow(() -> new RuntimeException("Error: Role 'ROLE_USER' is not found."));
-                        roles.add(userRole);
-                }
-            });
-        }
+                                // This will return a Mono<Set<Role>> or Mono<Role> depending on single/multiple
+                                Mono<Set<Role>> fetchedRolesMono;
 
-        user.setRoles(roles); // Set the roles for the new user
-        userRepository.save(user); // Save the new user to the database
+                                if (strRoles == null || strRoles.isEmpty()) {
+                                    // Default to ROLE_USER if no role is specified or the set is empty
+                                    fetchedRolesMono = roleRepository.findByName(ERole.ROLE_USER)
+                                            .switchIfEmpty(Mono.error(new RuntimeException("Error: Role 'ROLE_USER' is not found.")))
+                                            .map(role -> {
+                                                Set<Role> defaultRoles = new HashSet<>();
+                                                defaultRoles.add(role);
+                                                return defaultRoles;
+                                            });
+                                } else {
+                                    // Handle multiple roles reactively
+                                    fetchedRolesMono = Flux.fromIterable(strRoles)
+                                            .flatMap(roleName -> {
+                                                ERole eRole;
+                                                switch (roleName.toLowerCase()) {
+                                                    case "admin":
+                                                        eRole = ERole.ROLE_ADMIN;
+                                                        break;
+                                                    case "seller":
+                                                        eRole = ERole.ROLE_SELLER;
+                                                        break;
+                                                    default:
+                                                        eRole = ERole.ROLE_USER;
+                                                        break;
+                                                }
+                                                return roleRepository.findByName(eRole)
+                                                        .switchIfEmpty(Mono.error(new RuntimeException("Error: Role '" + eRole.name() + "' is not found.")));
+                                            })
+                                            .collect(Collectors.toSet()); // Collect into a Set<Role>
+                                }
 
-        return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
+                                return fetchedRolesMono
+                                        .flatMap(assignedRoles -> { // FlatMap to work with the fetched roles
+                                            user.setRoles(assignedRoles); // Set the roles for the new user
+                                            return userRepository.save(user); // Save the new user to the database
+                                        })
+                                        .thenReturn(new ResponseEntity<>(new MessageResponse("User registered successfully!"), HttpStatus.OK))
+                                        .onErrorResume(RuntimeException.class, e ->
+                                                Mono.just(new ResponseEntity<>(new MessageResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR)));
+                            });
+                });
     }
 }

@@ -9,11 +9,11 @@ import com.aliwudi.marketplace.backend.product.repository.StoreRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Page; // NEW IMPORT
-import org.springframework.data.domain.Pageable; // NEW IMPORT
+// Remove Page and Pageable imports
+import reactor.core.publisher.Mono; // NEW: Import Mono for reactive types
+import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
 
-import java.util.List;
-import java.util.Optional;
+// Remove List and Optional imports
 
 @Service
 public class StoreService {
@@ -28,61 +28,80 @@ public class StoreService {
     }
 
     @Transactional
-    public Store createStore(StoreRequest storeRequest) {
-        Seller seller = sellerRepository.findById(storeRequest.getSellerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId()));
+    public Mono<Store> createStore(StoreRequest storeRequest) {
+        // Find the Seller reactively
+        return sellerRepository.findById(storeRequest.getSellerId())
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId())))
+                .flatMap(seller -> {
+                    Store store = new Store();
+                    store.setName(storeRequest.getName());
+                    store.setLocation(storeRequest.getLocation());
+                    store.setDescription(storeRequest.getDescription());
+                    store.setContactInfo(storeRequest.getContactInfo());
+                    store.setProfileImageUrl(storeRequest.getProfileImageUrl());
+                    store.setRating(storeRequest.getRating());
+                    store.setCategories(storeRequest.getCategories());
+                    store.setSeller(seller); // Link to Seller
 
-        Store store = new Store();
-        store.setName(storeRequest.getName());
-        store.setLocation(storeRequest.getLocation());
-        store.setDescription(storeRequest.getDescription());
-        store.setContactInfo(storeRequest.getContactInfo());
-        store.setProfileImageUrl(storeRequest.getProfileImageUrl());
-        store.setRating(storeRequest.getRating());
-        store.setCategories(storeRequest.getCategories());
-        store.setSeller(seller);
-
-        return storeRepository.save(store);
+                    return storeRepository.save(store); // Save the new store
+                });
     }
 
-    public List<Store> getAllStores() {
-        return storeRepository.findAll();
+    public Flux<Store> getAllStores() {
+        return storeRepository.findAll(); // findAll now returns Flux<Store>
     }
 
-    public Optional<Store> getStoreById(Long id) {
-        return storeRepository.findById(id);
+    public Mono<Store> getStoreById(Long id) {
+        return storeRepository.findById(id); // findById now returns Mono<Store>
     }
 
-    public Page<Store> getStoresBySeller(Long sellerId, Pageable pageable) {
-        return storeRepository.findBySeller_Id(sellerId, pageable);
+    // MODIFIED: getStoresBySeller to accept offset and limit for pagination
+    public Flux<Store> getStoresBySeller(Long sellerId, Long offset, Integer limit) {
+        // Assuming findBySeller_Id in StoreRepository is updated to accept offset and limit
+        return storeRepository.findBySeller_Id(sellerId, offset, limit);
     }
 
-    // Add update and delete methods for Store
-    @Transactional
-    public Store updateStore(Long id, StoreRequest storeRequest) {
-        Store existingStore = storeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found with id: " + id));
-
-        Seller seller = sellerRepository.findById(storeRequest.getSellerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId()));
-
-        existingStore.setName(storeRequest.getName());
-        existingStore.setLocation(storeRequest.getLocation());
-        existingStore.setDescription(storeRequest.getDescription());
-        existingStore.setContactInfo(storeRequest.getContactInfo());
-        existingStore.setProfileImageUrl(storeRequest.getProfileImageUrl());
-        existingStore.setRating(storeRequest.getRating());
-        existingStore.setCategories(storeRequest.getCategories());
-        existingStore.setSeller(seller);
-
-        return storeRepository.save(existingStore);
+    // NEW: Add a count method for pagination metadata
+    public Mono<Long> countStoresBySeller(Long sellerId) {
+        return storeRepository.countBySeller_Id(sellerId);
     }
+
 
     @Transactional
-    public void deleteStore(Long id) {
-        if (!storeRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Store not found with id: " + id);
-        }
-        storeRepository.deleteById(id);
+    public Mono<Store> updateStore(Long id, StoreRequest storeRequest) {
+        // Find existing store and seller reactively, then update
+        Mono<Store> existingStoreMono = storeRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Store not found with id: " + id)));
+
+        Mono<Seller> sellerMono = sellerRepository.findById(storeRequest.getSellerId())
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId())));
+
+        return Mono.zip(existingStoreMono, sellerMono)
+                .flatMap(tuple -> {
+                    Store existingStore = tuple.getT1();
+                    Seller seller = tuple.getT2();
+
+                    existingStore.setName(storeRequest.getName());
+                    existingStore.setLocation(storeRequest.getLocation());
+                    existingStore.setDescription(storeRequest.getDescription());
+                    existingStore.setContactInfo(storeRequest.getContactInfo());
+                    existingStore.setProfileImageUrl(storeRequest.getProfileImageUrl());
+                    existingStore.setRating(storeRequest.getRating());
+                    existingStore.setCategories(storeRequest.getCategories());
+                    existingStore.setSeller(seller); // Link to the new seller if changed
+
+                    return storeRepository.save(existingStore); // Save the updated store
+                });
+    }
+
+    @Transactional
+    public Mono<Void> deleteStore(Long id) {
+        return storeRepository.existsById(id) // existsById returns Mono<Boolean>
+                .flatMap(exists -> {
+                    if (!exists) {
+                        return Mono.error(new ResourceNotFoundException("Store not found with id: " + id));
+                    }
+                    return storeRepository.deleteById(id); // deleteById should return Mono<Void>
+                });
     }
 }

@@ -1,15 +1,16 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
-
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryRequest;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryResponse;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryUpdateRequest;
 import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
-import com.aliwudi.marketplace.backend.lgtmed.service.*;
+import com.aliwudi.marketplace.backend.lgtmed.service.DeliveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono; // NEW: Import Mono
+import org.springframework.web.server.ResponseStatusException; // NEW: For reactive error handling
 
 @RestController
 @RequestMapping("/api/deliveries")
@@ -19,38 +20,48 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     @PostMapping
-    public ResponseEntity<DeliveryResponse> createDelivery(@RequestBody DeliveryRequest request) {
-        Delivery delivery = deliveryService.createDelivery(
+    public Mono<ResponseEntity<DeliveryResponse>> createDelivery(@RequestBody DeliveryRequest request) {
+        return deliveryService.createDelivery(
                 request.getOrderId(),
                 request.getRecipientName(),
                 request.getRecipientAddress(),
                 request.getDeliveryAgent(),
                 request.getEstimatedDeliveryDate()
-        );
-        return ResponseEntity.status(HttpStatus.CREATED).body(convertToDto(delivery, "Delivery created successfully"));
+            )
+            .map(delivery -> ResponseEntity.status(HttpStatus.CREATED).body(convertToDto(delivery, "Delivery created successfully")))
+            .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     @GetMapping("/order/{orderId}")
-    public ResponseEntity<DeliveryResponse> getDeliveryByOrderId(@PathVariable String orderId) {
-        Delivery delivery = deliveryService.getDeliveryByOrderId(orderId);
-        return ResponseEntity.ok(convertToDto(delivery, "Delivery found"));
+    public Mono<ResponseEntity<DeliveryResponse>> getDeliveryByOrderId(@PathVariable String orderId) {
+        return deliveryService.getDeliveryByOrderId(orderId)
+            .map(delivery -> ResponseEntity.ok(convertToDto(delivery, "Delivery found")))
+            .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Delivery not found for orderId: " + orderId)))
+            .onErrorResume(ResponseStatusException.class, Mono::error) // Re-throw as WebFlux exception
+            .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     @GetMapping("/track/{trackingNumber}")
-    public ResponseEntity<DeliveryResponse> getDeliveryByTrackingNumber(@PathVariable String trackingNumber) {
-        Delivery delivery = deliveryService.getDeliveryByTrackingNumber(trackingNumber);
-        return ResponseEntity.ok(convertToDto(delivery, "Delivery found"));
+    public Mono<ResponseEntity<DeliveryResponse>> getDeliveryByTrackingNumber(@PathVariable String trackingNumber) {
+        return deliveryService.getDeliveryByTrackingNumber(trackingNumber)
+            .map(delivery -> ResponseEntity.ok(convertToDto(delivery, "Delivery found")))
+            .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Delivery not found for trackingNumber: " + trackingNumber)))
+            .onErrorResume(ResponseStatusException.class, Mono::error) // Re-throw as WebFlux exception
+            .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     @PutMapping("/update-status")
-    public ResponseEntity<DeliveryResponse> updateDeliveryStatus(@RequestBody DeliveryUpdateRequest request) {
-        Delivery delivery = deliveryService.updateDeliveryStatus(
+    public Mono<ResponseEntity<DeliveryResponse>> updateDeliveryStatus(@RequestBody DeliveryUpdateRequest request) {
+        return deliveryService.updateDeliveryStatus(
                 request.getTrackingNumber(),
                 request.getNewStatus(),
                 request.getCurrentLocation(),
                 request.getNotes()
-        );
-        return ResponseEntity.ok(convertToDto(delivery, "Delivery status updated"));
+            )
+            .map(delivery -> ResponseEntity.ok(convertToDto(delivery, "Delivery status updated")))
+            .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Delivery not found for update, trackingNumber: " + request.getTrackingNumber())))
+            .onErrorResume(ResponseStatusException.class, Mono::error) // Re-throw as WebFlux exception
+            .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
     }
 
     private DeliveryResponse convertToDto(Delivery delivery, String message) {

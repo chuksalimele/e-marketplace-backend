@@ -1,15 +1,14 @@
-// SellerService.java
 package com.aliwudi.marketplace.backend.product.service;
 
 import com.aliwudi.marketplace.backend.product.model.Seller;
 import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;    // NEW IMPORT
-import org.springframework.data.domain.Pageable; // NEW IMPORT
+// Remove Page and Pageable imports
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono; // NEW: Import Mono for reactive types
+import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
 
-import java.util.List;
-import java.util.Optional;
+// Remove Optional import
 
 @Service
 public class SellerService {
@@ -23,25 +22,40 @@ public class SellerService {
 
     // --- CRUD Operations ---
 
-    // MODIFIED: getAllSellers to accept Pageable
-    public Page<Seller> getAllSellers(Pageable pageable) {
-        return sellerRepository.findAll(pageable);
+    // MODIFIED: getAllSellers to accept offset and limit for pagination
+    public Flux<Seller> getAllSellers(Long offset, Integer limit) {
+        // Assuming your reactive SellerRepository now has a findAll method that accepts offset and limit
+        return sellerRepository.findAll(offset, limit);
     }
 
-    public Optional<Seller> getSellerById(Long id) {
+    // NEW: Add a count method for pagination metadata
+    public Mono<Long> countAllSellers() {
+        return sellerRepository.count();
+    }
+
+    public Mono<Seller> getSellerById(Long id) {
+        // findById now returns Mono<Seller>
         return sellerRepository.findById(id);
     }
 
-    public Seller saveSeller(Seller seller) {
+    public Mono<Seller> saveSeller(Seller seller) {
+        // save now returns Mono<Seller>
         return sellerRepository.save(seller);
     }
 
-    public void deleteSeller(Long id) {
-        sellerRepository.deleteById(id);
+    public Mono<Void> deleteSeller(Long id) {
+        // deleteById now returns Mono<Void>
+        return sellerRepository.deleteById(id);
     }
 
     // NEW: Search sellers by name with pagination and sorting
-    public Page<Seller> searchSellers(String searchTerm, Pageable pageable) {
-        return sellerRepository.findByNameContainingIgnoreCase(searchTerm, pageable);
+    public Flux<Seller> searchSellers(String searchTerm, Long offset, Integer limit) {
+        // Assuming your reactive SellerRepository has a method for searching with pagination
+        return sellerRepository.findByNameContainingIgnoreCase(searchTerm, offset, limit);
+    }
+
+    // NEW: Add a count method for search results pagination metadata
+    public Mono<Long> countSearchSellers(String searchTerm) {
+        return sellerRepository.countByNameContainingIgnoreCase(searchTerm);
     }
 }

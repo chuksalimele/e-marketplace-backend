@@ -1,110 +1,116 @@
-// SellerController.java (CORRECTED createSeller method)
 package com.aliwudi.marketplace.backend.product.controller;
 
-
 import com.aliwudi.marketplace.backend.product.model.Seller;
-import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
 import com.aliwudi.marketplace.backend.product.service.SellerService;
-import org.springframework.data.domain.Page;    // NEW IMPORT
-import org.springframework.data.domain.Pageable; // NEW IMPORT
-import org.springframework.data.domain.Sort;     // NEW IMPORT
-import org.springframework.data.web.PageableDefault; // NEW IMPORT
-import org.springframework.data.web.SortDefault;     // NEW IMPORT
+import org.springframework.beans.factory.annotation.Autowired;
+// Remove Page, Pageable, Sort, PageableDefault, SortDefault imports
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
+import reactor.core.publisher.Mono; // NEW: Import Mono for reactive single results
 
-import java.util.List; // Keep this import for non-paginated methods if they still exist
-import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List; // Keep this import for collecting Flux into a List
+// Remove Optional import
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
 @RequestMapping("/api/sellers")
 public class SellerController {
 
-    private final SellerRepository sellerRepository; // Keep if directly used in controller
-    private final SellerService sellerService; // NEW: Inject SellerService
+    // Removed direct SellerRepository injection from controller as service layer handles it.
+    private final SellerService sellerService;
 
     @Autowired
-    public SellerController(SellerRepository sellerRepository, SellerService sellerService) {
-        this.sellerRepository = sellerRepository;
-        this.sellerService = sellerService; // Initialize service
+    public SellerController(SellerService sellerService) {
+        this.sellerService = sellerService;
     }
 
     // Get all sellers - accessible by any authenticated user
-    // MODIFIED: getAllSellers to support pagination and sorting
-    // Example usage: GET /api/sellers?page=0&size=5&sort=name,desc
+    // MODIFIED: getAllSellers to support reactive pagination and sorting
+    // Example usage: GET /api/sellers?offset=0&limit=10
     @GetMapping
-    public ResponseEntity<Page<Seller>> getAllSellers(
-            @PageableDefault(page = 0, size = 10) // Default page 0, size 10
-            @SortDefault(sort = "name", direction = Sort.Direction.ASC) // Default sort by name ascending
-            Pageable pageable) {
-        
-        Page<Seller> sellers = sellerService.getAllSellers(pageable);
-        return new ResponseEntity<>(sellers, HttpStatus.OK);
+    public Mono<ResponseEntity<List<Seller>>> getAllSellers(
+            @RequestParam(defaultValue = "0") Long offset, // Reactive pagination: offset
+            @RequestParam(defaultValue = "10") Integer limit) { // Reactive pagination: limit
+
+        // Collect Flux into a List and wrap in ResponseEntity
+        return sellerService.getAllSellers(offset, limit)
+                .collectList()
+                .map(sellers -> new ResponseEntity<>(sellers, HttpStatus.OK));
+    }
+
+    // NEW: Endpoint to get total count for all sellers (useful for pagination metadata)
+    @GetMapping("/count")
+    public Mono<ResponseEntity<Long>> countAllSellers() {
+        return sellerService.countAllSellers()
+                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
     }
 
     // Get seller by ID - accessible by any authenticated user
     @GetMapping("/{id}")
-    public ResponseEntity<Seller> getSellerById(@PathVariable Long id) {
-        Optional<Seller> sellerData = sellerService.getSellerById(id); // Use service
-        return sellerData.map(seller -> new ResponseEntity<>(seller, HttpStatus.OK))
-                         .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public Mono<ResponseEntity<Seller>> getSellerById(@PathVariable Long id) {
+        return sellerService.getSellerById(id) // Use service, which returns Mono<Seller>
+                .map(seller -> new ResponseEntity<>(seller, HttpStatus.OK))
+                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND)); // Handle not found
     }
 
     // Create a new seller - Only for ADMINS
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Seller> createSeller(@RequestBody Seller seller) {
-        try {
-            Seller _seller = sellerService.saveSeller(seller); // Use service
-            return new ResponseEntity<>(_seller, HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public Mono<ResponseEntity<Seller>> createSeller(@RequestBody Seller seller) {
+        return sellerService.saveSeller(seller) // Use service, which returns Mono<Seller>
+                .map(_seller -> new ResponseEntity<>(_seller, HttpStatus.CREATED))
+                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Handle errors reactively
     }
 
     // Update an existing seller - Only for ADMINS
     // Updates only the basic seller information e.g name
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Seller> updateSeller(@PathVariable Long id, @RequestBody Seller seller) {
-        Optional<Seller> sellerData = sellerService.getSellerById(id); // Use service
-
-        if (sellerData.isPresent()) {
-            Seller _seller = sellerData.get();
-            _seller.setName(seller.getName());
-            //_seller.setEmail(seller.getEmail());//email is not updatable
-            return new ResponseEntity<>(sellerService.saveSeller(_seller), HttpStatus.OK); // Use service
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Mono<ResponseEntity<Seller>> updateSeller(@PathVariable Long id, @RequestBody Seller seller) {
+        // Retrieve the existing seller, update it, and save reactively
+        return sellerService.getSellerById(id)
+                .switchIfEmpty(Mono.just(new Seller())) // Provide an empty Mono if not found to fall into defaultIfEmpty
+                .flatMap(existingSeller -> {
+                    if (existingSeller.getId() == null) { // Check if it was actually found
+                        return Mono.just(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                    }
+                    existingSeller.setName(seller.getName());
+                    // _seller.setEmail(seller.getEmail());//email is not updatable
+                    return sellerService.saveSeller(existingSeller)
+                            .map(updatedSeller -> new ResponseEntity<>(updatedSeller, HttpStatus.OK));
+                })
+                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR)));
     }
 
     // Delete a seller - Only for ADMINS
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<HttpStatus> deleteSeller(@PathVariable Long id) {
-        try {
-            sellerService.deleteSeller(id); // Use service
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    @ResponseStatus(HttpStatus.NO_CONTENT) // Indicate success with 204 No Content
+    public Mono<Void> deleteSeller(@PathVariable Long id) {
+        return sellerService.deleteSeller(id) // Use service, which returns Mono<Void>
+                .onErrorResume(e -> Mono.error(new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting seller", e))); // Handle errors reactively
     }
 
-    // NEW: Endpoint to search sellers by name with pagination and sorting
-    // Example: GET /api/sellers/search?query=tech&page=0&size=5
+    // NEW: Endpoint to search sellers by name with reactive pagination and sorting
+    // Example: GET /api/sellers/search?query=tech&offset=0&limit=5
     @GetMapping("/search")
-    public ResponseEntity<Page<Seller>> searchSellers(
+    public Mono<ResponseEntity<List<Seller>>> searchSellers(
             @RequestParam String query,
-            @PageableDefault(page = 0, size = 10)
-            @SortDefault(sort = "name", direction = Sort.Direction.ASC)
-            Pageable pageable) {
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "10") Integer limit) {
 
-        Page<Seller> sellers = sellerService.searchSellers(query, pageable);
-        return new ResponseEntity<>(sellers, HttpStatus.OK);
+        return sellerService.searchSellers(query, offset, limit)
+                .collectList()
+                .map(sellers -> new ResponseEntity<>(sellers, HttpStatus.OK));
+    }
+
+    // NEW: Endpoint to get total count for search results pagination metadata
+    @GetMapping("/search/count")
+    public Mono<ResponseEntity<Long>> countSearchSellers(@RequestParam String query) {
+        return sellerService.countSearchSellers(query)
+                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
     }
 }

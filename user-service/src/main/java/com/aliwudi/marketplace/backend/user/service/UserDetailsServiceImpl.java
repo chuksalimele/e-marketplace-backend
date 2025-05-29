@@ -1,31 +1,33 @@
-// UserDetailsServiceImpl.java
 package com.aliwudi.marketplace.backend.user.service;
 
 import com.aliwudi.marketplace.backend.user.model.User;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService; // NEW: Import ReactiveUserDetailsService
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Good practice for service methods
+import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono; // NEW: Import Mono
 
-// This service is responsible for fetching user details from your database.
-@Service // Marks this as a Spring Service component
-public class UserDetailsServiceImpl implements UserDetailsService {
+@Service
+public class UserDetailsServiceImpl implements ReactiveUserDetailsService {
 
-    @Autowired // Spring will inject the UserRepository here
-    UserRepository userRepository;
+    private final UserRepository userRepository; // Ensure this is a reactive repository (e.g., extends ReactiveCrudRepository or R2dbcRepository)
+
+    @Autowired
+    public UserDetailsServiceImpl(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     // This method is called by Spring Security during the authentication process.
+    // It now returns a Mono<UserDetails> for non-blocking operations.
     @Override
-    @Transactional // Ensures the entire method runs within a single database transaction
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // Attempt to find the user by username in the database
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + username));
-
-        // Build and return our custom UserDetailsImpl object
-        return UserDetailsImpl.build(user);
+    @Transactional // Keep for reactive transaction management if needed
+    public Mono<UserDetails> findByUsername(String username) {
+        // Attempt to find the user by username in the database reactively
+        return userRepository.findByUsername(username) // Assuming findByUsername returns Mono<User>
+                .switchIfEmpty(Mono.error(new UsernameNotFoundException("User Not Found with username: " + username)))
+                .map(UserDetailsImpl::build); // Build and return our custom UserDetailsImpl object
     }
 }

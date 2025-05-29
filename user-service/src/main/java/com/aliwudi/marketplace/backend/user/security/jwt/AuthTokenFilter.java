@@ -1,89 +1,87 @@
-// AuthTokenFilter.java
 package com.aliwudi.marketplace.backend.user.security.jwt;
 
-import com.aliwudi.marketplace.backend.user.service.UserDetailsServiceImpl; // Our custom service to load user details
-import jakarta.servlet.FilterChain; // For chaining filters
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.aliwudi.marketplace.backend.user.service.UserDetailsServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired; // For dependency injection
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; // For creating an authentication object
-import org.springframework.security.core.context.SecurityContextHolder; // To set the authenticated user in the security context
-import org.springframework.security.core.userdetails.UserDetails; // Spring Security's user details interface
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource; // To build authentication details from the request
-import org.springframework.util.StringUtils; // Spring utility for String operations
-import org.springframework.web.filter.OncePerRequestFilter; // Ensures this filter runs only once per request
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder; // NEW: Reactive context holder
+import org.springframework.security.core.context.SecurityContext; // NEW: SecurityContext for reactive
+import org.springframework.security.core.context.SecurityContextImpl; // NEW: Implementation for SecurityContext
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.server.WebFilter; // NEW: WebFilter for reactive applications
+import org.springframework.security.web.server.authentication.WebFilterServerAuthenticationConverter; // Consider for complex cases
+import org.springframework.stereotype.Component; // Mark as component for auto-detection
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ServerWebExchange; // NEW: Reactive equivalent of HttpServletRequest/Response
+import org.springframework.web.server.WebFilterChain; // NEW: Reactive filter chain
+import reactor.core.publisher.Mono; // NEW: Import Mono
 
-import java.io.IOException;
-
-// This filter is executed once per request to validate JWT tokens.
-public class AuthTokenFilter extends OncePerRequestFilter {
-
-    @Autowired // Injects our JwtUtils bean
-    private JwtUtils jwtUtils;
-
-    @Autowired // Injects our UserDetailsServiceImpl bean
-    private UserDetailsServiceImpl userDetailsService;
+// This filter is executed once per request to validate JWT tokens in a reactive context.
+@Component // Mark as a Spring component for auto-detection
+public class AuthTokenFilter implements WebFilter { // Implements WebFilter for reactive
 
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
 
+    private final JwtUtils jwtUtils;
+    private final UserDetailsServiceImpl userDetailsService;
+
+    // Use constructor injection as it's generally preferred
+    @Autowired
+    public AuthTokenFilter(JwtUtils jwtUtils, UserDetailsServiceImpl userDetailsService) {
+        this.jwtUtils = jwtUtils;
+        this.userDetailsService = userDetailsService;
+    }
+
     /**
-     * This is the core method of the filter that performs JWT validation.
-     * @param request The incoming HTTP request.
-     * @param response The HTTP response.
-     * @param filterChain The filter chain to continue processing.
+     * This is the core method of the reactive filter that performs JWT validation.
+     * It processes the ServerWebExchange (reactive request/response) and returns a Mono<Void>.
+     *
+     * @param exchange The incoming reactive HTTP request/response exchange.
+     * @param chain The reactive filter chain to continue processing.
+     * @return A Mono<Void> indicating when the filter processing is complete.
      */
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-        try {
-            // 1. Extract the JWT from the "Authorization" header
-            String jwt = parseJwt(request);
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        return Mono.justOrEmpty(parseJwt(exchange)) // 1. Extract the JWT from the "Authorization" header
+                .filter(jwt -> jwtUtils.validateJwtToken(jwt)) // 2. If a JWT is found and it's valid:
+                .flatMap(jwt -> {
+                    String username = jwtUtils.getUserNameFromJwtToken(jwt);
+                    // Load user details reactively
+                    return userDetailsService.findByUsername(username) // This returns Mono<UserDetails>
+                            .flatMap(userDetails -> {
+                                UsernamePasswordAuthenticationToken authentication =
+                                        new UsernamePasswordAuthenticationToken(
+                                                userDetails,
+                                                null,
+                                                userDetails.getAuthorities());
 
-            // 2. If a JWT is found and it's valid:
-            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-                // Get the username from the validated token
-                String username = jwtUtils.getUserNameFromJwtToken(jwt);
-
-                // Load user details (username, roles, etc.) using our UserDetailsService
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                // Create an authentication object using the loaded user details
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null, // Credentials are null because the token itself is the credential here
-                                userDetails.getAuthorities()); // User's roles/authorities
-
-                // Set additional details about the authentication request (e.g., remote IP address)
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // Set the authentication object in Spring Security's context.
-                // This tells Spring Security that the current user is authenticated for this request.
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
-        } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e.getMessage());
-        }
-
-        // Continue to the next filter in the chain (or the controller if this is the last filter)
-        filterChain.doFilter(request, response);
+                                // Store authentication in reactive security context
+                                // This is crucial for subsequent security checks in reactive applications
+                                SecurityContext securityContext = new SecurityContextImpl(authentication);
+                                return chain.filter(exchange)
+                                        .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(Mono.just(securityContext)));
+                            })
+                            .onErrorResume(e -> {
+                                logger.error("Cannot set user authentication: {}", e.getMessage());
+                                // Do not propagate error to client directly if only for auth failure,
+                                // just continue filter chain without setting context.
+                                return chain.filter(exchange);
+                            });
+                })
+                .switchIfEmpty(chain.filter(exchange)); // If no JWT or invalid, just continue the chain
     }
 
     /**
      * Helper method to extract the JWT string from the "Authorization" header.
-     * The header typically looks like: "Authorization: Bearer <JWT_TOKEN>"
-     * @param request The HTTP request.
-     * @return The JWT string, or null if not found or not in "Bearer" format.
+     * @param exchange The ServerWebExchange.
+     * @return The JWT string wrapped in an Optional/Mono.
      */
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
+    private String parseJwt(ServerWebExchange exchange) {
+        String headerAuth = exchange.getRequest().getHeaders().getFirst("Authorization");
 
-        // Check if the header exists and starts with "Bearer "
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7); // Return the token part after "Bearer "
+            return headerAuth.substring(7);
         }
         return null;
     }

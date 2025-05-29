@@ -2,20 +2,28 @@
 package com.aliwudi.marketplace.backend.product.repository;
 
 import com.aliwudi.marketplace.backend.product.model.Seller;
-import org.springframework.data.domain.Page;    // NEW IMPORT
-import org.springframework.data.domain.Pageable; // NEW IMPORT
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional; 
+import reactor.core.publisher.Flux; // NEW: Import Flux for multiple results
+import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
+
+// Remove old JpaRepository import, Page, and Pageable imports
 
 @Repository
-public interface SellerRepository extends JpaRepository<Seller, Long> {
-    // JpaRepository provides basic CRUD operations.
+// NEW: Extend ReactiveCrudRepository instead of JpaRepository
+public interface SellerRepository extends ReactiveCrudRepository<Seller, Long> {
+    // ReactiveCrudRepository provides basic reactive CRUD operations.
 
-    // You can add custom methods here if needed, e.g.,
-     Optional<Seller> findByName(String name);
+    // Old: Optional<Seller> findByName(String name);
+    // NEW: Returns Mono for zero or one result.
+    Mono<Seller> findByName(String name);
 
-    // NEW: Method for finding sellers by name with pagination and sorting
-    Page<Seller> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    // Old: Page<Seller> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    // NEW: For pagination, use Flux with offset and limit parameters, which R2DBC translates to SQL OFFSET/LIMIT.
+    Flux<Seller> findByNameContainingIgnoreCase(String name, Long offset, Integer limit);
+    // NEW: Add a count method for total elements when paginating.
+    Mono<Long> countByNameContainingIgnoreCase(String name);
+
+    public Flux<Seller> findAll(Long offset, Integer limit);
 }

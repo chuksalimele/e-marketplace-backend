@@ -2,38 +2,53 @@
 package com.aliwudi.marketplace.backend.product.repository;
 
 import com.aliwudi.marketplace.backend.product.model.Product;
-import org.springframework.data.domain.Page; // NEW IMPORT
-import org.springframework.data.domain.Pageable; // NEW IMPORT
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
-import java.util.Optional; 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.List;
+@Repository
+public interface ProductRepository extends ReactiveCrudRepository<Product, Long> {
 
-@Repository // Optional but good practice for clarity
-public interface ProductRepository extends JpaRepository<Product, Long> {
-    // JpaRepository provides methods like save(), findById(), findAll(), deleteById(), etc.
+    Mono<Product> findByName(String name);
 
-    // You can define custom query methods by following Spring Data JPA naming conventions:
-    Optional<Product> findByName(String name);
+    // --- Reactive Pagination Methods ---
+    // These methods now accept 'offset' (for skipping records) and 'limit' (for taking records)
+    // Spring Data R2DBC will translate these into SQL OFFSET and LIMIT clauses,
+    // ensuring pagination happens at the database level.
 
-    Page<Product> findByStore_Id(Long storeId, Pageable pageable);
-
-    Page<Product> findByStore_Seller_Id(Long sellerId, Pageable pageable); // To get all products for a seller across all their stores
-
-    Page<Product> findByCategory_Name(String categoryName, Pageable pageable);
-
-    Page<Product> findByCategory_NameAndStore_Location(String categoryName, String location, Pageable pageable);
+    // Also adding count methods for proper pagination metadata (total elements)
     
-    Page<Product> findByNameContainingIgnoreCase(String searcTerm, Pageable pageable);
-    
-    // For location-based search, you might add:
-    Page<Product> findByStore_LocationIgnoreCase(String location, Pageable pageable);
-    
-    Page<Product> findByStore_IdAndStore_LocationIgnoreCase(Long storeId, String location, Pageable pageable);
+    public Flux<Product> findAll(Long offset, Integer limit);
 
-    Page<Product> findByNameContainingIgnoreCaseAndStore_LocationIgnoreCase(String product_name, String location, Pageable pageable);
+    Flux<Product> findByStore_Id(Long storeId, Long offset, Integer limit);
+    Mono<Long> countByStore_Id(Long storeId);
 
-    // Or more advanced queries for geo-spatial searching once you implement that.    
+    Flux<Product> findByStore_Seller_Id(Long sellerId, Long offset, Integer limit);
+    Mono<Long> countByStore_Seller_Id(Long sellerId);
 
+    Flux<Product> findByCategory_Name(String categoryName, Long offset, Integer limit);
+    Mono<Long> countByCategory_Name(String categoryName);
+
+    Flux<Product> findByCategory_NameAndStore_Location(String categoryName, String location, Long offset, Integer limit);
+    Mono<Long> countByCategory_NameAndStore_Location(String categoryName, String location);
+
+    Flux<Product> findByNameContainingIgnoreCase(String searchTerm, Long offset, Integer limit);
+    Mono<Long> countByNameContainingIgnoreCase(String searchTerm);
+
+    Flux<Product> findByStore_LocationIgnoreCase(String location, Long offset, Integer limit);
+    Mono<Long> countByStore_LocationIgnoreCase(String location);
+
+    Flux<Product> findByStore_IdAndStore_LocationIgnoreCase(Long storeId, String location, Long offset, Integer limit);
+    Mono<Long> countByStore_IdAndStore_LocationIgnoreCase(Long storeId, String location);
+
+    Flux<Product> findByNameContainingIgnoreCaseAndStore_LocationIgnoreCase(String productName, String location, Long offset, Integer limit);
+    Mono<Long> countByNameContainingIgnoreCaseAndStore_LocationIgnoreCase(String productName, String location);
+
+    // You can also add more advanced queries using @Query annotation if derived query methods become too complex,
+    // ensuring to use R2DBC-compatible SQL with OFFSET/LIMIT.
+    // Example:
+    // @Query("SELECT * FROM product WHERE name LIKE :name OFFSET :offset LIMIT :limit")
+    // Flux<Product> findProductsByNameWithPagination(@Param("name") String name, @Param("offset") Long offset, @Param("limit") Integer limit);
+   
 }
