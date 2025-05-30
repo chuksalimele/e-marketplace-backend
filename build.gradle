@@ -42,11 +42,18 @@ subprojects {
 	//implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
 	//implementation 'org.springframework.boot:spring-boot-starter-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+        implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+        runtimeOnly 'com.h2database:h2'
+        runtimeOnly 'com.mysql:mysql-connector-j'
+        runtimeOnly 'io.asyncer:r2dbc-mysql'
+        runtimeOnly 'io.r2dbc:r2dbc-h2'
+        runtimeOnly 'org.postgresql:postgresql'
+        runtimeOnly 'org.postgresql:r2dbc-postgresql'
+
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'com.h2database:h2'
-	//runtimeOnly 'com.mysql:mysql-connector-j'
-	//runtimeOnly 'org.postgresql:postgresql'
+
 	annotationProcessor 'org.projectlombok:lombok'
 
         // Spring Boot Starter WebFlux for WebClient (reactive HTTP client)

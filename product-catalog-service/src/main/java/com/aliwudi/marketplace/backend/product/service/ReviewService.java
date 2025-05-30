@@ -1,122 +1,140 @@
 package com.aliwudi.marketplace.backend.product.service;
 
-import com.aliwudi.marketplace.backend.product.model.Product;
-import com.aliwudi.marketplace.backend.product.model.Review;
-import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
-import com.aliwudi.marketplace.backend.product.repository.ReviewRepository;
 import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
-import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
+import com.aliwudi.marketplace.backend.product.exception.InvalidReviewDataException;
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.product.model.Product; // Assuming you have a Product entity
+import com.aliwudi.marketplace.backend.product.model.Review;
+import com.aliwudi.marketplace.backend.product.repository.ProductRepository; // Assuming ProductRepository
+import com.aliwudi.marketplace.backend.product.repository.ReviewRepository; // Assuming ReviewRepository
+import com.aliwudi.marketplace.backend.user.repository.UserRepository; // Assuming UserRepository for userId validation
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent exception messages
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Mono; // NEW: Import Mono for reactive types
-import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-// Remove List and Optional imports as Mono/Flux handle these
+import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
-    private final ProductRepository productRepository;
+    private final ProductRepository productRepository; // To validate product existence
+    private final UserRepository userRepository;     // To validate user existence (optional, but good practice)
 
-    @Autowired
-    public ReviewService(ReviewRepository reviewRepository, ProductRepository productRepository) {
-        this.reviewRepository = reviewRepository;
-        this.productRepository = productRepository;
-    }
-
-    @Transactional
+    
     public Mono<Review> submitReview(ReviewRequest reviewRequest) {
-        // Find the Product reactively
+        // First, check if the product exists
         Mono<Product> productMono = productRepository.findById(reviewRequest.getProductId())
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with ID: " + reviewRequest.getProductId())));
 
-        return productMono.flatMap(product ->
-            // Check if the user has already reviewed this product
-            reviewRepository.findByUserIdAndProduct(reviewRequest.getUserId(), product)
-                    .flatMap(existingReview -> Mono.<Review>error(new DuplicateResourceException("User has already submitted a review for this product.")))
-                    .switchIfEmpty(Mono.defer(() -> { // Only proceed if no duplicate is found
-                        Review review = new Review();
-                        review.setUserId(reviewRequest.getUserId());
-                        review.setProduct(product);
-                        review.setRating(reviewRequest.getRating());
-                        review.setComment(reviewRequest.getComment());
-                        // reviewDate is set by @PrePersist in Review entity
-                        return reviewRepository.save(review);
-                    }))
-        );
+        // Optional: Check if the user exists
+        Mono<Boolean> userExistsMono = userRepository.existsById(reviewRequest.getUserId());
+
+        // Check if a review already exists for this user and product
+        Mono<Boolean> reviewExistsMono = reviewRepository.existsByProduct_IdAndUserId(reviewRequest.getProductId(), reviewRequest.getUserId());
+
+        return Mono.zip(productMono, userExistsMono, reviewExistsMono)
+                .flatMap(tuple -> {
+                    Product product = tuple.getT1();
+                    boolean userExists = tuple.getT2();
+                    boolean reviewExists = tuple.getT3();
+
+                    if (!userExists) {
+                        return Mono.error(new ResourceNotFoundException("User not found with ID: " + reviewRequest.getUserId()));
+                    }
+                    if (reviewExists) {
+                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION));
+                    }
+
+                    if (reviewRequest.getRating() < 1 || reviewRequest.getRating() > 5) {
+                        return Mono.error(new InvalidReviewDataException(ApiResponseMessages.INVALID_REVIEW_RATING));
+                    }
+                    // You can add more complex validation logic here for comment length, etc.
+
+                    Review review = Review.builder()
+                            .productId(reviewRequest.getProductId()) // Store product ID directly
+                            .product(product) // Link to the product entity for convenience (if mapped)
+                            .userId(reviewRequest.getUserId())
+                            .rating(reviewRequest.getRating())
+                            .comment(reviewRequest.getComment())
+                            .reviewDate(LocalDateTime.now())
+                            .build();
+
+                    return reviewRepository.save(review);
+                })
+                .switchIfEmpty(Mono.error(new InvalidReviewDataException("Failed to submit review due to missing product or user data."))); // Should be caught by ResourceNotFoundException
     }
 
-    public Flux<Review> getReviewsByProductId(Long productId, Long offset, Integer limit) {
-        // Find the Product reactively, then fetch reviews
-        return reviewRepository.findByProduct_Id(productId, offset, limit); 
-    }
-
-    public Flux<Review> getReviewsByUserId(Long userId, Long offset, Integer limit) {
-        // If userRepository interaction is needed and reactive:
-        // return userRepository.findById(userId)
-        //         .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found with ID: " + userId)))
-        //         .flatMapMany(user -> reviewRepository.findByUserId(userId));
-
-        // Assuming findByUserId in ReviewRepository is direct and returns Flux<Review>
-        return reviewRepository.findByUserId(userId, offset, limit);
-    }
-
-    public Mono<Review> getReviewById(Long id) {
-        return reviewRepository.findById(id); // findById now returns Mono<Review>
-    }
-
-    @Transactional
-    public Mono<Review> updateReview(Long reviewId, ReviewRequest updateRequest) {
-        return reviewRepository.findById(reviewId)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Review not found with ID: " + reviewId)))
+    
+    public Mono<Review> updateReview(Long id, ReviewRequest updateRequest) {
+        return reviewRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
                 .flatMap(existingReview -> {
-                    // For security, you might add a check here that the authenticated user
-                    // is the owner of the review or an ADMIN.
-                    // This would typically involve using Reactor Context or a security principal.
-                    // Mono<String> currentUserIdMono = Mono.subscriberContext()
-                    //     .map(context -> context.get("userId")); // Example of getting user ID from context
-
-                    // return currentUserIdMono.flatMap(currentUserId -> {
-                    //     if (!existingReview.getUserId().equals(currentUserId)) {
-                    //         return Mono.error(new AccessDeniedException("You are not authorized to update this review."));
-                    //     }
-
-                        if (updateRequest.getRating() != null) {
-                            existingReview.setRating(updateRequest.getRating());
+                    if (updateRequest.getRating() != null) {
+                        if (updateRequest.getRating() < 1 || updateRequest.getRating() > 5) {
+                            return Mono.error(new InvalidReviewDataException(ApiResponseMessages.INVALID_REVIEW_RATING));
                         }
-                        if (updateRequest.getComment() != null) {
-                            existingReview.setComment(updateRequest.getComment());
-                        }
-                        return reviewRepository.save(existingReview);
-                    // });
-                });
-    }
-
-    @Transactional
-    public Mono<Void> deleteReview(Long reviewId) {
-        return reviewRepository.existsById(reviewId) // existsById returns Mono<Boolean>
-                .flatMap(exists -> {
-                    if (!exists) {
-                        return Mono.error(new ResourceNotFoundException("Review not found with ID: " + reviewId));
+                        existingReview.setRating(updateRequest.getRating());
                     }
-                    return reviewRepository.deleteById(reviewId); // deleteById should return Mono<Void>
+                    if (updateRequest.getComment() != null && !updateRequest.getComment().isBlank()) {
+                        existingReview.setComment(updateRequest.getComment());
+                    }
+                    // Update review date only if comment or rating is changed
+                    if (updateRequest.getRating() != null || (updateRequest.getComment() != null && !updateRequest.getComment().isBlank())) {
+                        existingReview.setReviewDate(LocalDateTime.now());
+                    }
+                    return reviewRepository.save(existingReview);
                 });
     }
 
-    // Method to get average rating for a product
+    
+    public Mono<Void> deleteReview(Long id) {
+        return reviewRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
+                .flatMap(reviewRepository::delete);
+    }
+
+    
+    public Flux<Review> getReviewsByProductId(Long productId, Long offset, Integer limit) {
+        // Optional: Check if product exists before fetching reviews if you want to throw 404
+        return productRepository.findById(productId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .flatMapMany(product -> reviewRepository.findByProduct_Id(productId, offset, limit));
+    }
+
+    
+    public Flux<Review> getReviewsByUserId(Long userId, Long offset, Integer limit) {
+        // Optional: Check if user exists before fetching reviews if you want to throw 404
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + userId)))
+                .flatMapMany(user -> reviewRepository.findByUserId(userId, offset, limit));
+    }
+
+    
     public Mono<Double> getAverageRatingForProduct(Long productId) {
-        // Ensure product exists before querying
-        return productRepository.existsById(productId) // existsById returns Mono<Boolean>
-                .flatMap(exists -> {
-                    if (!exists) {
-                        return Mono.error(new ResourceNotFoundException("Product not found with ID: " + productId));
-                    }
-                    // Assuming findAverageRatingByProductId returns Mono<Double>
-                    return reviewRepository.findAverageRatingByProductId(productId);
-                });
+        return productRepository.findById(productId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .flatMap(product -> reviewRepository.findByProduct_Id(productId)
+                        .map(Review::getRating)
+                        .collect(Collectors.averagingDouble(Integer::doubleValue))
+                        .map(avg -> Double.isNaN(avg) ? 0.0 : avg)); // Handle case where no reviews exist
+    }
+
+    // New count methods
+    
+    public Mono<Long> countReviewsByProductId(Long productId) {
+        return reviewRepository.countByProduct_Id(productId);
+    }
+
+    
+    public Mono<Long> countReviewsByUserId(Long userId) {
+        return reviewRepository.countByUserId(userId);
     }
 }

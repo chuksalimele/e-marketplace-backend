@@ -20,4 +20,6 @@ public interface CartItemRepository extends ReactiveCrudRepository<CartItem, Lon
 
     // Optional: Delete a CartItem by Cart and Product (if not using orphanRemoval via entity relationship)
     //Mono<Integer> deleteByCartAndProductId(Cart cart, Long productId);
+
+    public Mono<Boolean>  deleteByCart(Cart cart);
 }

@@ -1,14 +1,17 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.InventoryUpdateRequest;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.StockOperationRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.dto.StockResponse;
+import com.aliwudi.marketplace.backend.orderprocessing.dto.StockResponse; // Assuming this DTO exists
+import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException; // Assuming this exception
+import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException; // Assuming this exception
 import com.aliwudi.marketplace.backend.orderprocessing.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono; // NEW: Import Mono for reactive types
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -18,46 +21,94 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping("/{productId}")
-    public Mono<ResponseEntity<StockResponse>> getAvailableStock(@PathVariable String productId) {
-        // Service method now returns Mono<Integer>
-        return inventoryService.getAvailableStock(productId)
-                .map(availableQuantity -> ResponseEntity.ok(StockResponse.builder()
-                        .productId(productId)
-                        .availableQuantity(availableQuantity)
-                        .build()))
-                .defaultIfEmpty(ResponseEntity.notFound().build()); // Handle case where stock might not be found
+    public Mono<StandardResponseEntity> getAvailableStock(@PathVariable String productId) {
+        return inventoryService.getAvailableStock(productId) // Service returns Mono<Integer>
+                .map(availableQuantity -> StandardResponseEntity.ok(
+                        StockResponse.builder()
+                                .productId(productId)
+                                .availableQuantity(availableQuantity)
+                                .build(),
+                        ApiResponseMessages.OPERATION_SUCCESSFUL // Or a more specific message if available
+                ))
+                // Handle cases where getAvailableStock might return Mono.empty() or throw an exception
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(
+                        ApiResponseMessages.PRODUCT_NOT_FOUND + productId
+                )))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just(StandardResponseEntity.internalServerError(
+                                ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage()
+                        )));
     }
 
     @PostMapping("/add-or-update")
-    // For void methods in reactive controllers, you can return Mono<Void> or Mono<ResponseEntity<Void>>.
-    // If you return Mono<Void>, Spring WebFlux will automatically send a 200 OK or 201 Created if annotated.
-    @ResponseStatus(HttpStatus.CREATED)
-    public Mono<Void> createOrUpdateInventory(@RequestBody InventoryUpdateRequest request) {
-        // Service method now returns Mono<Void>
-        return inventoryService.createOrUpdateInventory(request.getProductId(), request.getQuantity());
+    public Mono<StandardResponseEntity> createOrUpdateInventory(@RequestBody InventoryUpdateRequest request) {
+        return inventoryService.createOrUpdateInventory(request.getProductId(), request.getQuantity())
+                .then(Mono.just(StandardResponseEntity.created(
+                        null, // No specific data payload for void operations
+                        ApiResponseMessages.OPERATION_SUCCESSFUL // Or a more specific message like "Inventory updated/created."
+                )))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just(StandardResponseEntity.internalServerError(
+                                ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage()
+                        )));
     }
 
-    // Endpoint for reserving stock (e.g., when an order is placed)
     @PostMapping("/reserve")
-    @ResponseStatus(HttpStatus.OK)
-    public Mono<Void> reserveStock(@RequestBody StockOperationRequest request) {
-        // Service method now returns Mono<Void>
-        return inventoryService.reserveStock(request.getProductId(), request.getQuantity());
+    public Mono<StandardResponseEntity> reserveStock(@RequestBody StockOperationRequest request) {
+        return inventoryService.reserveStock(request.getProductId(), request.getQuantity())
+                .then(Mono.just(StandardResponseEntity.ok(
+                        null,
+                        ApiResponseMessages.OPERATION_SUCCESSFUL // Or "Stock reserved successfully."
+                )))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just(StandardResponseEntity.notFound(
+                                ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId()
+                        )))
+                .onErrorResume(InsufficientStockException.class, e ->
+                        Mono.just(StandardResponseEntity.badRequest(
+                                ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage() // Assuming exception message provides details
+                        )))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just(StandardResponseEntity.internalServerError(
+                                ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage()
+                        )));
     }
 
-    // Endpoint for releasing stock (e.g., if an order is cancelled or payment fails)
     @PostMapping("/release")
-    @ResponseStatus(HttpStatus.OK)
-    public Mono<Void> releaseStock(@RequestBody StockOperationRequest request) {
-        // Service method now returns Mono<Void>
-        return inventoryService.releaseStock(request.getProductId(), request.getQuantity());
+    public Mono<StandardResponseEntity> releaseStock(@RequestBody StockOperationRequest request) {
+        return inventoryService.releaseStock(request.getProductId(), request.getQuantity())
+                .then(Mono.just(StandardResponseEntity.ok(
+                        null,
+                        ApiResponseMessages.OPERATION_SUCCESSFUL // Or "Stock released successfully."
+                )))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just(StandardResponseEntity.notFound(
+                                ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId()
+                        )))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just(StandardResponseEntity.internalServerError(
+                                ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage()
+                        )));
     }
 
-    // Endpoint for confirming reservation and deducting stock (e.g., after successful payment)
     @PostMapping("/confirm-deduct")
-    @ResponseStatus(HttpStatus.OK)
-    public Mono<Void> confirmReservationAndDeductStock(@RequestBody StockOperationRequest request) {
-        // Service method now returns Mono<Void>
-        return inventoryService.confirmReservationAndDeductStock(request.getProductId(), request.getQuantity());
+    public Mono<StandardResponseEntity> confirmReservationAndDeductStock(@RequestBody StockOperationRequest request) {
+        return inventoryService.confirmReservationAndDeductStock(request.getProductId(), request.getQuantity())
+                .then(Mono.just(StandardResponseEntity.ok(
+                        null,
+                        ApiResponseMessages.OPERATION_SUCCESSFUL // Or "Stock confirmed and deducted successfully."
+                )))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just(StandardResponseEntity.notFound(
+                                ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId()
+                        )))
+                .onErrorResume(InsufficientStockException.class, e ->
+                        Mono.just(StandardResponseEntity.badRequest(
+                                ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage()
+                        )))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just(StandardResponseEntity.internalServerError(
+                                ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage()
+                        )));
     }
 }

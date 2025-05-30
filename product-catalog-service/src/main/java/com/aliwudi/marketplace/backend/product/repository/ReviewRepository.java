@@ -36,4 +36,8 @@ public interface ReviewRepository extends ReactiveCrudRepository<Review, Long> {
     // NEW: Returns Mono<Double> as the average is a single value.
     @Query("SELECT AVG(r.rating) FROM review r WHERE r.product_id = :productId")
     Mono<Double> findAverageRatingByProductId(Long productId);
+
+    public Flux<Review> findByProduct_Id(Long productId);
+
+    public Mono<Boolean> existsByProduct_IdAndUserId(Long productId, Long userId);
 }

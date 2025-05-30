@@ -1,85 +1,167 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
 import com.aliwudi.marketplace.backend.product.dto.StoreRequest;
+import com.aliwudi.marketplace.backend.product.dto.StoreResponse; // New DTO for responses
+import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException; // Re-using or creating
+import com.aliwudi.marketplace.backend.product.exception.InvalidStoreDataException; // New custom exception
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using or creating
 import com.aliwudi.marketplace.backend.product.model.Store;
 import com.aliwudi.marketplace.backend.product.service.StoreService;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-// Removed Page and Pageable imports as they are not typically used with reactive repositories
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
-import reactor.core.publisher.Mono; // NEW: Import Mono for reactive single results
-import java.util.List; // Still useful for collecting Flux into a List
-import org.springframework.web.server.ResponseStatusException; // For reactive error handling
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/stores")
+@RequiredArgsConstructor // Using Lombok for constructor injection
 public class StoreController {
 
     private final StoreService storeService;
 
-    @Autowired
-    public StoreController(StoreService storeService) {
-        this.storeService = storeService;
+    /**
+     * Helper method to map Store entity to StoreResponse DTO for public exposure.
+     */
+    private StoreResponse mapStoreToStoreResponse(Store store) {
+        if (store == null) {
+            return null;
+        }
+        return StoreResponse.builder()
+                .id(store.getId())
+                .name(store.getName())
+                .description(store.getDescription())
+                .address(store.getAddress())
+                .sellerId(store.getSellerId())
+                .createdAt(store.getCreatedAt())
+                .updatedAt(store.getUpdatedAt())
+                .build();
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')") // Only sellers/admins can create stores
-    public Mono<ResponseEntity<Store>> createStore(@Valid @RequestBody StoreRequest storeRequest) {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    public Mono<StandardResponseEntity> createStore(@Valid @RequestBody StoreRequest storeRequest) {
+        // Basic input validation
+        if (storeRequest.getName() == null || storeRequest.getName().isBlank() ||
+            storeRequest.getSellerId() == null || storeRequest.getSellerId() <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_CREATION_REQUEST));
+        }
+
         return storeService.createStore(storeRequest)
-                .map(createdStore -> new ResponseEntity<>(createdStore, HttpStatus.CREATED))
-                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
+                .map(createdStore -> (StandardResponseEntity) StandardResponseEntity.created(
+                        mapStoreToStoreResponse(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS))
+                .onErrorResume(DuplicateResourceException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(ApiResponseMessages.DUPLICATE_STORE_NAME)))
+                .onErrorResume(InvalidStoreDataException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_STORE + ": " + e.getMessage())));
     }
 
     @GetMapping
-    public Mono<ResponseEntity<List<Store>>> getAllStores() {
+    public Mono<StandardResponseEntity> getAllStores() {
         return storeService.getAllStores()
-                .collectList() // Collect Flux of stores into a List
-                .map(stores -> new ResponseEntity<>(stores, HttpStatus.OK));
+                .map(this::mapStoreToStoreResponse)
+                .collectList()
+                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
     }
 
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Store>> getStoreById(@PathVariable Long id) {
+    public Mono<StandardResponseEntity> getStoreById(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+        }
+
         return storeService.getStoreById(id)
-                .map(store -> new ResponseEntity<>(store, HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND)); // Handle not found case
+                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        mapStoreToStoreResponse(store), ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE + ": " + e.getMessage())));
     }
 
-    // MODIFIED: getStoresBySeller to use reactive pagination parameters
-    @GetMapping("/by-seller/{sellerId}") // Changed path to avoid ambiguity with getStoreById
-    public Mono<ResponseEntity<List<Store>>> getStoresBySeller(
+    @GetMapping("/by-seller/{sellerId}")
+    public Mono<StandardResponseEntity> getStoresBySeller(
             @PathVariable Long sellerId,
-            @RequestParam(defaultValue = "0") Long offset, // Reactive pagination: offset
-            @RequestParam(defaultValue = "20") Integer limit) { // Reactive pagination: limit
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "20") Integer limit) {
+
+        if (sellerId == null || sellerId <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
+        }
+        if (offset < 0 || limit <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
 
         return storeService.getStoresBySeller(sellerId, offset, limit)
-                .collectList() // Collect Flux of stores into a List
-                .map(stores -> new ResponseEntity<>(stores, HttpStatus.OK));
+                .map(this::mapStoreToStoreResponse)
+                .collectList()
+                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES_BY_SELLER + ": " + e.getMessage())));
     }
 
-    // NEW: Endpoint to get the total count of stores for a specific seller
     @GetMapping("/by-seller/{sellerId}/count")
-    public Mono<ResponseEntity<Long>> countStoresBySeller(@PathVariable Long sellerId) {
+    public Mono<StandardResponseEntity> countStoresBySeller(@PathVariable Long sellerId) {
+        if (sellerId == null || sellerId <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
+        }
+
         return storeService.countStoresBySeller(sellerId)
-                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT_BY_SELLER + ": " + e.getMessage())));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    public Mono<ResponseEntity<Store>> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
+    public Mono<StandardResponseEntity> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+        }
+
         return storeService.updateStore(id, storeRequest)
-                .map(updatedStore -> new ResponseEntity<>(updatedStore, HttpStatus.OK))
-                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Generic error handling
+                .map(updatedStore -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        mapStoreToStoreResponse(updatedStore), ApiResponseMessages.STORE_UPDATED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                .onErrorResume(InvalidStoreDataException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_STORE + ": " + e.getMessage())));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    @ResponseStatus(HttpStatus.NO_CONTENT) // Sets 204 No Content on successful deletion
-    public Mono<Void> deleteStore(@PathVariable Long id) {
+    public Mono<StandardResponseEntity> deleteStore(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+        }
+
         return storeService.deleteStore(id)
-                .onErrorResume(e -> Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting store", e)));
+                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.STORE_DELETED_SUCCESS)))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_STORE + ": " + e.getMessage())));
     }
 }

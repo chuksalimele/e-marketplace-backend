@@ -1,40 +1,30 @@
 package com.aliwudi.marketplace.backend.lgtmed.model;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "media_assets")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table("media_assets") // Ensure your table name is correct
 public class MediaAsset {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
-    private String assetName; // Original file name
-
-    @Column(nullable = false, unique = true)
-    private String uniqueFileName; // Stored file name / key in storage
-
-    @Column(nullable = false)
-    private String fileType; // e.g., image/jpeg, image/png
-
-    @Column(nullable = false)
-    private String url; // Publicly accessible URL for the asset
-
-    private String entityId; // e.g., productId, userId, categoryId - foreign key to link asset to entity
-    private String entityType; // e.g., "PRODUCT", "USER", "CATEGORY" - helps categorize assets
-
-    @Column(nullable = false)
+    private Long id; // Using Long for auto-incrementing ID
+    private String assetName;
+    private String uniqueFileName; // Stored filename (e.g., S3 key, generated UUID)
+    private String url; // Public URL to access the asset
+    private String fileType; // e.g., image/jpeg, video/mp4
+    private String entityId; // ID of the associated entity (e.g., product ID, user ID)
+    private String entityType; // Type of the associated entity (e.g., PRODUCT, USER, REVIEW)
     private LocalDateTime uploadDate;
+    private Long fileSize; // Optional: Store file size
+    private String storagePath; // Optional: Internal path in storage system
+    private String uploadedBy; // Optional: User who uploaded this asset
 }

@@ -11,17 +11,9 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
-@Entity
-@Table(name = "users",
-        uniqueConstraints = {
-            @UniqueConstraint(columnNames = "username"),
-            @UniqueConstraint(columnNames = "email")
-        })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-// IMPORTANT: Removed 'exclude = {"cart"}' as Cart is no longer part of this entity
-@EqualsAndHashCode // If you have other fields you want to exclude, add them here.
 public class UserDto {
     private Long id;
     private String username;

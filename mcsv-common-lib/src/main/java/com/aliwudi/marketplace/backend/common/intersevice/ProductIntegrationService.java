@@ -7,10 +7,8 @@ package com.aliwudi.marketplace.backend.common.intersevice;
 import com.aliwudi.marketplace.backend.common.dto.ProductDto;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 
 /**
  * Service responsible for integrating with the Product Catalog Service using
@@ -30,28 +28,15 @@ public class ProductIntegrationService {
         this.webClient = webClientBuilder.baseUrl(path).build();
     }
 
-    /**
-     * Fetches all products from the ProductDto Catalog Service using WebClient.
-     *
-     * @return A Flux of ProductDto objects.
-     */
-    public Flux<ProductDto> getAllProductsWebClient() {
-        return webClient.get()
-                .retrieve() // Perform the request and retrieve the response
-                .bodyToFlux(ProductDto.class) // Convert the response body to a Flux of ProductDto objects                   
-                .doOnNext( // For logging - REMOVE IN PRODUCTION
-                        product -> System.out.println("WebClient fetched product: " + product
-                        ));
-    }
 
     /**
-     * Fetches a single product by ID from the ProductDto Catalog Service using
-     * WebClient.
+     * Fetches a single product by ID from the product-catalog-service
+     * micro service using WebClient.
      *
      * @param productId The ID of the product to fetch.
      * @return A Mono of the ProductDto object.
      */
-    public Mono<ProductDto> getProductByIdWebClient(Long productId) {
+    public Mono<ProductDto> getProductDtoById(Long productId) {
         return webClient.get()
                 .uri("/{id}", productId) // Append the product ID to the base URL
                 .retrieve()
@@ -60,5 +45,9 @@ public class ProductIntegrationService {
                         // For logging - REMOVE IN PRODUCTION
                         product -> System.out.println("WebClient fetched product by ID: " + product)
                 );
+    }
+
+    public Mono<ProductDto> decreaseAndSaveStock(Long id, Integer quantity) {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 }

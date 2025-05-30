@@ -1,107 +1,119 @@
 package com.aliwudi.marketplace.backend.product.service;
 
 import com.aliwudi.marketplace.backend.product.dto.StoreRequest;
+import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
+import com.aliwudi.marketplace.backend.product.exception.InvalidStoreDataException;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.product.model.Seller;
 import com.aliwudi.marketplace.backend.product.model.Store;
-import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
-import com.aliwudi.marketplace.backend.product.repository.StoreRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-// Remove Page and Pageable imports
-import reactor.core.publisher.Mono; // NEW: Import Mono for reactive types
-import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
+import com.aliwudi.marketplace.backend.product.repository.StoreRepository; // Assuming StoreRepository
+import com.aliwudi.marketplace.backend.user.repository.UserRepository; // Assuming UserRepository for sellerId validation
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent exception messages
 
-// Remove List and Optional imports
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.time.LocalDateTime;
 
 @Service
-public class StoreService {
+@RequiredArgsConstructor
+public class StoreService{
 
     private final StoreRepository storeRepository;
-    private final SellerRepository sellerRepository; // To link stores to sellers
+    private final UserRepository userRepository; // To validate sellerId
 
-    @Autowired
-    public StoreService(StoreRepository storeRepository, SellerRepository sellerRepository) {
-        this.storeRepository = storeRepository;
-        this.sellerRepository = sellerRepository;
-    }
-
-    @Transactional
+    
     public Mono<Store> createStore(StoreRequest storeRequest) {
-        // Find the Seller reactively
-        return sellerRepository.findById(storeRequest.getSellerId())
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId())))
-                .flatMap(seller -> {
-                    Store store = new Store();
-                    store.setName(storeRequest.getName());
-                    store.setLocation(storeRequest.getLocation());
-                    store.setDescription(storeRequest.getDescription());
-                    store.setContactInfo(storeRequest.getContactInfo());
-                    store.setProfileImageUrl(storeRequest.getProfileImageUrl());
-                    store.setRating(storeRequest.getRating());
-                    store.setCategories(storeRequest.getCategories());
-                    store.setSeller(seller); // Link to Seller
+        // Validate seller existence
+        Mono<Boolean> sellerExistsMono = userRepository.existsById(storeRequest.getSellerId())
+                .filter(exists -> exists)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + storeRequest.getSellerId())));
 
-                    return storeRepository.save(store); // Save the new store
-                });
-    }
+        // Check for duplicate store name (optional, but good practice if names should be unique)
+        Mono<Boolean> duplicateNameCheckMono = storeRepository.findByName(storeRequest.getName())
+                .flatMap(existingStore -> Mono.error(new DuplicateResourceException(ApiResponseMessages.DUPLICATE_STORE_NAME)))
+                .hasElement() // Check if any element is emitted (i.e., store found)
+                .map(found -> !found); // Map to true if not found (i.e., no duplicate)
 
-    public Flux<Store> getAllStores() {
-        return storeRepository.findAll(); // findAll now returns Flux<Store>
-    }
-
-    public Mono<Store> getStoreById(Long id) {
-        return storeRepository.findById(id); // findById now returns Mono<Store>
-    }
-
-    // MODIFIED: getStoresBySeller to accept offset and limit for pagination
-    public Flux<Store> getStoresBySeller(Long sellerId, Long offset, Integer limit) {
-        // Assuming findBySeller_Id in StoreRepository is updated to accept offset and limit
-        return storeRepository.findBySeller_Id(sellerId, offset, limit);
-    }
-
-    // NEW: Add a count method for pagination metadata
-    public Mono<Long> countStoresBySeller(Long sellerId) {
-        return storeRepository.countBySeller_Id(sellerId);
-    }
-
-
-    @Transactional
-    public Mono<Store> updateStore(Long id, StoreRequest storeRequest) {
-        // Find existing store and seller reactively, then update
-        Mono<Store> existingStoreMono = storeRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Store not found with id: " + id)));
-
-        Mono<Seller> sellerMono = sellerRepository.findById(storeRequest.getSellerId())
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Seller not found with id: " + storeRequest.getSellerId())));
-
-        return Mono.zip(existingStoreMono, sellerMono)
+        return Mono.zip(sellerExistsMono, duplicateNameCheckMono)
                 .flatMap(tuple -> {
-                    Store existingStore = tuple.getT1();
-                    Seller seller = tuple.getT2();
-
-                    existingStore.setName(storeRequest.getName());
-                    existingStore.setLocation(storeRequest.getLocation());
-                    existingStore.setDescription(storeRequest.getDescription());
-                    existingStore.setContactInfo(storeRequest.getContactInfo());
-                    existingStore.setProfileImageUrl(storeRequest.getProfileImageUrl());
-                    existingStore.setRating(storeRequest.getRating());
-                    existingStore.setCategories(storeRequest.getCategories());
-                    existingStore.setSeller(seller); // Link to the new seller if changed
-
-                    return storeRepository.save(existingStore); // Save the updated store
+                    // If we reach here, seller exists and name is unique
+                    Store store = Store.builder()
+                            .name(storeRequest.getName())
+                            .description(storeRequest.getDescription())
+                            .address(storeRequest.getAddress())
+                            .sellerId(storeRequest.getSellerId())
+                            .createdAt(LocalDateTime.now())
+                            .updatedAt(LocalDateTime.now())
+                            .build();
+                    return storeRepository.save(store);
+                })
+                .onErrorResume(e -> {
+                    if (e instanceof ResourceNotFoundException || e instanceof DuplicateResourceException) {
+                        return Mono.error(e); // Re-throw specific, already handled exceptions
+                    }
+                    return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_CREATING_STORE, e)); // Generic error
                 });
     }
 
-    @Transactional
-    public Mono<Void> deleteStore(Long id) {
-        return storeRepository.existsById(id) // existsById returns Mono<Boolean>
-                .flatMap(exists -> {
-                    if (!exists) {
-                        return Mono.error(new ResourceNotFoundException("Store not found with id: " + id));
+    
+    public Mono<Store> updateStore(Long id, StoreRequest storeRequest) {
+        return storeRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                .flatMap(existingStore -> {
+                    // Update only allowed fields
+                    if (storeRequest.getName() != null && !storeRequest.getName().isBlank()) {
+                        existingStore.setName(storeRequest.getName());
                     }
-                    return storeRepository.deleteById(id); // deleteById should return Mono<Void>
+                    if (storeRequest.getDescription() != null && !storeRequest.getDescription().isBlank()) {
+                        existingStore.setDescription(storeRequest.getDescription());
+                    }
+                    if (storeRequest.getAddress() != null && !storeRequest.getAddress().isBlank()) {
+                        existingStore.setAddress(storeRequest.getAddress());
+                    }
+                    // Seller ID should generally not be updated after creation, or requires specific logic/permissions
+                    // if (storeRequest.getSellerId() != null) {
+                    //    existingStore.setSellerId(storeRequest.getSellerId());
+                    // }
+                    existingStore.setUpdatedAt(LocalDateTime.now());
+                    return storeRepository.save(existingStore);
                 });
+    }
+
+    
+    public Mono<Void> deleteStore(Long id) {
+        return storeRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                .flatMap(storeRepository::delete);
+    }
+
+    
+    public Mono<Store> getStoreById(Long id) {
+        return storeRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.STORE_NOT_FOUND + id)));
+    }
+
+    
+    public Flux<Store> getAllStores() {
+        return storeRepository.findAll();
+    }
+
+    
+    public Flux<Store> getStoresBySeller(Long sellerId, Long offset, Integer limit) {
+        // Optional: Validate seller existence here if you want to throw 404 for non-existent seller
+        return userRepository.existsById(sellerId)
+                .filter(exists -> exists)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .flatMapMany(exists -> storeRepository.findBySeller_Id(sellerId, offset, limit));
+    }
+
+    
+    public Mono<Long> countStoresBySeller(Long sellerId) {
+         // Optional: Validate seller existence here if you want to throw 404 for non-existent seller
+        return userRepository.existsById(sellerId)
+                .filter(exists -> exists)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .flatMap(exists -> storeRepository.countBySeller_Id(sellerId));
     }
 }

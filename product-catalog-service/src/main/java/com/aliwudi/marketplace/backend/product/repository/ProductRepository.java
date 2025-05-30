@@ -50,5 +50,21 @@ public interface ProductRepository extends ReactiveCrudRepository<Product, Long>
     // Example:
     // @Query("SELECT * FROM product WHERE name LIKE :name OFFSET :offset LIMIT :limit")
     // Flux<Product> findProductsByNameWithPagination(@Param("name") String name, @Param("offset") Long offset, @Param("limit") Integer limit);
+
+
+    public Mono<Long> countByLocation(String location);
+
+    public Flux<Product>  findByStore_IdAndLocation(Long storeId, String location, Long offset, Integer limit);
+
+    public Mono<Long> countByStore_IdAndLocation(Long storeId, String location);
+
+    public Flux<Product> findByCategory_NameAndLocation(String categoryName, String location, Long offset, Integer limit);
+
+    public Mono<Long> countByCategory_NameAndLocation(String categoryName, String location);
+
+    public Flux<Product> findByNameContainingIgnoreCaseAndLocationContainingIgnoreCase(String productName, String location, Long offset, Integer limit);
+
+    public Mono<Long> countByNameContainingIgnoreCaseAndLocationContainingIgnoreCase(String productName, String location);
+
    
 }

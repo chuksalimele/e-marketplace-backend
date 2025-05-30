@@ -1,116 +1,178 @@
-package com.aliwudi.marketplace.backend.product.controller;
+package com.aliwudi.marketplace.backend.product.controller; // Assuming 'seller' is part of 'product' for now
 
+import com.aliwudi.marketplace.backend.product.dto.SellerRequest; // New DTO for incoming seller data
+import com.aliwudi.marketplace.backend.product.dto.SellerResponse; // New DTO for outgoing seller data
+import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException; // Re-using or creating
+import com.aliwudi.marketplace.backend.product.exception.InvalidSellerDataException; // New custom exception for seller-specific data issues
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using or creating
 import com.aliwudi.marketplace.backend.product.model.Seller;
 import com.aliwudi.marketplace.backend.product.service.SellerService;
-import org.springframework.beans.factory.annotation.Autowired;
-// Remove Page, Pageable, Sort, PageableDefault, SortDefault imports
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux; // NEW: Import Flux for reactive collections
-import reactor.core.publisher.Mono; // NEW: Import Mono for reactive single results
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.List; // Keep this import for collecting Flux into a List
-// Remove Optional import
+import java.util.List;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
 @RequestMapping("/api/sellers")
+@RequiredArgsConstructor // Using Lombok for constructor injection
 public class SellerController {
 
-    // Removed direct SellerRepository injection from controller as service layer handles it.
     private final SellerService sellerService;
 
-    @Autowired
-    public SellerController(SellerService sellerService) {
-        this.sellerService = sellerService;
+    /**
+     * Helper method to map Seller entity to SellerResponse DTO for public exposure.
+     */
+    private SellerResponse mapSellerToSellerResponse(Seller seller) {
+        if (seller == null) {
+            return null;
+        }
+        return SellerResponse.builder()
+                .id(seller.getId())
+                .name(seller.getName())
+                .email(seller.getEmail()) // Assuming email is part of Seller entity
+                .createdAt(seller.getCreatedAt())
+                .updatedAt(seller.getUpdatedAt())
+                .build();
     }
 
-    // Get all sellers - accessible by any authenticated user
-    // MODIFIED: getAllSellers to support reactive pagination and sorting
-    // Example usage: GET /api/sellers?offset=0&limit=10
     @GetMapping
-    public Mono<ResponseEntity<List<Seller>>> getAllSellers(
-            @RequestParam(defaultValue = "0") Long offset, // Reactive pagination: offset
-            @RequestParam(defaultValue = "10") Integer limit) { // Reactive pagination: limit
+    public Mono<StandardResponseEntity> getAllSellers(
+            @RequestParam(defaultValue = "0") Long offset,
+            @RequestParam(defaultValue = "10") Integer limit) {
 
-        // Collect Flux into a List and wrap in ResponseEntity
+        if (offset < 0 || limit <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
         return sellerService.getAllSellers(offset, limit)
+                .map(this::mapSellerToSellerResponse)
                 .collectList()
-                .map(sellers -> new ResponseEntity<>(sellers, HttpStatus.OK));
+                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLERS + ": " + e.getMessage())));
     }
 
-    // NEW: Endpoint to get total count for all sellers (useful for pagination metadata)
     @GetMapping("/count")
-    public Mono<ResponseEntity<Long>> countAllSellers() {
+    public Mono<StandardResponseEntity> countAllSellers() {
         return sellerService.countAllSellers()
-                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER_COUNT + ": " + e.getMessage())));
     }
 
-    // Get seller by ID - accessible by any authenticated user
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Seller>> getSellerById(@PathVariable Long id) {
-        return sellerService.getSellerById(id) // Use service, which returns Mono<Seller>
-                .map(seller -> new ResponseEntity<>(seller, HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND)); // Handle not found
+    public Mono<StandardResponseEntity> getSellerById(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+        }
+
+        return sellerService.getSellerById(id)
+                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        mapSellerToSellerResponse(seller), ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND + id)))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER + ": " + e.getMessage())));
     }
 
-    // Create a new seller - Only for ADMINS
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<ResponseEntity<Seller>> createSeller(@RequestBody Seller seller) {
-        return sellerService.saveSeller(seller) // Use service, which returns Mono<Seller>
-                .map(_seller -> new ResponseEntity<>(_seller, HttpStatus.CREATED))
-                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR))); // Handle errors reactively
+    public Mono<StandardResponseEntity> createSeller(@Valid @RequestBody SellerRequest sellerRequest) {
+        // Basic input validation
+        if (sellerRequest.getName() == null || sellerRequest.getName().isBlank() ||
+            sellerRequest.getEmail() == null || sellerRequest.getEmail().isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_CREATION_REQUEST));
+        }
+
+        return sellerService.createSeller(sellerRequest)
+                .map(createdSeller -> (StandardResponseEntity) StandardResponseEntity.created(
+                        mapSellerToSellerResponse(createdSeller), ApiResponseMessages.SELLER_CREATED_SUCCESS))
+                .onErrorResume(DuplicateResourceException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
+                .onErrorResume(InvalidSellerDataException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_SELLER + ": " + e.getMessage())));
     }
 
-    // Update an existing seller - Only for ADMINS
-    // Updates only the basic seller information e.g name
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<ResponseEntity<Seller>> updateSeller(@PathVariable Long id, @RequestBody Seller seller) {
-        // Retrieve the existing seller, update it, and save reactively
-        return sellerService.getSellerById(id)
-                .switchIfEmpty(Mono.just(new Seller())) // Provide an empty Mono if not found to fall into defaultIfEmpty
-                .flatMap(existingSeller -> {
-                    if (existingSeller.getId() == null) { // Check if it was actually found
-                        return Mono.just(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-                    }
-                    existingSeller.setName(seller.getName());
-                    // _seller.setEmail(seller.getEmail());//email is not updatable
-                    return sellerService.saveSeller(existingSeller)
-                            .map(updatedSeller -> new ResponseEntity<>(updatedSeller, HttpStatus.OK));
-                })
-                .onErrorResume(e -> Mono.just(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR)));
+    public Mono<StandardResponseEntity> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+        }
+        if (sellerRequest.getName() == null || sellerRequest.getName().isBlank()) {
+             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_UPDATE_REQUEST));
+        }
+
+        return sellerService.updateSeller(id, sellerRequest)
+                .map(updatedSeller -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        mapSellerToSellerResponse(updatedSeller), ApiResponseMessages.SELLER_UPDATED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
+                .onErrorResume(InvalidSellerDataException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_SELLER + ": " + e.getMessage())));
     }
 
-    // Delete a seller - Only for ADMINS
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    @ResponseStatus(HttpStatus.NO_CONTENT) // Indicate success with 204 No Content
-    public Mono<Void> deleteSeller(@PathVariable Long id) {
-        return sellerService.deleteSeller(id) // Use service, which returns Mono<Void>
-                .onErrorResume(e -> Mono.error(new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting seller", e))); // Handle errors reactively
+    public Mono<StandardResponseEntity> deleteSeller(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+        }
+
+        return sellerService.deleteSeller(id)
+                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.SELLER_DELETED_SUCCESS)))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_SELLER + ": " + e.getMessage())));
     }
 
-    // NEW: Endpoint to search sellers by name with reactive pagination and sorting
-    // Example: GET /api/sellers/search?query=tech&offset=0&limit=5
     @GetMapping("/search")
-    public Mono<ResponseEntity<List<Seller>>> searchSellers(
+    public Mono<StandardResponseEntity> searchSellers(
             @RequestParam String query,
             @RequestParam(defaultValue = "0") Long offset,
             @RequestParam(defaultValue = "10") Integer limit) {
 
+        if (query == null || query.isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+        }
+        if (offset < 0 || limit <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
         return sellerService.searchSellers(query, offset, limit)
+                .map(this::mapSellerToSellerResponse)
                 .collectList()
-                .map(sellers -> new ResponseEntity<>(sellers, HttpStatus.OK));
+                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
+                        sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLERS + ": " + e.getMessage())));
     }
 
-    // NEW: Endpoint to get total count for search results pagination metadata
     @GetMapping("/search/count")
-    public Mono<ResponseEntity<Long>> countSearchSellers(@RequestParam String query) {
+    public Mono<StandardResponseEntity> countSearchSellers(@RequestParam String query) {
+        if (query == null || query.isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+        }
+
         return sellerService.countSearchSellers(query)
-                .map(count -> new ResponseEntity<>(count, HttpStatus.OK));
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLER_COUNT + ": " + e.getMessage())));
     }
 }
