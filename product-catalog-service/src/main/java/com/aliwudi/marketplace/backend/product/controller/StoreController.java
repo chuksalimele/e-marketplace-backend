@@ -7,7 +7,6 @@ import com.aliwudi.marketplace.backend.product.exception.InvalidStoreDataExcepti
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using or creating
 import com.aliwudi.marketplace.backend.product.model.Store;
 import com.aliwudi.marketplace.backend.product.service.StoreService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
 import jakarta.validation.Valid;
@@ -19,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/stores")
@@ -55,14 +55,12 @@ public class StoreController {
         }
 
         return storeService.createStore(storeRequest)
-                .map(createdStore -> (StandardResponseEntity) StandardResponseEntity.created(
-                        mapStoreToStoreResponse(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS))
+                .map(createdStore -> (StandardResponseEntity) StandardResponseEntity.created(mapStoreToStoreResponse(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(ApiResponseMessages.DUPLICATE_STORE_NAME)))
                 .onErrorResume(InvalidStoreDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_STORE + ": " + e.getMessage())));
     }
@@ -72,8 +70,7 @@ public class StoreController {
         return storeService.getAllStores()
                 .map(this::mapStoreToStoreResponse)
                 .collectList()
-                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
     }
@@ -85,8 +82,7 @@ public class StoreController {
         }
 
         return storeService.getStoreById(id)
-                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapStoreToStoreResponse(store), ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
+                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(mapStoreToStoreResponse(store), ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -110,10 +106,8 @@ public class StoreController {
         return storeService.getStoresBySeller(sellerId, offset, limit)
                 .map(this::mapStoreToStoreResponse)
                 .collectList()
-                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES_BY_SELLER + ": " + e.getMessage())));
     }
@@ -126,8 +120,7 @@ public class StoreController {
 
         return storeService.countStoresBySeller(sellerId)
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., seller not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT_BY_SELLER + ": " + e.getMessage())));
     }
@@ -140,8 +133,7 @@ public class StoreController {
         }
 
         return storeService.updateStore(id, storeRequest)
-                .map(updatedStore -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapStoreToStoreResponse(updatedStore), ApiResponseMessages.STORE_UPDATED_SUCCESS))
+                .map(updatedStore -> (StandardResponseEntity) StandardResponseEntity.ok(mapStoreToStoreResponse(updatedStore), ApiResponseMessages.STORE_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(InvalidStoreDataException.class, e ->

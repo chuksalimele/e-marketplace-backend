@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
+import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,8 +39,4 @@ public class Payment {
     private LocalDateTime paymentDate;
 
     private String gatewayResponse; // Raw response from payment gateway
-
-    public enum PaymentStatus {
-        PENDING, SUCCESS, FAILED, REFUNDED
-    }
 }

@@ -7,7 +7,6 @@ import com.aliwudi.marketplace.backend.product.exception.InvalidSellerDataExcept
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using or creating
 import com.aliwudi.marketplace.backend.product.model.Seller;
 import com.aliwudi.marketplace.backend.product.service.SellerService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
 import jakarta.validation.Valid;
@@ -19,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
@@ -56,8 +56,7 @@ public class SellerController {
         return sellerService.getAllSellers(offset, limit)
                 .map(this::mapSellerToSellerResponse)
                 .collectList()
-                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLERS + ": " + e.getMessage())));
     }
@@ -77,8 +76,7 @@ public class SellerController {
         }
 
         return sellerService.getSellerById(id)
-                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapSellerToSellerResponse(seller), ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
+                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(mapSellerToSellerResponse(seller), ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -96,8 +94,7 @@ public class SellerController {
         }
 
         return sellerService.createSeller(sellerRequest)
-                .map(createdSeller -> (StandardResponseEntity) StandardResponseEntity.created(
-                        mapSellerToSellerResponse(createdSeller), ApiResponseMessages.SELLER_CREATED_SUCCESS))
+                .map(createdSeller -> (StandardResponseEntity) StandardResponseEntity.created(mapSellerToSellerResponse(createdSeller), ApiResponseMessages.SELLER_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
@@ -117,8 +114,7 @@ public class SellerController {
         }
 
         return sellerService.updateSeller(id, sellerRequest)
-                .map(updatedSeller -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapSellerToSellerResponse(updatedSeller), ApiResponseMessages.SELLER_UPDATED_SUCCESS))
+                .map(updatedSeller -> (StandardResponseEntity) StandardResponseEntity.ok(mapSellerToSellerResponse(updatedSeller), ApiResponseMessages.SELLER_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
@@ -158,8 +154,7 @@ public class SellerController {
         return sellerService.searchSellers(query, offset, limit)
                 .map(this::mapSellerToSellerResponse)
                 .collectList()
-                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLERS + ": " + e.getMessage())));
     }

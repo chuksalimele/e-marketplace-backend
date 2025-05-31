@@ -23,7 +23,7 @@ public class MediaAsset {
     private String fileType; // e.g., image/jpeg, video/mp4
     private String entityId; // ID of the associated entity (e.g., product ID, user ID)
     private String entityType; // Type of the associated entity (e.g., PRODUCT, USER, REVIEW)
-    private LocalDateTime uploadDate;
+    private LocalDateTime uploadTime;
     private Long fileSize; // Optional: Store file size
     private String storagePath; // Optional: Internal path in storage system
     private String uploadedBy; // Optional: User who uploaded this asset

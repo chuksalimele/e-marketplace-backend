@@ -4,7 +4,6 @@ import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentRequest;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentResponse;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Payment;
 import com.aliwudi.marketplace.backend.orderprocessing.service.PaymentService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException; // Assuming this for payment/order not found
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException; // If payment initiation involves stock check
@@ -12,6 +11,7 @@ import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientSto
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -37,8 +37,7 @@ public class PaymentController {
                 request.getAmount(),
                 request.getProductIdForInventory() // Temporary: in real use, would get this from order
             )
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(
-                PaymentResponse.builder()
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(PaymentResponse.builder()
                     .orderId(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
@@ -50,8 +49,7 @@ public class PaymentController {
             // Error handling for initiation process
             .onErrorResume(ResourceNotFoundException.class, e ->
                 Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + request.getOrderId())))
-            .onErrorResume(InsufficientStockException.class, e -> // If payment initiation triggers stock check
-                Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+            .onErrorResume(InsufficientStockException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
             .onErrorResume(Exception.class, e ->
                 Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_INITIATING_PAYMENT + ": " + e.getMessage())));
     }
@@ -76,12 +74,9 @@ public class PaymentController {
                         .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.PAYMENT_CALLBACK_PROCESSED_SUCCESS)))
                 )
                 // Handle exceptions from both the enum conversion and the service call
-                .onErrorResume(IllegalArgumentException.class, e -> // For invalid PaymentStatus value
-                    Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_STATUS_VALUE + status)))
-                .onErrorResume(ResourceNotFoundException.class, e -> // E.g., transactionRef or orderId not found
-                    Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PAYMENT_NOT_FOUND + transactionRef)))
-                .onErrorResume(Exception.class, e -> // Catch any other unexpected exceptions
-                    Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_PROCESSING_CALLBACK + ": " + e.getMessage())));
+                .onErrorResume(IllegalArgumentException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_STATUS_VALUE + status)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PAYMENT_NOT_FOUND + transactionRef)))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_PROCESSING_CALLBACK + ": " + e.getMessage())));
     }
 
     @GetMapping("/{orderId}")
@@ -91,8 +86,7 @@ public class PaymentController {
         }
 
         return paymentService.getPaymentDetails(orderId) // Service returns Mono<Payment>
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(
-                PaymentResponse.builder()
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(PaymentResponse.builder()
                     .orderId(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())

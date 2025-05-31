@@ -1,43 +1,34 @@
 package com.aliwudi.marketplace.backend.lgtmed.model;
 
-import jakarta.persistence.*;
+import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "deliveries")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table("deliveries") // Ensure your table name is correct
 public class Delivery {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, unique = true)
-    private String orderId; // The order this delivery is for
-
-    @Column(nullable = false, unique = true)
-    private String trackingNumber; // Unique tracking number
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private DeliveryStatus status;
-
-    private String currentLocation; // e.g., "Warehouse", "In Transit - Abuja", "Delivered"
-    private LocalDateTime estimatedDeliveryDate;
-    private LocalDateTime actualDeliveryDate;
+    private Long id; // Using Long for auto-incrementing ID
+    private String orderId; // Links to the Order entity
+    private String trackingNumber;
     private String recipientName;
     private String recipientAddress;
-    private String deliveryAgent; // e.g., "Kwik Delivery", "GIG Logistics"
-
-    public enum DeliveryStatus {
-        PENDING, SCHEDULED, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILED, CANCELLED, RETURNED
-    }
+    private String deliveryAgent; // e.g., "DHL", "FedEx", "Local Courier"
+    private DeliveryStatus status; // Enum: PENDING, SHIPPED, IN_TRANSIT, DELIVERED, FAILED, CANCELED
+    private String currentLocation; // Latest known location
+    private LocalDateTime estimatedDeliveryDate;
+    private LocalDateTime actualDeliveryDate; // Null until delivered
+    private String notes; // Any additional notes or updates
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+       
 }

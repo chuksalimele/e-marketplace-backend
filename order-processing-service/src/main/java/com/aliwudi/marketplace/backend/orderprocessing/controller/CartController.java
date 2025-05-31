@@ -3,7 +3,6 @@ package com.aliwudi.marketplace.backend.orderprocessing.controller;
 import com.aliwudi.marketplace.backend.common.dto.CartDto; // Assuming CartDto exists
 import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem; // Assuming CartItem exists
 import com.aliwudi.marketplace.backend.orderprocessing.service.CartService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException; // Assuming product/cart item not found
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException; // For stock-related errors
@@ -15,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 
 import java.util.Map;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -74,10 +74,8 @@ public class CartController {
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(InsufficientStockException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e -> // Catches authentication/security context errors
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage()))) // Add an unauthorized helper to StandardResponseEntity
-                .onErrorResume(Exception.class, e -> // General fallback error
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_ADDING_CART_ITEM + ": " + e.getMessage())));
+                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage()))) // Add an unauthorized helper to StandardResponseEntity
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_ADDING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -90,12 +88,9 @@ public class CartController {
                 .flatMap(userId -> cartService.getUserCartDetails(userId)) // Service returns Mono<CartDto>
                 // Cast to raw type StandardResponseEntity
                 .map(userCartDetails -> (StandardResponseEntity) StandardResponseEntity.ok(userCartDetails, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // Cart not found for user (empty or nonexistent)
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER)))
-                .onErrorResume(IllegalStateException.class, e -> // Catches authentication/security context errors
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> // General fallback error
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER)))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
@@ -121,10 +116,8 @@ public class CartController {
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(InsufficientStockException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e -> // Catches authentication/security context errors
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> // General fallback error
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
+                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -143,12 +136,9 @@ public class CartController {
                 .flatMap(userId -> cartService.removeCartItem(userId, productId)) // Service returns Mono<Void>
                 .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS))) // After completion, return success
                 // Error handling based on potential service exceptions
-                .onErrorResume(ResourceNotFoundException.class, e -> // Cart item/product not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART + productId)))
-                .onErrorResume(IllegalStateException.class, e -> // Catches authentication/security context errors
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> // General fallback error
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART + productId)))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -160,9 +150,7 @@ public class CartController {
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.clearCart(userId)) // Service returns Mono<Void>
                 .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_CLEARED_SUCCESS)))
-                .onErrorResume(IllegalStateException.class, e -> // Catches authentication/security context errors
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> // General fallback error
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CLEARING_CART + ": " + e.getMessage())));
+                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CLEARING_CART + ": " + e.getMessage())));
     }
 }

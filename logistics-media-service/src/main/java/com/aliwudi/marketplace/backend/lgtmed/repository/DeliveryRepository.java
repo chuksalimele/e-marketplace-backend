@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.lgtmed.repository;
 
+import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery.DeliveryStatus; // Import if not already
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux; // NEW: Import Flux
 import reactor.core.publisher.Mono;

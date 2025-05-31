@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
+import com.aliwudi.marketplace.backend.common.status.OrderStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor; // Will be adjusted by Lombok for new fields
 import lombok.Data;

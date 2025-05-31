@@ -28,27 +28,27 @@ public class StandardResponseEntity<T> extends ResponseEntity<ApiResponse<T>> {
 
     // Success response
     public static <T> StandardResponseEntity ok(T data, String message) {
-        return new StandardResponseEntity(ApiResponse.success(data, message, HttpStatus.OK), HttpStatus.OK);
+        return new StandardResponseEntity<>(ApiResponse.success(data, message, HttpStatus.OK), HttpStatus.OK);
     }
 
     // Created response
     public static <T> StandardResponseEntity created(T data, String message) {
-        return new StandardResponseEntity(ApiResponse.success(data, message, HttpStatus.CREATED), HttpStatus.CREATED);
+        return new StandardResponseEntity<>(ApiResponse.success(data, message, HttpStatus.CREATED), HttpStatus.CREATED);
     }
 
     // Not Found error response
     public static StandardResponseEntity notFound(String errorMessage) {
-        return new StandardResponseEntity(ApiResponse.error(errorMessage, HttpStatus.NOT_FOUND), HttpStatus.NOT_FOUND);
+        return new StandardResponseEntity<>(ApiResponse.error(errorMessage, HttpStatus.NOT_FOUND), HttpStatus.NOT_FOUND);
     }
 
     // Bad Request error response
     public static StandardResponseEntity badRequest(String errorMessage) {
-        return new StandardResponseEntity(ApiResponse.error(errorMessage, HttpStatus.BAD_REQUEST), HttpStatus.BAD_REQUEST);
+        return new StandardResponseEntity<>(ApiResponse.error(errorMessage, HttpStatus.BAD_REQUEST), HttpStatus.BAD_REQUEST);
     }
 
     // Internal Server Error response
     public static StandardResponseEntity internalServerError(String errorMessage) {
-        return new StandardResponseEntity(ApiResponse.error(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR), HttpStatus.INTERNAL_SERVER_ERROR);
+        return new StandardResponseEntity<>(ApiResponse.error(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     
         // Unauthorized response (NEW)

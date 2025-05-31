@@ -3,7 +3,6 @@ package com.aliwudi.marketplace.backend.user.controller;
 import com.aliwudi.marketplace.backend.user.dto.UserDto; // Assuming you have a UserDto for public user data
 import com.aliwudi.marketplace.backend.user.model.User; // Your User entity
 import com.aliwudi.marketplace.backend.user.service.UserService; // The service layer for user operations
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.user.exception.ResourceNotFoundException; // Re-using or creating this for user not found
 
@@ -16,6 +15,7 @@ import org.springframework.http.HttpStatus; // For internal clarity
 
 import java.util.List;
 import java.util.stream.Collectors;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/users") // A separate endpoint from /api/auth
@@ -60,8 +60,7 @@ public class UserController {
     public Mono<StandardResponseEntity> getMyUserDetails() {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.getUserById(userId)) // Service returns Mono<User>
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND))) // Should not happen if authenticated, but as fallback
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
@@ -81,8 +80,7 @@ public class UserController {
         // if this endpoint is only for specific roles (e.g., ADMIN).
 
         return userService.getUserById(id) // Service returns Mono<User>
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -101,10 +99,8 @@ public class UserController {
 
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.updateUser(userId, userDto)) // Service returns Mono<User>
-                .map(updatedUser -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapUserToUserDto(updatedUser), ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // Should not happen for authenticated user, but as fallback
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .map(updatedUser -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(updatedUser), ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -120,8 +116,7 @@ public class UserController {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.deleteUser(userId)) // Service returns Mono<Void>
                 .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.USER_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e -> // User not found for deletion
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e ->

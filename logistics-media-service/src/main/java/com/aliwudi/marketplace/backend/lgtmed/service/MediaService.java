@@ -5,7 +5,6 @@ import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidMediaDataExceptio
 import com.aliwudi.marketplace.backend.lgtmed.exception.MediaAssetNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.repository.MediaRepository;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @Service
 @RequiredArgsConstructor
@@ -61,7 +61,7 @@ public class MediaService{
                             .fileType(req.getFileType())
                             .entityId(req.getEntityId())
                             .entityType(req.getEntityType())
-                            .uploadDate(LocalDateTime.now())
+                            .uploadTime(LocalDateTime.now())
                             // .fileSize(fileSize) // If calculated
                             .build();
 

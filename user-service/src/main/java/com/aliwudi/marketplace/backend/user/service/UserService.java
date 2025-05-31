@@ -7,7 +7,6 @@ import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.user.exception.RoleNotFoundException; // Import your custom exception
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException; // Reusing this exception
 import com.aliwudi.marketplace.backend.common.enumeration.ERole;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For messages in service
 import com.aliwudi.marketplace.backend.user.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +17,7 @@ import reactor.core.publisher.Mono;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @Service
 @RequiredArgsConstructor

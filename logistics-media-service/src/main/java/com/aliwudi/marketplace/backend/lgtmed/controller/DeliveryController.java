@@ -1,22 +1,22 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
+import com.aliwudi.marketplace.backend.common.dto.DeliveryDto;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryRequest;
-import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryResponse;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryUpdateRequest;
 import com.aliwudi.marketplace.backend.lgtmed.service.DeliveryService;
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery; // Import Delivery for mapDeliveryToDeliveryResponse
+import com.aliwudi.marketplace.backend.lgtmed.model.Delivery; // Import Delivery for mapDeliveryToDeliveryDto
 import com.aliwudi.marketplace.backend.lgtmed.exception.DeliveryNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidDeliveryDataException;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
-import jakarta.validation.Valid;
+import jakarta.validation.Valid; 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize; // Assuming security is applied here
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.List; // For Flux.collectList()
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/deliveries")
@@ -26,13 +26,13 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     /**
-     * Helper method to map Delivery entity to DeliveryResponse DTO for public exposure.
+     * Helper method to map Delivery entity to DeliveryDto DTO for public exposure.
      */
-    private DeliveryResponse mapDeliveryToDeliveryResponse(Delivery delivery) {
+    private DeliveryDto mapDeliveryToDeliveryDto(Delivery delivery) {
         if (delivery == null) {
             return null;
         }
-        return DeliveryResponse.builder()
+        return DeliveryDto.builder()
                 .orderId(delivery.getOrderId())
                 .trackingNumber(delivery.getTrackingNumber())
                 .status(delivery.getStatus())
@@ -64,8 +64,7 @@ public class DeliveryController {
                 request.getDeliveryAgent(),
                 request.getEstimatedDeliveryDate()
             )
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.created(
-                    mapDeliveryToDeliveryResponse(delivery), ApiResponseMessages.DELIVERY_CREATED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.created(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_CREATED_SUCCESS))
             .onErrorResume(InvalidDeliveryDataException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
             .onErrorResume(Exception.class, e ->
@@ -79,8 +78,7 @@ public class DeliveryController {
         }
 
         return deliveryService.getDeliveryByOrderId(orderId)
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(
-                    mapDeliveryToDeliveryResponse(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
             .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_ORDER + orderId)))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -95,8 +93,7 @@ public class DeliveryController {
         }
 
         return deliveryService.getDeliveryByTrackingNumber(trackingNumber)
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(
-                    mapDeliveryToDeliveryResponse(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
             .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_TRACKING + trackingNumber)))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -108,18 +105,17 @@ public class DeliveryController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')") // Only admin/delivery agent can update status
     public Mono<StandardResponseEntity> updateDeliveryStatus(@Valid @RequestBody DeliveryUpdateRequest request) {
         if (request.getTrackingNumber() == null || request.getTrackingNumber().isBlank() ||
-            request.getNewStatus() == null || request.getNewStatus().isBlank()) {
+            request.getNewStatus() == null || request.getNewStatus().name().isBlank()) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_DELIVERY_STATUS_UPDATE_REQUEST));
         }
 
         return deliveryService.updateDeliveryStatus(
                 request.getTrackingNumber(),
-                request.getNewStatus(),
+                request.getNewStatus().name(),
                 request.getCurrentLocation(),
                 request.getNotes()
             )
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(
-                    mapDeliveryToDeliveryResponse(delivery), ApiResponseMessages.DELIVERY_STATUS_UPDATED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_STATUS_UPDATED_SUCCESS))
             .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_UPDATE + request.getTrackingNumber())))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -140,8 +136,7 @@ public class DeliveryController {
         }
 
         return deliveryService.cancelDelivery(trackingNumber, reason)
-                .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapDeliveryToDeliveryResponse(delivery), ApiResponseMessages.DELIVERY_CANCELED_SUCCESS))
+                .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_CANCELED_SUCCESS))
                 .onErrorResume(DeliveryNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(InvalidDeliveryDataException.class, e ->
@@ -165,12 +160,10 @@ public class DeliveryController {
         }
 
         return deliveryService.getDeliveriesByAgent(deliveryAgent, offset, limit)
-                .map(this::mapDeliveryToDeliveryResponse)
+                .map(this::mapDeliveryToDeliveryDto)
                 .collectList()
-                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidDeliveryDataException.class, e -> // Catches invalid agent check from service
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
+                .onErrorResume(InvalidDeliveryDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_DELIVERIES_BY_AGENT + ": " + e.getMessage())));
     }
@@ -185,8 +178,7 @@ public class DeliveryController {
 
         return deliveryService.countDeliveriesByAgent(deliveryAgent)
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.DELIVERY_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidDeliveryDataException.class, e -> // Catches invalid agent check from service
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(InvalidDeliveryDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_DELIVERIES_BY_AGENT + ": " + e.getMessage())));
     }
@@ -205,12 +197,10 @@ public class DeliveryController {
         }
 
         return deliveryService.searchDeliveries(query, offset, limit)
-                .map(this::mapDeliveryToDeliveryResponse)
+                .map(this::mapDeliveryToDeliveryDto)
                 .collectList()
-                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidDeliveryDataException.class, e -> // Catches invalid query check from service
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
+                .onErrorResume(InvalidDeliveryDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_DELIVERIES + ": " + e.getMessage())));
     }
@@ -224,8 +214,7 @@ public class DeliveryController {
 
         return deliveryService.countSearchDeliveries(query)
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.DELIVERY_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidDeliveryDataException.class, e -> // Catches invalid query check from service
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(InvalidDeliveryDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_SEARCH_DELIVERIES + ": " + e.getMessage())));
     }
@@ -241,10 +230,9 @@ public class DeliveryController {
         }
 
         return deliveryService.getAllDeliveries(offset, limit)
-                .map(this::mapDeliveryToDeliveryResponse)
+                .map(this::mapDeliveryToDeliveryDto)
                 .collectList()
-                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
+                .map(deliveries -> (StandardResponseEntity) StandardResponseEntity.ok(deliveries, ApiResponseMessages.DELIVERIES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_DELIVERIES + ": " + e.getMessage())));
     }

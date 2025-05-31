@@ -1,12 +1,11 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
+import com.aliwudi.marketplace.backend.common.dto.MediaDto;
 import com.aliwudi.marketplace.backend.lgtmed.dto.MediaUploadRequest;
-import com.aliwudi.marketplace.backend.lgtmed.dto.MediaResponse; // Assuming this DTO is correctly located
 import com.aliwudi.marketplace.backend.lgtmed.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.service.MediaService;
 import com.aliwudi.marketplace.backend.lgtmed.exception.MediaAssetNotFoundException; // New custom exception
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidMediaDataException; // New custom exception
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
 import jakarta.validation.Valid;
@@ -17,6 +16,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/media")
@@ -26,21 +26,21 @@ public class MediaController {
     private final MediaService mediaService;
 
     /**
-     * Helper method to map MediaAsset entity to MediaResponse DTO for public exposure.
+     * Helper method to map MediaAsset entity to MediaDto DTO for public exposure.
      */
-    private MediaResponse mapMediaAssetToMediaResponse(MediaAsset asset) {
+    private MediaDto mapMediaAssetToMediaDto(MediaAsset asset) {
         if (asset == null) {
             return null;
         }
-        return MediaResponse.builder()
-                .assetId(String.valueOf(asset.getId())) // Convert Long ID to String if DTO expects String
+        return MediaDto.builder()
+                .id(asset.getId()) // Convert Long ID to String if DTO expects String
                 .assetName(asset.getAssetName())
                 .uniqueFileName(asset.getUniqueFileName()) // Include uniqueFileName
                 .url(asset.getUrl())
                 .fileType(asset.getFileType())
                 .entityId(asset.getEntityId())
                 .entityType(asset.getEntityType())
-                .uploadDate(asset.getUploadDate())
+                .uploadTime(asset.getUploadTime())
                 .build();
     }
 
@@ -57,8 +57,7 @@ public class MediaController {
         }
 
         return mediaService.uploadMedia(request)
-            .map(asset -> (StandardResponseEntity) StandardResponseEntity.created(
-                    mapMediaAssetToMediaResponse(asset), ApiResponseMessages.MEDIA_UPLOAD_SUCCESS))
+            .map(asset -> (StandardResponseEntity) StandardResponseEntity.created(mapMediaAssetToMediaDto(asset), ApiResponseMessages.MEDIA_UPLOAD_SUCCESS))
             .onErrorResume(InvalidMediaDataException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
             .onErrorResume(Exception.class, e ->
@@ -72,8 +71,7 @@ public class MediaController {
         }
 
         return mediaService.getMediaAssetByUniqueFileName(uniqueFileName)
-            .map(asset -> (StandardResponseEntity) StandardResponseEntity.ok(
-                    mapMediaAssetToMediaResponse(asset), ApiResponseMessages.MEDIA_RETRIEVED_SUCCESS))
+            .map(asset -> (StandardResponseEntity) StandardResponseEntity.ok(mapMediaAssetToMediaDto(asset), ApiResponseMessages.MEDIA_RETRIEVED_SUCCESS))
             .switchIfEmpty(Mono.error(new MediaAssetNotFoundException(ApiResponseMessages.MEDIA_NOT_FOUND + uniqueFileName)))
             .onErrorResume(MediaAssetNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -96,10 +94,9 @@ public class MediaController {
         }
 
         return mediaService.getMediaAssetsForEntity(entityId, entityType, offset, limit)
-            .map(this::mapMediaAssetToMediaResponse)
+            .map(this::mapMediaAssetToMediaDto)
             .collectList()
-            .map(responses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                    responses, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
+            .map(responses -> (StandardResponseEntity) StandardResponseEntity.ok(responses, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
             .onErrorResume(Exception.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
     }
@@ -147,10 +144,9 @@ public class MediaController {
         }
 
         return mediaService.getAllMediaAssets(offset, limit)
-                .map(this::mapMediaAssetToMediaResponse)
+                .map(this::mapMediaAssetToMediaDto)
                 .collectList()
-                .map(responses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        responses, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
+                .map(responses -> (StandardResponseEntity) StandardResponseEntity.ok(responses, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_MEDIA + ": " + e.getMessage())));
     }

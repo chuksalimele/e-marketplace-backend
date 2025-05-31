@@ -1,20 +1,17 @@
 package com.aliwudi.marketplace.backend.common.dto;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.util.HashSet;
-import java.util.Set;
+import lombok.Builder;
 
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class StoreDto {
     private Long id;
     private String name; // e.g., "Downtown Branch", "Online Warehouse"
@@ -24,4 +21,6 @@ public class StoreDto {
     private String profileImageUrl;
     private Double rating; // StoreDto-specific rating
     private SellerDto seller;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;    
 }

@@ -7,7 +7,6 @@ import com.aliwudi.marketplace.backend.product.dto.ReviewResponse; // Assuming t
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using existing or creating this
 import com.aliwudi.marketplace.backend.product.model.Review;
 import com.aliwudi.marketplace.backend.product.service.ReviewService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
 import jakarta.validation.Valid;
@@ -19,6 +18,7 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors; // Needed for stream operations on List
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -58,8 +58,7 @@ public class ReviewController {
         }
 
         return reviewService.submitReview(reviewRequest)
-                .map(review -> (StandardResponseEntity) StandardResponseEntity.created(
-                        mapReviewToReviewResponse(review), ApiResponseMessages.REVIEW_SUBMITTED_SUCCESS))
+                .map(review -> (StandardResponseEntity) StandardResponseEntity.created(mapReviewToReviewResponse(review), ApiResponseMessages.REVIEW_SUBMITTED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + e.getMessage()))) // Assuming this comes from product/user validation
                 .onErrorResume(DuplicateResourceException.class, e ->
@@ -86,10 +85,8 @@ public class ReviewController {
         return reviewService.getReviewsByProductId(productId, offset, limit)
                 .map(this::mapReviewToReviewResponse)
                 .collectList()
-                .map(reviewResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        reviewResponses, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // Catches if product itself not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .map(reviewResponses -> (StandardResponseEntity) StandardResponseEntity.ok(reviewResponses, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_FOR_PRODUCT + ": " + e.getMessage())));
     }
@@ -110,10 +107,8 @@ public class ReviewController {
         return reviewService.getReviewsByUserId(userId, offset, limit)
                 .map(this::mapReviewToReviewResponse)
                 .collectList()
-                .map(reviewResponses -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        reviewResponses, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> // Catches if user itself not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + userId)))
+                .map(reviewResponses -> (StandardResponseEntity) StandardResponseEntity.ok(reviewResponses, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + userId)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_BY_USER + ": " + e.getMessage())));
     }
@@ -130,8 +125,7 @@ public class ReviewController {
                     Map<String, Double> data = Map.of("averageRating", averageRating != null ? averageRating : 0.0);
                     return (StandardResponseEntity) StandardResponseEntity.ok(data, ApiResponseMessages.AVERAGE_RATING_RETRIEVED_SUCCESS);
                 })
-                .onErrorResume(ResourceNotFoundException.class, e -> // Product not found
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_AVERAGE_RATING + ": " + e.getMessage())));
     }
@@ -146,8 +140,7 @@ public class ReviewController {
         }
 
         return reviewService.updateReview(id, updateRequest)
-                .map(updatedReview -> (StandardResponseEntity) StandardResponseEntity.ok(
-                        mapReviewToReviewResponse(updatedReview), ApiResponseMessages.REVIEW_UPDATED_SUCCESS))
+                .map(updatedReview -> (StandardResponseEntity) StandardResponseEntity.ok(mapReviewToReviewResponse(updatedReview), ApiResponseMessages.REVIEW_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
                 .onErrorResume(InvalidReviewDataException.class, e ->

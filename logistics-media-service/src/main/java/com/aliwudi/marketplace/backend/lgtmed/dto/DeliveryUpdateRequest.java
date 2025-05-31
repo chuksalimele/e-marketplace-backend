@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.lgtmed.dto;
 
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery.DeliveryStatus;
+import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

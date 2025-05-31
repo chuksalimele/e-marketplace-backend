@@ -4,15 +4,15 @@
  */
 package com.aliwudi.marketplace.backend.common.dto;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data // Generates getters, setters, toString, equals, hashCode
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class InventoryDto {
     private Long id;
     private ProductDto Product; 

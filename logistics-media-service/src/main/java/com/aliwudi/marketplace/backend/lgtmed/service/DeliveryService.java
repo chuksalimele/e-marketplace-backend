@@ -1,12 +1,10 @@
 package com.aliwudi.marketplace.backend.lgtmed.service;
 
+import com.aliwudi.marketplace.backend.common.intersevice.OrderIntegrationService;
 import com.aliwudi.marketplace.backend.lgtmed.exception.DeliveryNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidDeliveryDataException;
 import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
-import com.aliwudi.marketplace.backend.lgtmed.model.DeliveryStatus;
 import com.aliwudi.marketplace.backend.lgtmed.repository.DeliveryRepository;
-import com.aliwudi.marketplace.backend.order.repository.OrderRepository;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,18 +13,20 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 
 @Service
 @RequiredArgsConstructor
 public class DeliveryService{
 
     private final DeliveryRepository deliveryRepository;
-    private final OrderRepository orderRepository;
+    private final OrderIntegrationService orderIntegrationService;
 
     
     public Mono<Delivery> createDelivery(String orderId, String recipientName, String recipientAddress, String deliveryAgent, LocalDateTime estimatedDeliveryDate) {
         // 1. Validate if the order exists
-        return orderRepository.existsById(orderId)
+        return orderIntegrationService.orderExistsById(orderId)
                 .flatMap(orderExists -> {
                     if (Boolean.FALSE.equals(orderExists)) {
                         return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.ORDER_NOT_FOUND + orderId));
@@ -100,7 +100,7 @@ public class DeliveryService{
                         if (delivery.getStatus() == DeliveryStatus.DELIVERED && status != DeliveryStatus.DELIVERED) {
                             return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_STATUS_TRANSITION_FROM_DELIVERED));
                         }
-                        if (delivery.getStatus() == DeliveryStatus.CANCELED && status != DeliveryStatus.CANCELED) {
+                        if (delivery.getStatus() == DeliveryStatus.CANCELLED && status != DeliveryStatus.CANCELLED) {
                             return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_STATUS_TRANSITION_FROM_CANCELED));
                         }
 
@@ -140,11 +140,11 @@ public class DeliveryService{
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_CANCEL + trackingNumber)))
                 .flatMap(delivery -> {
                     // Only allow cancellation if status is PENDING or SHIPPED (adjust as per business rules)
-                    if (delivery.getStatus() == DeliveryStatus.DELIVERED || delivery.getStatus() == DeliveryStatus.CANCELED || delivery.getStatus() == DeliveryStatus.FAILED) {
+                    if (delivery.getStatus() == DeliveryStatus.DELIVERED || delivery.getStatus() == DeliveryStatus.CANCELLED || delivery.getStatus() == DeliveryStatus.FAILED) {
                         return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_STATUS_FOR_CANCELLATION + delivery.getStatus().name()));
                     }
 
-                    delivery.setStatus(DeliveryStatus.CANCELED);
+                    delivery.setStatus(DeliveryStatus.CANCELLED);
                     String newNotes = "Canceled. Reason: " + (cancellationReason != null && !cancellationReason.isBlank() ? cancellationReason : "No reason provided.");
                     String existingNotes = delivery.getNotes();
                     delivery.setNotes(existingNotes == null || existingNotes.isBlank() ? newNotes : existingNotes + "\n" + newNotes);
