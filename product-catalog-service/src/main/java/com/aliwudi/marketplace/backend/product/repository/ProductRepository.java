@@ -8,6 +8,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface ProductRepository extends R2dbcRepository<Product, Long> {
@@ -103,4 +105,26 @@ public interface ProductRepository extends R2dbcRepository<Product, Long> {
      * Check if a product with a given name exists for a specific seller (e.g., for uniqueness).
      */
     Mono<Boolean> existsByNameIgnoreCaseAndSellerId(String name, Long sellerId);
+    
+
+
+    @Query("SELECT p.* FROM products p JOIN stores s ON p.store_id = s.id JOIN locations l ON s.location_id = l.id WHERE l.id = :locationId")
+    Flux<Product> findProductsByLocationId(@Param("locationId") Long locationId, Pageable pageable);
+
+    /**
+     * Counts products associated with a specific location ID by joining through Store and Location tables.
+     */
+    @Query("SELECT COUNT(p.id) FROM products p JOIN stores s ON p.store_id = s.id JOIN locations l ON s.location_id = l.id WHERE l.id = :locationId")
+    Mono<Long> countProductsByLocationId(@Param("locationId") Long locationId);
+
+    @Query("SELECT p.* FROM products p JOIN stores s ON p.store_id = s.id JOIN locations l ON s.location_id = l.id WHERE l.country = :country AND l.city = :city")
+    Flux<Product> findProductsByCountryAndCity(@Param("country") String country, @Param("city") String city, Pageable pageable);
+
+    /**
+     * Counts products associated with a specific country and city by joining through Store and Location tables.
+     */
+    @Query("SELECT COUNT(p.id) FROM products p JOIN stores s ON p.store_id = s.id JOIN locations l ON s.location_id = l.id WHERE l.country = :country AND l.city = :city")
+    Mono<Long> countProductsByCountryAndCity(@Param("country") String country, @Param("city") String city);
+
+    
 }

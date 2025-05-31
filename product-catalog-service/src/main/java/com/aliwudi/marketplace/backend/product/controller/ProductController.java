@@ -378,4 +378,71 @@ public class ProductController {
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_PRODUCT_COUNT + ": " + e.getMessage())));
     }
+    
+    // --- New Location-based Endpoints ---
+
+    @GetMapping("/location/{locationId}")
+    public Mono<StandardResponseEntity> getProductsByLocationId(
+            @PathVariable Long locationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (locationId == null || locationId <= 0 || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
+        return productService.getProductsByLocationId(locationId, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/location/{locationId}/count")
+    public Mono<StandardResponseEntity> countProductsByLocationId(@PathVariable Long locationId) {
+        if (locationId == null || locationId <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+        }
+        return productService.countProductsByLocationId(locationId)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/location/country/{country}/city/{city}")
+    public Mono<StandardResponseEntity> getProductsByCountryAndCity(
+            @PathVariable String country,
+            @PathVariable String city,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (country == null || country.isBlank() || city == null || city.isBlank() || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
+        return productService.getProductsByCountryAndCity(country, city, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/location/country/{country}/city/{city}/count")
+    public Mono<StandardResponseEntity> countProductsByCountryAndCity(
+            @PathVariable String country,
+            @PathVariable String city) {
+
+        if (country == null || country.isBlank() || city == null || city.isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+        }
+        return productService.countProductsByCountryAndCity(country, city)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT + ": " + e.getMessage())));
+    }
+    
 }

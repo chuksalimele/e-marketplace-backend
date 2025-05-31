@@ -347,6 +347,60 @@ public class ProductService {
         return productRepository.countByNameContainingIgnoreCase(productName);
     }
 
+    // --- New Location-based methods ---
+
+    /**
+     * Finds products by location ID with pagination.
+     * Assumes ProductRepository has a method like `findByStore_LocationId(Long locationId, Pageable pageable)`.
+     *
+     * @param locationId The ID of the location.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting products.
+     */
+    public Flux<Product> getProductsByLocationId(Long locationId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return productRepository.findProductsByLocationId(locationId,  pageable);
+    }
+
+    /**
+     * Counts products by location ID.
+     * Assumes ProductRepository has a method like `countByStore_LocationId(Long locationId)`.
+     *
+     * @param locationId The ID of the location.
+     * @return A Mono emitting the count of products.
+     */
+    public Mono<Long> countProductsByLocationId(Long locationId) {        
+        return productRepository.countProductsByLocationId(locationId);
+    }
+
+    /**
+     * Finds products by country and city with pagination.
+     * Assumes ProductRepository has a method like `findByStore_Location_CountryAndStore_Location_City(String country, String city, Pageable pageable)`.
+     *
+     * @param country The country name.
+     * @param city The city name.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting products.
+     */
+    public Flux<Product> getProductsByCountryAndCity(String country, String city, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return productRepository.findProductsByCountryAndCity(country, city, pageable);
+    }
+
+    /**
+     * Counts products by country and city.
+     * Assumes ProductRepository has a method like `countByStore_Location_CountryAndStore_Location_City(String country, String city)`.
+     *
+     * @param country The country name.
+     * @param city The city name.
+     * @return A Mono emitting the count of products.
+     */
+    public Mono<Long> countProductsByCountryAndCity(String country, String city) {
+        return productRepository.countProductsByCountryAndCity(country, city);
+    }
+    
     // The existing methods for location-based filtering are removed as they are not explicitly in the repository.
     // If location filtering is needed, it should be added to the Product model and ProductRepository.
     // For now, we will only implement methods explicitly defined in the provided ProductRepository.

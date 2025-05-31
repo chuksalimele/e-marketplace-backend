@@ -2,6 +2,13 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
+    public String ERROR_RETRIEVING_PRODUCT_COUNT_BY_PRICE_RANGE = "Error retrieving product count by price range";
+    public String ERROR_RETRIEVING_PRODUCTS_BY_PRICE_RANGE = "Error retrieving products by price range";
+    public String ERROR_RETRIEVING_PRODUCT_COUNT_BY_STORE_AND_CATEGORY = "Error retrieving product count by store and category";
+    public String ERROR_RETRIEVING_PRODUCTS_BY_STORE_AND_CATEGORY = "Error retrieving products by store and category";    
+    public String ERROR_RETRIEVING_PRODUCTS_BY_SELLER = "Error retrieving products by seller.";
+    public String ERROR_RETRIEVING_PRODUCTS_BY_SELLER_AND_CATEGORY = "Error retrieving products by seller and category.";
+
     // --- Success Messages ---
     String ORDER_CREATED_SUCCESS = "Order created successfully.";
     String ORDER_RETRIEVED_SUCCESS = "Order retrieved successfully.";
