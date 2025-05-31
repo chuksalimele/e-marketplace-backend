@@ -1,32 +1,69 @@
 package com.aliwudi.marketplace.backend.product.repository;
 
 import com.aliwudi.marketplace.backend.product.model.Store;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
+import org.springframework.data.domain.Pageable; // For pagination
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
-
-import reactor.core.publisher.Flux; // NEW: Import Flux for multiple results
-import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
-
-// Remove old JpaRepository import, Page, and Pageable imports
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Repository
-// NEW: Extend ReactiveCrudRepository instead of JpaRepository
-public interface StoreRepository extends ReactiveCrudRepository<Store, Long> {
+public interface StoreRepository extends R2dbcRepository<Store, Long> {
 
-    // Old: Optional<Store> findByName(String name);
-    // NEW: Returns Mono for zero or one result.
-    Mono<Store> findByName(String name);
+    // --- Basic Retrieval & Pagination ---
+    Flux<Store> findAllBy(Pageable pageable);
 
-    // Old: Page<Store> findBySeller_Id(Long sellerId, Pageable pageable);
-    // NEW: For pagination, use Flux with offset and limit parameters, which R2DBC translates to SQL OFFSET/LIMIT.
-    Flux<Store> findBySeller_Id(Long sellerId, Long offset, Integer limit);
-    // NEW: Add a count method for total elements when paginating.
-    Mono<Long> countBySeller_Id(Long sellerId);
+    // --- Store Filtering and Search with Pagination ---
 
-    // Old: Page<Store> findByLocationIgnoreCase(String locationPart, Pageable pageable);
-    Flux<Store> findByLocationIgnoreCase(String locationPart, Long offset, Integer limit);
-    Mono<Long> countByLocationIgnoreCase(String locationPart);
+    /**
+     * Find all stores owned by a specific seller with pagination.
+     */
+    Flux<Store> findBySellerId(Long sellerId, Pageable pageable);
 
-    // You might need more complex queries for geographical proximity later,
-    // which would also return Flux/Mono.
+    /**
+     * Search stores by name (case-insensitive, contains) with pagination.
+     */
+    Flux<Store> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /**
+     * Search stores by locationId (case-insensitive, contains) with pagination.
+     */
+    Flux<Store> findByLocationIdContainingIgnoreCase(String locationId, Pageable pageable);
+
+    /**
+     * Find stores with a rating greater than or equal to a minimum value, with pagination.
+     */
+    Flux<Store> findByRatingGreaterThanEqual(Double minRating, Pageable pageable);
+
+    // --- Count Queries (for pagination metadata) ---
+
+    /**
+     * Count all stores.
+     */
+    Mono<Long> count();
+
+    /**
+     * Count all stores owned by a specific seller.
+     */
+    Mono<Long> countBySellerId(Long sellerId);
+
+    /**
+     * Count stores by name (case-insensitive, contains).
+     */
+    Mono<Long> countByNameContainingIgnoreCase(String name);
+
+    /**
+     * Count stores by locationId (case-insensitive, contains).
+     */
+    Mono<Long> countByLocationIdContainingIgnoreCase(String locationId);
+
+    /**
+     * Count stores with a rating greater than or equal to a minimum value.
+     */
+    Mono<Long> countByRatingGreaterThanEqual(Double minRating);
+
+    /**
+     * Check if a store with a given name exists for a specific seller (e.g., for uniqueness).
+     */
+    Mono<Boolean> existsByNameIgnoreCaseAndSellerId(String name, Long sellerId);
 }

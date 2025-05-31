@@ -1,29 +1,45 @@
-// SellerRepository.java
 package com.aliwudi.marketplace.backend.product.repository;
 
 import com.aliwudi.marketplace.backend.product.model.Seller;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
+import org.springframework.data.domain.Pageable; // For pagination
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
-
-import reactor.core.publisher.Flux; // NEW: Import Flux for multiple results
-import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
-
-// Remove old JpaRepository import, Page, and Pageable imports
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Repository
-// NEW: Extend ReactiveCrudRepository instead of JpaRepository
-public interface SellerRepository extends ReactiveCrudRepository<Seller, Long> {
-    // ReactiveCrudRepository provides basic reactive CRUD operations.
+public interface SellerRepository extends R2dbcRepository<Seller, Long> {
 
-    // Old: Optional<Seller> findByName(String name);
-    // NEW: Returns Mono for zero or one result.
-    Mono<Seller> findByName(String name);
+    // --- Basic Retrieval & Pagination ---
+    Flux<Seller> findAllBy(Pageable pageable);
 
-    // Old: Page<Seller> findByNameContainingIgnoreCase(String name, Pageable pageable);
-    // NEW: For pagination, use Flux with offset and limit parameters, which R2DBC translates to SQL OFFSET/LIMIT.
-    Flux<Seller> findByNameContainingIgnoreCase(String name, Long offset, Integer limit);
-    // NEW: Add a count method for total elements when paginating.
+    // --- Seller Filtering and Search with Pagination ---
+
+    /**
+     * Search sellers by name (case-insensitive, contains) with pagination.
+     */
+    Flux<Seller> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /**
+     * Find a seller by their unique email address (no pagination, as it's unique).
+     */
+    Mono<Seller> findByEmail(String email);
+
+
+    // --- Count Queries (for pagination metadata) ---
+
+    /**
+     * Count all sellers.
+     */
+    Mono<Long> count();
+
+    /**
+     * Count sellers by name (case-insensitive, contains).
+     */
     Mono<Long> countByNameContainingIgnoreCase(String name);
 
-    public Flux<Seller> findAll(Long offset, Integer limit);
+    /**
+     * Check if a seller with a given email already exists.
+     */
+    Mono<Boolean> existsByEmail(String email);
 }

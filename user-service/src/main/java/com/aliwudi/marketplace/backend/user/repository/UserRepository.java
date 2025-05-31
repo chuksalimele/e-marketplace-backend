@@ -1,28 +1,52 @@
-// UserRepository.java
 package com.aliwudi.marketplace.backend.user.repository;
 
 import com.aliwudi.marketplace.backend.user.model.User;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
-import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
-
-// Remove old JpaRepository import and Optional import
-
-@Repository
-// NEW: Extend ReactiveCrudRepository instead of JpaRepository
 public interface UserRepository extends ReactiveCrudRepository<User, Long> {
-    // ReactiveCrudRepository automatically provides reactive versions of save(), findById(), findAll(), deleteById().
 
-    // Old: Optional<User> findByUsername(String username);
-    // NEW: Returns Mono for zero or one result. An empty Mono means no user found.
+    // --- Basic CRUD operations are inherited from ReactiveCrudRepository ---
+
+    // Find a user by username
     Mono<User> findByUsername(String username);
 
-    // Old: Boolean existsByUsername(String username);
-    // NEW: Returns Mono<Boolean> for the existence check.
-    Mono<Boolean> existsByUsername(String username);
+    // Find a user by email
+    Mono<User> findByEmail(String email);
 
-    // Old: Boolean existsByEmail(String email);
-    // NEW: Returns Mono<Boolean> for the existence check.
-    Mono<Boolean> existsByEmail(String email);
+    // Find users by first name, with pagination
+    Flux<User> findByFirstNameContainingIgnoreCase(String firstName, Pageable pageable);
+
+    // Count users by first name
+    Mono<Long> countByFirstNameContainingIgnoreCase(String firstName);
+
+    // Find users by last name, with pagination
+    Flux<User> findByLastNameContainingIgnoreCase(String lastName, Pageable pageable);
+
+    // Count users by last name
+    Mono<Long> countByLastNameContainingIgnoreCase(String lastName);
+
+    // Find users by username or email, with pagination
+    @Query("SELECT * FROM users WHERE username ILIKE :searchTerm OR email ILIKE :searchTerm")
+    Flux<User> findByUsernameOrEmailContainingIgnoreCase(String searchTerm, Pageable pageable);
+
+    // Count users by username or email
+    @Query("SELECT COUNT(*) FROM users WHERE username ILIKE :searchTerm OR email ILIKE :searchTerm")
+    Mono<Long> countByUsernameOrEmailContainingIgnoreCase(String searchTerm);
+
+    // Find users created after a certain date, with pagination
+    Flux<User> findByCreatedAtAfter(java.time.LocalDateTime date, Pageable pageable);
+
+    // Count users created after a certain date
+    Mono<Long> countByCreatedAtAfter(java.time.LocalDateTime date);
+
+    // Find users with a specific shipping address, with pagination
+    Flux<User> findByShippingAddressContainingIgnoreCase(String shippingAddress, Pageable pageable);
+
+    // Count users with a specific shipping address
+    Mono<Long> countByShippingAddressContainingIgnoreCase(String shippingAddress);
+
 }

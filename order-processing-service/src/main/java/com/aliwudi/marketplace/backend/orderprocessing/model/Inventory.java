@@ -4,14 +4,16 @@
  */
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "inventory")
+@Table("inventory")
 @Data // Generates getters, setters, toString, equals, hashCode
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,15 +21,8 @@ import lombok.NoArgsConstructor;
 public class Inventory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(unique = true, nullable = false)
-    private String productId; // Unique identifier for the product
-
-    @Column(nullable = false)
-    private Integer availableQuantity; // Current stock level
-
-    @Column(nullable = false)
+    private Long id;  
+    private Long productId; // Unique identifier for the product  
+    private Integer availableQuantity; // Current stock level    
     private Integer reservedQuantity; // Quantity reserved for pending orders
 }

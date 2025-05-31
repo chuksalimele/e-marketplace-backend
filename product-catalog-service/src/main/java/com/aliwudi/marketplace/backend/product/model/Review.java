@@ -1,47 +1,32 @@
 package com.aliwudi.marketplace.backend.product.model;
 
-import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
+import lombok.Builder;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "reviews", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "product_id"}) // A user can review a product only once
-})
+@Table("reviews")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor // For convenience with Lombok, but often manually populate in service
+@Builder
 public class Review {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    
-    @Column(nullable = false)
     private Long userId; // The user who left his/her review
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product; // The product being reviewed
-
-    @Column(nullable = false)
+    private Long productId; 
     private Integer rating; // Rating out of 5 (e.g., 1 to 5)
-
-    @Column(columnDefinition = "TEXT") // Use TEXT for potentially longer comments
     private String comment;
-
-    @Column(nullable = false)
-    private LocalDateTime reviewDate;
+    private LocalDateTime reviewTime;
 
     // Optional: Add a field for admin moderation status if needed (e.g., PENDING, APPROVED, REJECTED)
     // @Enumerated(EnumType.STRING)
     // private ReviewStatus status;
 
-    @PrePersist
-    protected void onCreate() {
-        reviewDate = LocalDateTime.now();
-    }
 }

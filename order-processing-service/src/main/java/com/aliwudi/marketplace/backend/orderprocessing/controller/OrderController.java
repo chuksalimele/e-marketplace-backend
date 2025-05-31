@@ -1,7 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
-import com.aliwudi.marketplace.backend.orderprocessing.model.OrderStatus;
 import com.aliwudi.marketplace.backend.orderprocessing.service.OrderService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
@@ -13,6 +12,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import lombok.RequiredArgsConstructor; // NEW: Added for cleaner constructor injection
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.status.OrderStatus;
 
 @RestController
 @RequestMapping("/api/orders")

@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
+import com.aliwudi.marketplace.backend.common.dto.PaymentDto;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentResponse;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Payment;
 import com.aliwudi.marketplace.backend.orderprocessing.service.PaymentService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -34,11 +35,10 @@ public class PaymentController {
 
         return paymentService.initiatePayment(
                 request.getOrderId(),
-                request.getAmount(),
-                request.getProductIdForInventory() // Temporary: in real use, would get this from order
+                request.getAmount()
             )
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(PaymentResponse.builder()
-                    .orderId(payment.getOrderId())
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(PaymentDto.builder()
+                    .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
                     .status(payment.getStatus())
@@ -68,7 +68,7 @@ public class PaymentController {
         }
 
         return Mono.just(status.toUpperCase())
-                .map(Payment.PaymentStatus::valueOf) // Convert status string to enum
+                .map(PaymentStatus::valueOf) // Convert status string to enum
                 .flatMap(paymentStatus ->
                     paymentService.processGatewayCallback(transactionRef, paymentStatus, "Webhook Callback Data", orderId, productId, quantity)
                         .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.PAYMENT_CALLBACK_PROCESSED_SUCCESS)))
@@ -86,8 +86,8 @@ public class PaymentController {
         }
 
         return paymentService.getPaymentDetails(orderId) // Service returns Mono<Payment>
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(PaymentResponse.builder()
-                    .orderId(payment.getOrderId())
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(PaymentDto.builder()
+                    .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
                     .status(payment.getStatus())

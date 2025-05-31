@@ -1,17 +1,19 @@
 package com.aliwudi.marketplace.backend.orderprocessing.model;
 
 import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "payments")
+
+@Table("payments")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,24 +21,12 @@ import java.time.LocalDateTime;
 public class Payment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false, unique = true)
-    private String orderId; // Link to the order
-    
-    @Column(nullable = false)
-    private String transactionRef; // Reference from the payment gateway
-
-    @Column(nullable = false)
+    private Long userId;
+    private Long orderId; 
+    private String transactionRef;
     private BigDecimal amount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PaymentStatus status; // PENDING, SUCCESS, FAILED, REFUNDED
-
-    @Column(nullable = false)
-    private LocalDateTime paymentDate;
-
+    private PaymentStatus status;
+    private LocalDateTime paymentTime;
     private String gatewayResponse; // Raw response from payment gateway
 }

@@ -18,8 +18,9 @@ public class ProductDto {
     private String name;
     private String description;
     private BigDecimal price;
-    private Integer stock; // Make sure this is initialized or set upon creation
-    private CategoryDto category;
+    private Integer stockQuantity; // Make sure this is initialized or set upon creation
+    private String category;
+    private LocationDto location;
     private StoreDto store;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;    

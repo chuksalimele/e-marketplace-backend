@@ -65,9 +65,9 @@ public class InventoryService {
     }
 
     @Transactional
-    public Mono<Void> releaseStock(String productId, Integer quantityToRelease) {
+    public Mono<Void> releaseStock(String orderId, Integer quantityToRelease) {
         log.info("Attempting to release {} units for product: {}", quantityToRelease, productId);
-        return inventoryRepository.findByProductId(productId)
+        return inventoryRepository.findByProductId(orderId)
                 .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                 .flatMap(inventory -> {
                     if (inventory.getReservedQuantity() < quantityToRelease) {

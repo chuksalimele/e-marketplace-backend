@@ -1,43 +1,79 @@
-// src/main/java/com/marketplace/emarketplacebackend/repository/ReviewRepository.java
 package com.aliwudi.marketplace.backend.product.repository;
 
-import com.aliwudi.marketplace.backend.product.model.Product;
 import com.aliwudi.marketplace.backend.product.model.Review;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository; // NEW: Import ReactiveCrudRepository
-import org.springframework.data.r2dbc.repository.Query; // NEW: Import @Query from Spring Data R2DBC
+import org.springframework.data.domain.Pageable; // For pagination
+import org.springframework.data.r2dbc.repository.Query; // For custom queries
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
+import org.springframework.data.repository.query.Param; // For @Param in custom queries
 import org.springframework.stereotype.Repository;
-
-import reactor.core.publisher.Flux; // NEW: Import Flux for multiple results
-import reactor.core.publisher.Mono; // NEW: Import Mono for single results or completion
-
-// Remove old JpaRepository import, Page, and Pageable imports
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Repository
-// NEW: Extend ReactiveCrudRepository instead of JpaRepository
-public interface ReviewRepository extends ReactiveCrudRepository<Review, Long> {
+public interface ReviewRepository extends R2dbcRepository<Review, Long> {
 
-    // Old: Page<Review> findByProduct(Product product, Pageable pageable);
-    // NEW: For pagination, use Flux with offset and limit parameters, which R2DBC translates to SQL OFFSET/LIMIT.
-    Flux<Review> findByProduct_Id(Long productId, Long offset, Integer limit);
-    Mono<Long> countByProduct_Id(Long productId); // For total count when paginating by product
+    // --- Basic Retrieval & Pagination ---
+    Flux<Review> findAllBy(Pageable pageable);
 
-    // Old: Page<Review> findByUserId(Long userId, Pageable pageable);
-    Flux<Review> findByUserId(Long userId, Long offset, Integer limit);
-    Mono<Long> countByUserId(Long userId); // For total count when paginating by user
+    // --- Review Filtering with Pagination ---
 
-    // Old: Optional<Review> findByUserIdAndProduct(Long userId, Product product);
-    // NEW: Returns Mono for zero or one review found.
-    Mono<Review> findByUserIdAndProduct(Long userId, Product product);
+    /**
+     * Find all reviews for a specific product with pagination.
+     */
+    Flux<Review> findByProductId(Long productId, Pageable pageable);
 
-    // Old: @Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
-    // Old: Double findAverageRatingByProductId(Long productId);
-    // NEW: Use @Query from org.springframework.data.r2dbc.repository.Query.
-    // NEW: Query directly references the table and column names for R2DBC (e.g., 'review' table, 'product_id' column).
-    // NEW: Returns Mono<Double> as the average is a single value.
-    @Query("SELECT AVG(r.rating) FROM review r WHERE r.product_id = :productId")
-    Mono<Double> findAverageRatingByProductId(Long productId);
+    /**
+     * Find all reviews left by a specific user with pagination.
+     */
+    Flux<Review> findByUserId(Long userId, Pageable pageable);
 
-    public Flux<Review> findByProduct_Id(Long productId);
+    /**
+     * Find reviews for a product with a rating greater than or equal to a minimum value, with pagination.
+     */
+    Flux<Review> findByProductIdAndRatingGreaterThanEqual(Long productId, Integer minRating, Pageable pageable);
 
-    public Mono<Boolean> existsByProduct_IdAndUserId(Long productId, Long userId);
+    /**
+     * Find the latest reviews for a product, ordered by review time descending, with pagination.
+     */
+    Flux<Review> findByProductIdOrderByReviewTimeDesc(Long productId, Pageable pageable);
+
+    /**
+     * Find reviews by a specific user for a specific product (usually unique, no pagination needed).
+     */
+    Mono<Review> findByUserIdAndProductId(Long userId, Long productId);
+
+
+    // --- Count Queries (for pagination metadata) ---
+
+    /**
+     * Count all reviews.
+     */
+    Mono<Long> count();
+
+    /**
+     * Count all reviews for a specific product.
+     */
+    Mono<Long> countByProductId(Long productId);
+
+    /**
+     * Count all reviews left by a specific user.
+     */
+    Mono<Long> countByUserId(Long userId);
+
+    /**
+     * Count reviews for a product with a rating greater than or equal to a minimum value.
+     */
+    Mono<Long> countByProductIdAndRatingGreaterThanEqual(Long productId, Integer minRating);
+
+    /**
+     * Get the average rating for a specific product.
+     * Note: For aggregate functions like AVG, you'll typically use a @Query.
+     */
+    @Query("SELECT AVG(r.rating) FROM reviews r WHERE r.product_id = :productId")
+    Mono<Double> findAverageRatingByProductId(@Param("productId") Long productId);
+
+    /**
+     * Check if a user has already reviewed a specific product.
+     */
+    Mono<Boolean> existsByUserIdAndProductId(Long userId, Long productId);
 }

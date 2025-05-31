@@ -1,18 +1,39 @@
-// CartRepository.java
 package com.aliwudi.marketplace.backend.orderprocessing.repository;
 
 import com.aliwudi.marketplace.backend.orderprocessing.model.Cart;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Repository
-public interface CartRepository extends ReactiveCrudRepository<Cart, Long> {
+public interface CartRepository extends R2dbcRepository<Cart, Long> {
 
-    // Custom method to find a Cart by the User it belongs to
-    // Spring Data JPA can automatically generate the query for this method name
+    // --- Basic Retrieval & Pagination ---
+    Flux<Cart> findAllBy(Pageable pageable);
+
+    // --- Cart Specific Queries ---
+
+    /**
+     * Find a cart by its associated user ID. Assumes one cart per user.
+     */
     Mono<Cart> findByUserId(Long userId);
+
+    // --- Count Queries ---
+
+    /**
+     * Count all carts.
+     */
+    Mono<Long> count();
+
+    /**
+     * Check if a cart exists for a given user ID.
+     */
+    Mono<Boolean> existsByUserId(Long userId);
+
+    /**
+     * Delete a cart by user ID.
+     */
+    Mono<Void> deleteByUserId(Long userId);
 }

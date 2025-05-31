@@ -1,70 +1,106 @@
-// ProductRepository.java
 package com.aliwudi.marketplace.backend.product.repository;
 
 import com.aliwudi.marketplace.backend.product.model.Product;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.domain.Pageable; // For pagination
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+
 @Repository
-public interface ProductRepository extends ReactiveCrudRepository<Product, Long> {
+public interface ProductRepository extends R2dbcRepository<Product, Long> {
 
-    Mono<Product> findByName(String name);
+    // --- Basic Retrieval & Pagination ---
 
-    // --- Reactive Pagination Methods ---
-    // These methods now accept 'offset' (for skipping records) and 'limit' (for taking records)
-    // Spring Data R2DBC will translate these into SQL OFFSET and LIMIT clauses,
-    // ensuring pagination happens at the database level.
+    // Find all products with pagination
+    Flux<Product> findAllBy(Pageable pageable); // 'By' is a common convention for findAll with Pageable
 
-    // Also adding count methods for proper pagination metadata (total elements)
-    
-    public Flux<Product> findAll(Long offset, Integer limit);
+    // --- Product Filtering and Search with Pagination ---
 
-    Flux<Product> findByStore_Id(Long storeId, Long offset, Integer limit);
-    Mono<Long> countByStore_Id(Long storeId);
+    /**
+     * Find products belonging to a specific store with pagination.
+     */
+    Flux<Product> findByStoreId(Long storeId, Pageable pageable);
 
-    Flux<Product> findByStore_Seller_Id(Long sellerId, Long offset, Integer limit);
-    Mono<Long> countByStore_Seller_Id(Long sellerId);
+    /**
+     * Find products sold by a specific seller with pagination.
+     */
+    Flux<Product> findBySellerId(Long sellerId, Pageable pageable);
 
-    Flux<Product> findByCategory_Name(String categoryName, Long offset, Integer limit);
-    Mono<Long> countByCategory_Name(String categoryName);
+    /**
+     * Find products by their category with pagination.
+     */
+    Flux<Product> findByCategory(String category, Pageable pageable);
 
-    Flux<Product> findByCategory_NameAndStore_Location(String categoryName, String location, Long offset, Integer limit);
-    Mono<Long> countByCategory_NameAndStore_Location(String categoryName, String location);
+    /**
+     * Search products by name (case-insensitive, contains) with pagination.
+     */
+    Flux<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
-    Flux<Product> findByNameContainingIgnoreCase(String searchTerm, Long offset, Integer limit);
-    Mono<Long> countByNameContainingIgnoreCase(String searchTerm);
+    /**
+     * Find products within a given price range (inclusive) with pagination.
+     */
+    Flux<Product> findByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
 
-    Flux<Product> findByStore_LocationIgnoreCase(String location, Long offset, Integer limit);
-    Mono<Long> countByStore_LocationIgnoreCase(String location);
+    // --- Combined Filters with Pagination ---
 
-    Flux<Product> findByStore_IdAndStore_LocationIgnoreCase(Long storeId, String location, Long offset, Integer limit);
-    Mono<Long> countByStore_IdAndStore_LocationIgnoreCase(Long storeId, String location);
+    /**
+     * Find products in a specific store and category with pagination.
+     */
+    Flux<Product> findByStoreIdAndCategory(Long storeId, String category, Pageable pageable);
 
-    Flux<Product> findByNameContainingIgnoreCaseAndStore_LocationIgnoreCase(String productName, String location, Long offset, Integer limit);
-    Mono<Long> countByNameContainingIgnoreCaseAndStore_LocationIgnoreCase(String productName, String location);
+    /**
+     * Find products by a seller within a specific category with pagination.
+     */
+    Flux<Product> findBySellerIdAndCategory(Long sellerId, String category, Pageable pageable);
 
-    // You can also add more advanced queries using @Query annotation if derived query methods become too complex,
-    // ensuring to use R2DBC-compatible SQL with OFFSET/LIMIT.
-    // Example:
-    // @Query("SELECT * FROM product WHERE name LIKE :name OFFSET :offset LIMIT :limit")
-    // Flux<Product> findProductsByNameWithPagination(@Param("name") String name, @Param("offset") Long offset, @Param("limit") Integer limit);
+    /**
+     * Find products by category and within a price range with pagination.
+     */
+    Flux<Product> findByCategoryAndPriceBetween(String category, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
 
 
-    public Mono<Long> countByLocation(String location);
+    // --- Count Queries (for pagination metadata) ---
 
-    public Flux<Product>  findByStore_IdAndLocation(Long storeId, String location, Long offset, Integer limit);
+    /**
+     * Count all products.
+     */
+    Mono<Long> count();
 
-    public Mono<Long> countByStore_IdAndLocation(Long storeId, String location);
+    /**
+     * Count products belonging to a specific store.
+     */
+    Mono<Long> countByStoreId(Long storeId);
 
-    public Flux<Product> findByCategory_NameAndLocation(String categoryName, String location, Long offset, Integer limit);
+    /**
+     * Count products sold by a specific seller.
+     */
+    Mono<Long> countBySellerId(Long sellerId);
 
-    public Mono<Long> countByCategory_NameAndLocation(String categoryName, String location);
+    /**
+     * Count products by their category.
+     */
+    Mono<Long> countByCategory(String category);
 
-    public Flux<Product> findByNameContainingIgnoreCaseAndLocationContainingIgnoreCase(String productName, String location, Long offset, Integer limit);
+    /**
+     * Count products by name (case-insensitive, contains).
+     */
+    Mono<Long> countByNameContainingIgnoreCase(String name);
 
-    public Mono<Long> countByNameContainingIgnoreCaseAndLocationContainingIgnoreCase(String productName, String location);
+    /**
+     * Count products within a given price range (inclusive).
+     */
+    Mono<Long> countByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice);
 
-   
+    /**
+     * Count products in a specific store and category.
+     */
+    Mono<Long> countByStoreIdAndCategory(Long storeId, String category);
+
+    /**
+     * Check if a product with a given name exists for a specific seller (e.g., for uniqueness).
+     */
+    Mono<Boolean> existsByNameIgnoreCaseAndSellerId(String name, Long sellerId);
 }

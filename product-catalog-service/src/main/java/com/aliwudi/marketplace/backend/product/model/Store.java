@@ -2,52 +2,40 @@ package com.aliwudi.marketplace.backend.product.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.HashSet;
 import java.util.Set;
+import lombok.Builder;
 
-@Entity
-@Table(name = "stores")
+@Table("stores")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(exclude = {"seller", "products"}) // Exclude bidirectional relationships
+@Builder
 public class Store {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
     private String name; // e.g., "Downtown Branch", "Online Warehouse"
-
-    @Column(nullable = false)
-    private String location; // e.g., "Lagos, Nigeria", "123 Main St, Anytown" - consider splitting into city, street, postal code etc.
-
+    private Long locationId; // with the it we can get its country, state and city
     private String description;
     private String contactInfo;
     private String profileImageUrl;
     private Double rating; // Store-specific rating
-    private String categories; // Categories specific to this store (if distinct from seller's overall categories)
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seller_id", nullable = false)
-    @JsonBackReference // Prevents infinite recursion when serializing Seller -> Stores -> Seller
-    private Seller seller;
-
-    @OneToMany(mappedBy = "store", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JsonManagedReference // Ensures products are serialized when a store is fetched
-    private Set<Product> products = new HashSet<>();
+    private Long sellerId;
 
     // Optional: Constructor for convenience
-    public Store(String name, String location, Seller seller) {
+    public Store(String name, Long locationId, Long sellerId) {
         this.name = name;
-        this.location = location;
-        this.seller = seller;
+        this.locationId = locationId;
+        this.sellerId = sellerId;
     }
 }

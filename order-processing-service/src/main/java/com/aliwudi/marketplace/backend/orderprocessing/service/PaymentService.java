@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
+import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Payment;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Payment.PaymentStatus;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ public class PaymentService {
     private final InventoryService inventoryService; // To interact with inventory after payment
 
     @Transactional
-    public Mono<Payment> initiatePayment(String orderId, BigDecimal amount, String productIdForInventory) {
+    public Mono<Payment> initiatePayment(String orderId, BigDecimal amount) {
         log.info("Initiating payment for orderId: {}, amount: {}", orderId, amount);
 
         // 1. Create a pending payment record
@@ -48,14 +48,14 @@ public class PaymentService {
                     // Simulate a successful payment immediately for demonstration
                     // In a real app, this would be handled by a webhook/callback from the gateway
                     // The call to processGatewayCallback should also be reactive.
-                    processGatewayCallback(savedPayment.getTransactionRef(), PaymentStatus.SUCCESS, "SIMULATED_SUCCESS", orderId, productIdForInventory, amount.intValue())
+                    processGatewayCallback(savedPayment.getTransactionRef(), PaymentStatus.SUCCESS, "SIMULATED_SUCCESS", orderId, amount.intValue())
                         .thenReturn(savedPayment) // Return the original savedPayment after callback processing
                 );
     }
 
     // This method would typically be called by a webhook from the payment gateway
     @Transactional
-    public Mono<Payment> processGatewayCallback(String transactionRef, PaymentStatus newStatus, String gatewayResponse, String orderId, String productIdForInventory, int quantityConfirmed) {
+    public Mono<Payment> processGatewayCallback(String transactionRef, PaymentStatus newStatus, String gatewayResponse, String orderId, int quantityConfirmed) {
         log.info("Processing payment gateway callback for transactionRef: {} with status: {}", transactionRef, newStatus);
 
         return paymentRepository.findByTransactionRef(transactionRef) // Returns Mono<Payment>
@@ -73,13 +73,13 @@ public class PaymentService {
                                     if (newStatus.equals(PaymentStatus.SUCCESS)) {
                                         log.info("Payment SUCCESS for orderId: {}. Deducting stock.", savedPayment.getOrderId());
                                         // Crucial: Deduct reserved stock upon successful payment
-                                        inventoryOperation = inventoryService.confirmReservationAndDeductStock(productIdForInventory, quantityConfirmed);
+                                        inventoryOperation = inventoryService.confirmReservationAndDeductStock(orderId, quantityConfirmed);
                                         // After successful payment, update order status (e.g., to 'PAID' or 'PROCESSING')
                                         // This would involve calling an OrderService method: orderService.updateOrderStatus(payment.getOrderId(), OrderStatus.PAID);
                                     } else if (newStatus.equals(PaymentStatus.FAILED) || newStatus.equals(PaymentStatus.REFUNDED)) {
                                         log.warn("Payment FAILED/REFUNDED for orderId: {}. Releasing reserved stock.", savedPayment.getOrderId());
                                         // Release reserved stock if payment fails
-                                        inventoryOperation = inventoryService.releaseStock(productIdForInventory, quantityConfirmed);
+                                        inventoryOperation = inventoryService.releaseStock(orderId, quantityConfirmed);
                                         // Update order status to 'PAYMENT_FAILED' or 'CANCELLED'
                                         // orderService.updateOrderStatus(payment.getOrderId(), OrderStatus.PAYMENT_FAILED);
                                     }

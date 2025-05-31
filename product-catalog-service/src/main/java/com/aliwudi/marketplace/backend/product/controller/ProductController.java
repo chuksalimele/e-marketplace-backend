@@ -1,12 +1,12 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
+import com.aliwudi.marketplace.backend.common.dto.ProductDto;
 import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
-import com.aliwudi.marketplace.backend.product.dto.ProductResponse; // Assuming you'll need a ProductResponse DTO
 import com.aliwudi.marketplace.backend.product.model.Product;
 import com.aliwudi.marketplace.backend.product.service.ProductService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
-import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Custom exception for product not found
-import com.aliwudi.marketplace.backend.product.exception.InvalidProductDataException; // Custom exception for invalid product data
+import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.product.exception.InvalidProductDataException;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,25 +15,26 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/products")
-@RequiredArgsConstructor // Using Lombok for constructor injection
+@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
 
     /**
-     * Helper method to map Product entity to ProductResponse DTO for public exposure.
+     * Helper method to map Product entity to ProductDto DTO for public exposure.
      */
-    private ProductResponse mapProductToProductResponse(Product product) {
+    private ProductDto mapProductToProductDto(Product product) {
         if (product == null) {
             return null;
         }
-        return ProductResponse.builder()
+        return ProductDto.builder()
                 .id(product.getId())
                 .name(product.getName())
                 .description(product.getDescription())
@@ -41,6 +42,7 @@ public class ProductController {
                 .stockQuantity(product.getStockQuantity())
                 .category(product.getCategory())
                 .storeId(product.getStoreId())
+                .sellerId(product.getSellerId()) // Include sellerId in response
                 .imageUrl(product.getImageUrl())
                 .location(product.getLocation())
                 .createdAt(product.getCreatedAt())
@@ -55,12 +57,12 @@ public class ProductController {
         if (productRequest.getName() == null || productRequest.getName().isBlank() ||
             productRequest.getPrice() == null || productRequest.getPrice().doubleValue() <= 0 ||
             productRequest.getStockQuantity() == null || productRequest.getStockQuantity() < 0 ||
-            productRequest.getStoreId() == null) {
+            productRequest.getStoreId() == null || productRequest.getSellerId() == null) { // Ensure sellerId is present
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_CREATION_REQUEST));
         }
 
         return productService.createProduct(productRequest)
-                .map(createdProduct -> (StandardResponseEntity) StandardResponseEntity.created(mapProductToProductResponse(createdProduct), ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
+                .map(createdProduct -> (StandardResponseEntity) StandardResponseEntity.created(mapProductToProductDto(createdProduct), ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
                 .onErrorResume(InvalidProductDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_DATA + e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -75,7 +77,7 @@ public class ProductController {
         }
 
         return productService.updateProduct(id, productRequest)
-                .map(updatedProduct -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductResponse(updatedProduct), ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
+                .map(updatedProduct -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductDto(updatedProduct), ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(InvalidProductDataException.class, e ->
@@ -86,24 +88,16 @@ public class ProductController {
 
     @GetMapping
     public Mono<StandardResponseEntity> getAllProducts(
-            @RequestParam(required = false) String location,
-            @RequestParam(defaultValue = "0") Long offset,
-            @RequestParam(defaultValue = "20") Integer limit) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        Flux<Product> productsFlux;
-        if (offset < 0 || limit <= 0) {
+        if (page < 0 || size <= 0) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        if (location != null && !location.trim().isEmpty()) {
-            productsFlux = productService.getAllProductsByLocation(location, offset, limit);
-        } else {
-            productsFlux = productService.getAllProducts(offset, limit);
-        }
-
-        return productsFlux.collectList()
+        return productService.getAllProducts(page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductResponse)
+                        .map(this::mapProductToProductDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -111,14 +105,8 @@ public class ProductController {
     }
 
     @GetMapping("/count")
-    public Mono<StandardResponseEntity> countAllProducts(@RequestParam(required = false) String location) {
-        Mono<Long> countMono;
-        if (location != null && !location.trim().isEmpty()) {
-            countMono = productService.countProductsByLocation(location);
-        } else {
-            countMono = productService.countAllProducts();
-        }
-        return countMono
+    public Mono<StandardResponseEntity> countAllProducts() {
+        return productService.countAllProducts()
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT + ": " + e.getMessage())));
@@ -131,7 +119,7 @@ public class ProductController {
         }
 
         return productService.getProductById(id)
-                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductResponse(product), ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductDto(product), ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -147,88 +135,28 @@ public class ProductController {
         }
 
         return productService.deleteProduct(id)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.PRODUCT_DELETED_SUCCESS))) // Use then to return a response after Mono<Void> completes
+                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.PRODUCT_DELETED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_PRODUCT + ": " + e.getMessage())));
     }
 
-    @GetMapping("/category/{categoryName}")
-    public Mono<StandardResponseEntity> getProductsByCategory(
-            @PathVariable String categoryName,
-            @RequestParam(required = false) String location,
-            @RequestParam(defaultValue = "0") Long offset,
-            @RequestParam(defaultValue = "20") Integer limit) {
-
-        if (categoryName == null || categoryName.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CATEGORY_NAME));
-        }
-        if (offset < 0 || limit <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
-        }
-
-        Flux<Product> productsFlux;
-        if (location != null && !location.trim().isEmpty()) {
-            productsFlux = productService.getProductsByCategoryAndLocation(categoryName, location, offset, limit);
-        } else {
-            productsFlux = productService.getProductsByCategory(categoryName, offset, limit);
-        }
-
-        return productsFlux.collectList()
-                .map(products -> products.stream()
-                        .map(this::mapProductToProductResponse)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY + ": " + e.getMessage())));
-    }
-
-    @GetMapping("/category/{categoryName}/count")
-    public Mono<StandardResponseEntity> countProductsByCategory(
-            @PathVariable String categoryName,
-            @RequestParam(required = false) String location) {
-
-        if (categoryName == null || categoryName.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CATEGORY_NAME));
-        }
-
-        Mono<Long> countMono;
-        if (location != null && !location.trim().isEmpty()) {
-            countMono = productService.countProductsByCategoryAndLocation(categoryName, location);
-        } else {
-            countMono = productService.countProductsByCategory(categoryName);
-        }
-        return countMono
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_CATEGORY + ": " + e.getMessage())));
-    }
+    // --- New Endpoints based on ProductRepository methods ---
 
     @GetMapping("/store/{storeId}")
     public Mono<StandardResponseEntity> getProductsByStore(
             @PathVariable Long storeId,
-            @RequestParam(required = false) String location,
-            @RequestParam(defaultValue = "0") Long offset,
-            @RequestParam(defaultValue = "20") Integer limit) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        if (storeId == null || storeId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
-        }
-        if (offset < 0 || limit <= 0) {
+        if (storeId == null || storeId <= 0 || page < 0 || size <= 0) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        Flux<Product> productsFlux;
-        if (location != null && !location.trim().isEmpty()) {
-            productsFlux = productService.getProductsByStoreAndLocation(storeId, location, offset, limit);
-        } else {
-            productsFlux = productService.getProductsByStore(storeId, offset, limit);
-        }
-
-        return productsFlux.collectList()
+        return productService.getProductsByStore(storeId, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductResponse)
+                        .map(this::mapProductToProductDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -236,50 +164,204 @@ public class ProductController {
     }
 
     @GetMapping("/store/{storeId}/count")
-    public Mono<StandardResponseEntity> countProductsByStore(
-            @PathVariable Long storeId,
-            @RequestParam(required = false) String location) {
-
+    public Mono<StandardResponseEntity> countProductsByStore(@PathVariable Long storeId) {
         if (storeId == null || storeId <= 0) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
         }
-
-        Mono<Long> countMono;
-        if (location != null && !location.trim().isEmpty()) {
-            countMono = productService.countProductsByStoreAndLocation(storeId, location);
-        } else {
-            countMono = productService.countProductsByStore(storeId);
-        }
-        return countMono
+        return productService.countProductsByStore(storeId)
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_STORE + ": " + e.getMessage())));
     }
 
-    @GetMapping("/search")
-    public Mono<StandardResponseEntity> searchProducts(
-            @RequestParam String product_name,
-            @RequestParam(required = false) String location,
-            @RequestParam(defaultValue = "0") Long offset,
-            @RequestParam(defaultValue = "20") Integer limit) {
+    @GetMapping("/seller/{sellerId}")
+    public Mono<StandardResponseEntity> getProductsBySeller(
+            @PathVariable Long sellerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        if (product_name == null || product_name.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
-        }
-        if (offset < 0 || limit <= 0) {
+        if (sellerId == null || sellerId <= 0 || page < 0 || size <= 0) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        Flux<Product> productsFlux;
-        if (location != null && !location.trim().isEmpty()) {
-            productsFlux = productService.searchProductsByNameAndLocation(product_name, location, offset, limit);
-        } else {
-            productsFlux = productService.searchProducts(product_name, offset, limit);
+        return productService.getProductsBySeller(sellerId, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_SELLER + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/seller/{sellerId}/count")
+    public Mono<StandardResponseEntity> countProductsBySeller(@PathVariable Long sellerId) {
+        if (sellerId == null || sellerId <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+        }
+        return productService.countProductsBySeller(sellerId)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_SELLER + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/category/{category}")
+    public Mono<StandardResponseEntity> getProductsByCategory(
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (category == null || category.isBlank() || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productsFlux.collectList()
+        return productService.getProductsByCategory(category, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductResponse)
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/category/{category}/count")
+    public Mono<StandardResponseEntity> countProductsByCategory(@PathVariable String category) {
+        if (category == null || category.isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CATEGORY_NAME));
+        }
+        return productService.countProductsByCategory(category)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_CATEGORY + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/price-range")
+    public Mono<StandardResponseEntity> getProductsByPriceRange(
+            @RequestParam BigDecimal minPrice,
+            @RequestParam BigDecimal maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (minPrice == null || maxPrice == null || minPrice.compareTo(BigDecimal.ZERO) < 0 || maxPrice.compareTo(BigDecimal.ZERO) < 0 || minPrice.compareTo(maxPrice) > 0 || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRICE_RANGE_PARAMETERS));
+        }
+
+        return productService.getProductsByPriceRange(minPrice, maxPrice, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_PRICE_RANGE + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/price-range/count")
+    public Mono<StandardResponseEntity> countProductsByPriceRange(
+            @RequestParam BigDecimal minPrice,
+            @RequestParam BigDecimal maxPrice) {
+
+        if (minPrice == null || maxPrice == null || minPrice.compareTo(BigDecimal.ZERO) < 0 || maxPrice.compareTo(BigDecimal.ZERO) < 0 || minPrice.compareTo(maxPrice) > 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRICE_RANGE_PARAMETERS));
+        }
+
+        return productService.countProductsByPriceRange(minPrice, maxPrice)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_PRICE_RANGE + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/store/{storeId}/category/{category}")
+    public Mono<StandardResponseEntity> getProductsByStoreAndCategory(
+            @PathVariable Long storeId,
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (storeId == null || storeId <= 0 || category == null || category.isBlank() || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
+        return productService.getProductsByStoreAndCategory(storeId, category, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_STORE_AND_CATEGORY + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/store/{storeId}/category/{category}/count")
+    public Mono<StandardResponseEntity> countProductsByStoreAndCategory(
+            @PathVariable Long storeId,
+            @PathVariable String category) {
+
+        if (storeId == null || storeId <= 0 || category == null || category.isBlank()) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+        }
+
+        return productService.countProductsByStoreAndCategory(storeId, category)
+                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCT_COUNT_BY_STORE_AND_CATEGORY + ": " + e.getMessage())));
+    }
+
+    @GetMapping("/seller/{sellerId}/category/{category}")
+    public Mono<StandardResponseEntity> getProductsBySellerAndCategory(
+            @PathVariable Long sellerId,
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (sellerId == null || sellerId <= 0 || category == null || category.isBlank() || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        }
+
+        return productService.getProductsBySellerAndCategory(sellerId, category, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_SELLER_AND_CATEGORY + ": " + e.getMessage())));
+    }
+
+    // No direct count for sellerIdAndCategory in provided repository, so no corresponding controller method.
+
+    @GetMapping("/category/{category}/price-range")
+    public Mono<StandardResponseEntity> getProductsByCategoryAndPriceBetween(
+            @PathVariable String category,
+            @RequestParam BigDecimal minPrice,
+            @RequestParam BigDecimal maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (category == null || category.isBlank() || minPrice == null || maxPrice == null || minPrice.compareTo(BigDecimal.ZERO) < 0 || maxPrice.compareTo(BigDecimal.ZERO) < 0 || minPrice.compareTo(maxPrice) > 0 || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRICE_RANGE_PARAMETERS));
+        }
+
+        return productService.getProductsByCategoryAndPriceBetween(category, minPrice, maxPrice, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
+                        .collect(Collectors.toList()))
+                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY_AND_PRICE_RANGE + ": " + e.getMessage())));
+    }
+
+    // No direct count for categoryAndPriceBetween in provided repository, so no corresponding controller method.
+
+    @GetMapping("/search")
+    public Mono<StandardResponseEntity> searchProducts(
+            @RequestParam String name, // Changed from product_name to name for consistency with repository
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (name == null || name.isBlank() || page < 0 || size <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+        }
+
+        return productService.searchProducts(name, page, size).collectList()
+                .map(products -> products.stream()
+                        .map(this::mapProductToProductDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -287,21 +369,11 @@ public class ProductController {
     }
 
     @GetMapping("/search/count")
-    public Mono<StandardResponseEntity> countSearchProducts(
-            @RequestParam String product_name,
-            @RequestParam(required = false) String location) {
-
-        if (product_name == null || product_name.isBlank()) {
+    public Mono<StandardResponseEntity> countSearchProducts(@RequestParam String name) { // Changed from product_name to name
+        if (name == null || name.isBlank()) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
-
-        Mono<Long> countMono;
-        if (location != null && !location.trim().isEmpty()) {
-            countMono = productService.countSearchProductsByNameAndLocation(product_name, location);
-        } else {
-            countMono = productService.countSearchProducts(product_name);
-        }
-        return countMono
+        return productService.countSearchProducts(name)
                 .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.PRODUCT_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_PRODUCT_COUNT + ": " + e.getMessage())));
