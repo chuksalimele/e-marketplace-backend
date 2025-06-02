@@ -2,6 +2,8 @@ package com.aliwudi.marketplace.backend.orderprocessing.repository;
 
 import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.Modifying;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -56,4 +58,24 @@ public interface CartItemRepository extends R2dbcRepository<CartItem, Long> {
      * Delete all cart items for a given cart ID.
      */
     Mono<Void> deleteByCartId(Long cartId);
+    
+    /**
+     * Delete cart item for a given userId and ProductId.
+     */
+    Mono<Void> deleteByUserIdAndProductId(Long userId, Long productId);
+
+
+    /**
+     * Remove a cart item by cart ID and product ID.
+     */
+    Mono<Void> deleteByCartIdAndProductId(Long cartId, Long productId);
+
+    /**
+     * Update the quantity of a cart item by cart ID and product ID.
+     * The @Modifying annotation is required for UPDATE and DELETE queries.
+     * The @Query annotation is used to define the custom query.
+     */
+    @Modifying
+    @Query("UPDATE cart_item SET quantity = :quantity WHERE cart_id = :cartId AND product_id = :productId")
+    Mono<Integer> updateQuantityByCartIdAndProductId(Long quantity, Long cartId, Long productId);    
 }

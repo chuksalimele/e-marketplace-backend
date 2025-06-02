@@ -10,7 +10,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 
 @Repository
-public interface MediaAssetRepository extends R2dbcRepository<MediaAsset, Long> {
+public interface MediaRepository extends R2dbcRepository<MediaAsset, Long> {
 
     // --- Basic Retrieval & Pagination ---
     Flux<MediaAsset> findAllBy(Pageable pageable);

@@ -9,7 +9,7 @@ import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientSto
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Order;
 import com.aliwudi.marketplace.backend.orderprocessing.model.OrderItem;
-import com.aliwudi.marketplace.backend.orderprocessing.model.OrderStatus;
+import com.aliwudi.marketplace.backend.common.status.OrderStatus;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.OrderItemRepository;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.OrderRepository;
 import lombok.AllArgsConstructor;
@@ -19,8 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.springframework.data.domain.Pageable; // Import for pagination
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime; // Import for time range queries
 import java.util.List;
 
 @Service
@@ -54,22 +56,10 @@ public class OrderService {
      * @return A Mono emitting the created Order.
      */
     public Mono<Order> createOrder(Long userId, List<OrderItemRequest> itemRequests, String shippingAddress, String paymentMethod) {
-        // Step 1: Validate User exists (optional, depends on your business logic)
-        // If user validation is critical for order creation, uncomment and handle.
-        // For simplicity, we'll assume userId is valid and proceed with order creation.
-        // If you need to ensure user exists from user service:
-        // return userIntegrationService.getUserById(userId)
-        //        .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found with ID: " + userId)))
-        //        .flatMap(userDto -> { ... rest of the logic ... });
-
-
         Order order = new Order();
         order.setUserId(userId);
         order.setShippingAddress(shippingAddress);
         order.setPaymentMethod(paymentMethod);
-        // orderDate and orderStatus are set by @PrePersist in Order entity, or can be set here.
-        // order.setOrderDate(LocalDateTime.now()); // Assuming you have a default in entity
-        // order.setOrderStatus(OrderStatus.PENDING); // Assuming you have a default in entity
 
         BigDecimal[] totalOrderAmount = {BigDecimal.ZERO}; // Use an array for mutable BigDecimal in lambda
 
@@ -78,10 +68,10 @@ public class OrderService {
                 .flatMap(request -> productIntegrationService.getProductDtoById(request.getProductId())
                         .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with ID: " + request.getProductId())))
                         .flatMap(product -> {
-                            if (product.getStock() == null || product.getStock() < request.getQuantity()) {
+                            if (product.getStockQuantity() == null || product.getStockQuantity() < request.getQuantity()) {
                                 return Mono.error(new InsufficientStockException(
                                         "Insufficient stock for product: " + product.getName() +
-                                                ". Available: " + (product.getStock() != null ? product.getStock() : 0) +
+                                                ". Available: " + (product.getStockQuantity() != null ? product.getStockQuantity() : 0) +
                                                 ", Requested: " + request.getQuantity()));
                             }
 
@@ -143,7 +133,7 @@ public class OrderService {
      * @return A Flux emitting orders for the given user.
      */
     public Flux<Order> getOrdersByUserId(Long userId) {
-        return orderRepository.findByUserId(userId);
+        return orderRepository.findByUserId(userId, Pageable.unpaged()); // Using unpaged to get all
     }
 
     /**
@@ -175,7 +165,7 @@ public class OrderService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order not found with ID: " + id)))
                 .flatMap(order ->
                     // First delete associated order items to avoid foreign key constraints
-                    orderItemRepository.deleteByOrder(order) 
+                    orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
                                       .then(orderRepository.delete(order)) // Then delete the order itself
                 )
                 .then(); // Ensure it returns Mono<Void>
@@ -190,10 +180,10 @@ public class OrderService {
      * @return A Mono<Void> indicating completion.
      */
     public Mono<Void> deleteOrdersByUserId(Long userId) {
-        return orderRepository.findByUserId(userId) // Find all orders for the user
+        return orderRepository.findByUserId(userId, Pageable.unpaged()) // Find all orders for the user
                 .flatMap(order ->
                     // For each order, first delete its items
-                    orderItemRepository.deleteByOrder(order) // Assumes deleteByOrder(Order order)
+                    orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
                         .then(Mono.just(order)) // Pass the order along
                 )
                 .collectList() // Collect all orders into a list
@@ -218,7 +208,7 @@ public class OrderService {
                     orderItemRepository.findById(orderItemId)
                             .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order Item not found with ID: " + orderItemId + " in order " + orderId)))
                             .flatMap(orderItem -> {
-                                if (!orderItem.getOrder().getId().equals(order.getId())) {
+                                if (!orderItem.getOrderId().equals(order.getId())) { // Use getOrderId() instead of getOrder().getId()
                                     return Mono.error(new IllegalArgumentException("Order item " + orderItemId + " does not belong to order " + orderId));
                                 }
                                 // Before deleting, you might want to return stock (if needed)
@@ -228,7 +218,8 @@ public class OrderService {
                                             // This requires re-fetching items or maintaining a collection
                                             // For simplicity, we're just deleting the item here.
                                             // If Order has a collection of OrderItems and is eagerly loaded, update it
-                                            order.getOrderItems().remove(orderItem);
+                                            // order.getOrderItems().remove(orderItem); // This line might cause issues if OrderItems is not eagerly loaded or managed
+                                            // Recalculate total amount or adjust it
                                             order.setTotalAmount(order.getTotalAmount().subtract(orderItem.getPriceAtTimeOfOrder().multiply(BigDecimal.valueOf(orderItem.getQuantity()))));
                                             orderRepository.save(order).subscribe(); // Non-blocking fire-and-forget for order update
                                         })
@@ -257,5 +248,181 @@ public class OrderService {
     public static class OrderItemRequest {
         private Long productId;
         private Integer quantity;
+    }
+
+    // --- OrderItemRepository Implementations ---
+
+    /**
+     * Retrieves all order items with pagination.
+     * @param pageable Pagination information.
+     * @return A Flux of OrderItem.
+     */
+    public Flux<OrderItem> findAllOrderItems(Pageable pageable) {
+        return orderItemRepository.findAllBy(pageable);
+    }
+
+    /**
+     * Retrieves all order items belonging to a specific order with pagination.
+     * @param orderId The ID of the order.
+     * @param pageable Pagination information.
+     * @return A Flux of OrderItem.
+     */
+    public Flux<OrderItem> findOrderItemsByOrderId(Long orderId, Pageable pageable) {
+        return orderItemRepository.findByOrderId(orderId, pageable);
+    }
+
+    /**
+     * Retrieves all order items containing a specific product with pagination.
+     * @param productId The ID of the product.
+     * @param pageable Pagination information.
+     * @return A Flux of OrderItem.
+     */
+    public Flux<OrderItem> findOrderItemsByProductId(Long productId, Pageable pageable) {
+        return orderItemRepository.findByProductId(productId, pageable);
+    }
+
+    /**
+     * Finds a specific order item by order ID and product ID.
+     * @param orderId The ID of the order.
+     * @param productId The ID of the product.
+     * @return A Mono emitting the OrderItem.
+     */
+    public Mono<OrderItem> findSpecificOrderItem(Long orderId, Long productId) {
+        return orderItemRepository.findByOrderIdAndProductId(orderId, productId);
+    }
+
+    /**
+     * Counts all order items.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countAllOrderItems() {
+        return orderItemRepository.count();
+    }
+
+    /**
+     * Counts all order items for a specific order.
+     * @param orderId The ID of the order.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrderItemsByOrderId(Long orderId) {
+        return orderItemRepository.countByOrderId(orderId);
+    }
+
+    /**
+     * Counts all order items for a specific product.
+     * @param productId The ID of the product.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrderItemsByProductId(Long productId) {
+        return orderItemRepository.countByProductId(productId);
+    }
+
+    /**
+     * Check if a specific product exists within a specific order.
+     * @param orderId The ID of the order.
+     * @param productId The ID of the product.
+     * @return A Mono emitting true if it exists, false otherwise.
+     */
+    public Mono<Boolean> checkOrderItemExists(Long orderId, Long productId) {
+        return orderItemRepository.existsByOrderIdAndProductId(orderId, productId);
+    }
+
+    // --- OrderRepository Implementations ---
+
+    /**
+     * Retrieves all orders with pagination.
+     * @param pageable Pagination information.
+     * @return A Flux of Order.
+     */
+    public Flux<Order> findAllOrders(Pageable pageable) {
+        return orderRepository.findAllBy(pageable);
+    }
+
+    /**
+     * Finds orders placed by a specific user with pagination.
+     * @param userId The ID of the user.
+     * @param pageable Pagination information.
+     * @return A Flux of Order.
+     */
+    public Flux<Order> findOrdersByUserId(Long userId, Pageable pageable) {
+        return orderRepository.findByUserId(userId, pageable);
+    }
+
+    /**
+     * Finds orders by their current status with pagination.
+     * @param orderStatus The status of the order.
+     * @param pageable Pagination information.
+     * @return A Flux of Order.
+     */
+    public Flux<Order> findOrdersByStatus(OrderStatus orderStatus, Pageable pageable) {
+        return orderRepository.findByOrderStatus(orderStatus, pageable);
+    }
+
+    /**
+     * Finds orders placed within a specific time range with pagination.
+     * @param startTime The start time of the range.
+     * @param endTime The end time of the range.
+     * @param pageable Pagination information.
+     * @return A Flux of Order.
+     */
+    public Flux<Order> findOrdersByTimeRange(LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
+        return orderRepository.findByOrderTimeBetween(startTime, endTime, pageable);
+    }
+
+    /**
+     * Finds orders by a specific user and status with pagination.
+     * @param userId The ID of the user.
+     * @param orderStatus The status of the order.
+     * @param pageable Pagination information.
+     * @return A Flux of Order.
+     */
+    public Flux<Order> findOrdersByUserIdAndStatus(Long userId, OrderStatus orderStatus, Pageable pageable) {
+        return orderRepository.findByUserIdAndOrderStatus(userId, orderStatus, pageable);
+    }
+
+    /**
+     * Counts all orders.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countAllOrders() {
+        return orderRepository.count();
+    }
+
+    /**
+     * Counts orders placed by a specific user.
+     * @param userId The ID of the user.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrdersByUserId(Long userId) {
+        return orderRepository.countByUserId(userId);
+    }
+
+    /**
+     * Counts orders by their current status.
+     * @param orderStatus The status of the order.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrdersByStatus(OrderStatus orderStatus) {
+        return orderRepository.countByOrderStatus(orderStatus);
+    }
+
+    /**
+     * Counts orders placed within a specific time range.
+     * @param startTime The start time of the range.
+     * @param endTime The end time of the range.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrdersByTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+        return orderRepository.countByOrderTimeBetween(startTime, endTime);
+    }
+
+    /**
+     * Counts orders by a specific user and status.
+     * @param userId The ID of the user.
+     * @param orderStatus The status of the order.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countOrdersByUserIdAndStatus(Long userId, OrderStatus orderStatus) {
+        return orderRepository.countByUserIdAndOrderStatus(userId, orderStatus);
     }
 }

@@ -4,11 +4,12 @@ package com.aliwudi.marketplace.backend.user.repository;
 import com.aliwudi.marketplace.backend.common.role.ERole;
 import com.aliwudi.marketplace.backend.user.model.Role;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public interface RoleRepository extends ReactiveCrudRepository<Role, Long> {
+public interface RoleRepository extends R2dbcRepository<Role, Long> {
 
     // --- Basic CRUD operations are inherited from ReactiveCrudRepository ---
 

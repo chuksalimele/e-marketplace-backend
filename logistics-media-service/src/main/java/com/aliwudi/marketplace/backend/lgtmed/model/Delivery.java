@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class Delivery {
     @Id
     private Long id; // Using Long for auto-incrementing ID
-    private String orderId; // Links to the Order entity
+    private Long orderId; // Links to the Order entity
     private String trackingNumber;
     private String recipientName;
     private String recipientAddress;

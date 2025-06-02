@@ -7,38 +7,59 @@ import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
 import com.aliwudi.marketplace.backend.lgtmed.repository.DeliveryRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Import Slf4j for logging
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux; // NEW: Import Flux
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.springframework.data.domain.Pageable; // Import for pagination
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException; // For parsing dates in service
 import java.util.UUID;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 
 @Service
 @RequiredArgsConstructor
-public class DeliveryService{
+@Slf4j // Add Slf4j for logging
+public class DeliveryService {
 
     private final DeliveryRepository deliveryRepository;
     private final OrderIntegrationService orderIntegrationService;
 
-    
-    public Mono<Delivery> createDelivery(String orderId, String recipientName, String recipientAddress, String deliveryAgent, LocalDateTime estimatedDeliveryDate) {
+    /**
+     * Creates a new delivery record.
+     *
+     * @param orderIdStr The ID of the order (as String).
+     * @param recipientName The name of the recipient.
+     * @param recipientAddress The address of the recipient.
+     * @param deliveryAgent The delivery agent.
+     * @param estimatedDeliveryDate The estimated delivery date.
+     * @return A Mono emitting the created Delivery.
+     * @throws InvalidDeliveryDataException if order not found, delivery already exists, or data is invalid.
+     */
+    public Mono<Delivery> createDelivery(String orderIdStr, String recipientName, String recipientAddress, String deliveryAgent, LocalDateTime estimatedDeliveryDate) {
+        Long orderId;
+        try {
+            orderId = Long.parseLong(orderIdStr);
+        } catch (NumberFormatException e) {
+            return Mono.error(new InvalidDeliveryDataException("Invalid Order ID format: " + orderIdStr));
+        }
+
         // 1. Validate if the order exists
         return orderIntegrationService.orderExistsById(orderId)
                 .flatMap(orderExists -> {
                     if (Boolean.FALSE.equals(orderExists)) {
-                        return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.ORDER_NOT_FOUND + orderId));
+                        return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.ORDER_NOT_FOUND + orderIdStr));
                     }
                     // 2. Ensure only one delivery per order (if that's the business rule)
                     return deliveryRepository.findByOrderId(orderId)
-                            .flatMap(existingDelivery -> Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.DELIVERY_ALREADY_EXISTS_FOR_ORDER + orderId)))
+                            .flatMap(existingDelivery -> Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.DELIVERY_ALREADY_EXISTS_FOR_ORDER + orderIdStr)))
                             .switchIfEmpty(Mono.defer(() -> {
                                 // 3. Create new Delivery
                                 String trackingNumber = UUID.randomUUID().toString();
                                 Delivery delivery = Delivery.builder()
-                                        .orderId(orderId)
+                                        .orderId(orderId) // Use Long orderId
                                         .trackingNumber(trackingNumber)
                                         .recipientName(recipientName)
                                         .recipientAddress(recipientAddress)
@@ -54,7 +75,7 @@ public class DeliveryService{
                 })
                 .cast(Delivery.class)
                 .onErrorResume(e -> {
-                    System.err.println("Error creating delivery for order " + orderId + ": " + e.getMessage());
+                    log.error("Error creating delivery for order {}: {}", orderIdStr, e.getMessage());
                     if (e instanceof InvalidDeliveryDataException) {
                         return Mono.error(e);
                     }
@@ -62,25 +83,45 @@ public class DeliveryService{
                 });
     }
 
-    
-    public Mono<Delivery> getDeliveryByOrderId(String orderId) {
+    /**
+     * Retrieves a delivery by its associated order ID.
+     * Converts String orderId to Long for repository interaction.
+     *
+     * @param orderIdStr The ID of the order (as String).
+     * @return A Mono emitting the Delivery if found.
+     * @throws DeliveryNotFoundException if no delivery is found for the given order ID.
+     */
+    public Mono<Delivery> getDeliveryByOrderId(String orderIdStr) {
+        Long orderId;
+        try {
+            orderId = Long.parseLong(orderIdStr);
+        } catch (NumberFormatException e) {
+            return Mono.error(new InvalidDeliveryDataException("Invalid Order ID format: " + orderIdStr));
+        }
+
         return deliveryRepository.findByOrderId(orderId)
-                .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_ORDER + orderId)))
+                .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_ORDER + orderIdStr)))
                 .onErrorResume(e -> {
-                    System.err.println("Error retrieving delivery by order ID " + orderId + ": " + e.getMessage());
-                    if (e instanceof DeliveryNotFoundException) {
+                    log.error("Error retrieving delivery by order ID {}: {}", orderIdStr, e.getMessage());
+                    if (e instanceof DeliveryNotFoundException || e instanceof InvalidDeliveryDataException) {
                         return Mono.error(e);
                     }
                     return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_RETRIEVING_DELIVERY_BY_ORDER + ": " + e.getMessage()));
                 });
     }
 
-    
+    /**
+     * Retrieves a delivery by its tracking number.
+     *
+     * @param trackingNumber The tracking number of the delivery.
+     * @return A Mono emitting the Delivery if found.
+     * @throws DeliveryNotFoundException if no delivery is found for the given tracking number.
+     */
     public Mono<Delivery> getDeliveryByTrackingNumber(String trackingNumber) {
         return deliveryRepository.findByTrackingNumber(trackingNumber)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_TRACKING + trackingNumber)))
                 .onErrorResume(e -> {
-                    System.err.println("Error retrieving delivery by tracking number " + trackingNumber + ": " + e.getMessage());
+                    log.error("Error retrieving delivery by tracking number {}: {}", trackingNumber, e.getMessage());
                     if (e instanceof DeliveryNotFoundException) {
                         return Mono.error(e);
                     }
@@ -88,7 +129,17 @@ public class DeliveryService{
                 });
     }
 
-    
+    /**
+     * Updates the status of an existing delivery.
+     *
+     * @param trackingNumber The tracking number of the delivery.
+     * @param newStatus The new status for the delivery (as String).
+     * @param currentLocation The current location of the delivery (optional).
+     * @param notes Additional notes for the update (optional).
+     * @return A Mono emitting the updated Delivery.
+     * @throws DeliveryNotFoundException if the delivery is not found.
+     * @throws InvalidDeliveryDataException if the new status is invalid or transition is not allowed.
+     */
     public Mono<Delivery> updateDeliveryStatus(String trackingNumber, String newStatus, String currentLocation, String notes) {
         return deliveryRepository.findByTrackingNumber(trackingNumber)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_UPDATE + trackingNumber)))
@@ -102,6 +153,11 @@ public class DeliveryService{
                         }
                         if (delivery.getStatus() == DeliveryStatus.CANCELLED && status != DeliveryStatus.CANCELLED) {
                             return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_STATUS_TRANSITION_FROM_CANCELED));
+                        }
+                        // Prevent setting to DELIVERED if estimated date is in future (optional, but good practice)
+                        if (status == DeliveryStatus.DELIVERED && delivery.getEstimatedDeliveryDate() != null && delivery.getEstimatedDeliveryDate().isAfter(LocalDateTime.now())) {
+                             log.warn("Attempting to set status to DELIVERED before estimated date for tracking number: {}", trackingNumber);
+                             // return Mono.error(new InvalidDeliveryDataException("Cannot set status to DELIVERED before estimated delivery date."));
                         }
 
                         delivery.setStatus(status);
@@ -125,7 +181,7 @@ public class DeliveryService{
                     return deliveryRepository.save(delivery);
                 })
                 .onErrorResume(e -> {
-                    System.err.println("Error updating delivery status for tracking number " + trackingNumber + ": " + e.getMessage());
+                    log.error("Error updating delivery status for tracking number {}: {}", trackingNumber, e.getMessage());
                     if (e instanceof DeliveryNotFoundException || e instanceof InvalidDeliveryDataException) {
                         return Mono.error(e);
                     }
@@ -133,8 +189,15 @@ public class DeliveryService{
                 });
     }
 
-    // NEW: Implement cancelDelivery
-    
+    /**
+     * Cancels a delivery.
+     *
+     * @param trackingNumber The tracking number of the delivery to cancel.
+     * @param cancellationReason Optional reason for cancellation.
+     * @return A Mono emitting the updated Delivery.
+     * @throws DeliveryNotFoundException if the delivery is not found.
+     * @throws InvalidDeliveryDataException if the delivery cannot be cancelled in its current state.
+     */
     public Mono<Delivery> cancelDelivery(String trackingNumber, String cancellationReason) {
         return deliveryRepository.findByTrackingNumber(trackingNumber)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_CANCEL + trackingNumber)))
@@ -152,7 +215,7 @@ public class DeliveryService{
                     return deliveryRepository.save(delivery);
                 })
                 .onErrorResume(e -> {
-                    System.err.println("Error canceling delivery " + trackingNumber + ": " + e.getMessage());
+                    log.error("Error canceling delivery {}: {}", trackingNumber, e.getMessage());
                     if (e instanceof DeliveryNotFoundException || e instanceof InvalidDeliveryDataException) {
                         return Mono.error(e);
                     }
@@ -160,94 +223,164 @@ public class DeliveryService{
                 });
     }
 
-    // NEW: Implement getDeliveriesByAgent
-    
-    public Flux<Delivery> getDeliveriesByAgent(String deliveryAgent, Long offset, Integer limit) {
-        if (deliveryAgent == null || deliveryAgent.isBlank()) {
-            return Flux.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_AGENT));
-        }
-        return deliveryRepository.findByDeliveryAgent(deliveryAgent)
-                .skip(offset)
-                .take(limit)
-                .onErrorResume(e -> {
-                    System.err.println("Error retrieving deliveries by agent " + deliveryAgent + ": " + e.getMessage());
-                    return Flux.error(new RuntimeException(ApiResponseMessages.ERROR_RETRIEVING_DELIVERIES_BY_AGENT + ": " + e.getMessage()));
-                });
+    // --- NEW: Implementations for all DeliveryRepository methods ---
+
+    /**
+     * Finds all delivery records with pagination.
+     *
+     * @param pageable Pagination information.
+     * @return A Flux of Delivery records.
+     */
+    public Flux<Delivery> findAllDeliveries(Pageable pageable) {
+        log.info("Finding all deliveries with pagination: {}", pageable);
+        return deliveryRepository.findAllBy(pageable);
     }
 
-    // NEW: Implement countDeliveriesByAgent
-    
-    public Mono<Long> countDeliveriesByAgent(String deliveryAgent) {
-        if (deliveryAgent == null || deliveryAgent.isBlank()) {
-            return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_DELIVERY_AGENT));
-        }
-        return deliveryRepository.countByDeliveryAgent(deliveryAgent)
-                .onErrorResume(e -> {
-                    System.err.println("Error counting deliveries by agent " + deliveryAgent + ": " + e.getMessage());
-                    return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_COUNTING_DELIVERIES_BY_AGENT + ": " + e.getMessage()));
-                });
+    /**
+     * Finds deliveries by their status with pagination.
+     *
+     * @param status The delivery status.
+     * @param pageable Pagination information.
+     * @return A Flux of Delivery records with the specified status.
+     */
+    public Flux<Delivery> findDeliveriesByStatus(DeliveryStatus status, Pageable pageable) {
+        log.info("Finding deliveries with status: {} with pagination: {}", status, pageable);
+        return deliveryRepository.findByStatus(status, pageable);
     }
 
-    // NEW: Implement searchDeliveries
-    
-    public Flux<Delivery> searchDeliveries(String query, Long offset, Integer limit) {
-        if (query == null || query.isBlank()) {
-            return Flux.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_SEARCH_TERM));
-        }
-        return deliveryRepository.findByRecipientNameContainingIgnoreCaseOrRecipientAddressContainingIgnoreCaseOrDeliveryAgentContainingIgnoreCase(
-                        query, query, query)
-                .skip(offset)
-                .take(limit)
-                .onErrorResume(e -> {
-                    System.err.println("Error searching deliveries for query " + query + ": " + e.getMessage());
-                    return Flux.error(new RuntimeException(ApiResponseMessages.ERROR_SEARCHING_DELIVERIES + ": " + e.getMessage()));
-                });
+    /**
+     * Finds deliveries by the delivery agent with pagination.
+     *
+     * @param deliveryAgent The name of the delivery agent.
+     * @param pageable Pagination information.
+     * @return A Flux of Delivery records for the specified agent.
+     */
+    public Flux<Delivery> findDeliveriesByDeliveryAgent(String deliveryAgent, Pageable pageable) {
+        log.info("Finding deliveries by agent: {} with pagination: {}", deliveryAgent, pageable);
+        return deliveryRepository.findByDeliveryAgent(deliveryAgent, pageable);
     }
 
-    // NEW: Implement countSearchDeliveries
-    
-    public Mono<Long> countSearchDeliveries(String query) {
-        if (query == null || query.isBlank()) {
-            return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.INVALID_SEARCH_TERM));
-        }
-        return deliveryRepository.countByRecipientNameContainingIgnoreCaseOrRecipientAddressContainingIgnoreCaseOrDeliveryAgentContainingIgnoreCase(
-                        query, query, query)
-                .onErrorResume(e -> {
-                    System.err.println("Error counting search results for deliveries query " + query + ": " + e.getMessage());
-                    return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_COUNTING_SEARCH_DELIVERIES + ": " + e.getMessage()));
-                });
+    /**
+     * Finds deliveries with an estimated delivery date before a specific date, with pagination.
+     *
+     * @param date The cutoff date.
+     * @param pageable Pagination information.
+     * @return A Flux of Delivery records.
+     */
+    public Flux<Delivery> findDeliveriesByEstimatedDeliveryDateBefore(LocalDateTime date, Pageable pageable) {
+        log.info("Finding deliveries with estimated delivery date before {} with pagination: {}", date, pageable);
+        return deliveryRepository.findByEstimatedDeliveryDateBefore(date, pageable);
     }
 
-    // NEW: Implement getAllDeliveries
-    
-    public Flux<Delivery> getAllDeliveries(Long offset, Integer limit) {
-        return deliveryRepository.findAll()
-                .skip(offset)
-                .take(limit)
-                .onErrorResume(e -> {
-                    System.err.println("Error retrieving all deliveries: " + e.getMessage());
-                    return Flux.error(new RuntimeException(ApiResponseMessages.ERROR_RETRIEVING_ALL_DELIVERIES + ": " + e.getMessage()));
-                });
+    /**
+     * Finds deliveries whose current location contains the specified string (case-insensitive), with pagination.
+     *
+     * @param location The location string to search for.
+     * @param pageable Pagination information.
+     * @return A Flux of Delivery records.
+     */
+    public Flux<Delivery> findDeliveriesByCurrentLocationContaining(String location, Pageable pageable) {
+        log.info("Finding deliveries by current location containing '{}' with pagination: {}", location, pageable);
+        return deliveryRepository.findByCurrentLocationContainingIgnoreCase(location, pageable);
     }
 
-    // NEW: Implement countAllDeliveries
-    
+    /**
+     * Counts all delivery records.
+     *
+     * @return A Mono emitting the total count of delivery records.
+     */
     public Mono<Long> countAllDeliveries() {
-        return deliveryRepository.count()
-                .onErrorResume(e -> {
-                    System.err.println("Error counting all deliveries: " + e.getMessage());
-                    return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_COUNTING_ALL_DELIVERIES + ": " + e.getMessage()));
-                });
+        log.info("Counting all deliveries.");
+        return deliveryRepository.count();
     }
 
-    // NEW: Implement deleteDelivery (by tracking number for consistency)
-    
+    /**
+     * Counts deliveries for a specific order ID.
+     * Converts String orderId to Long for repository interaction.
+     *
+     * @param orderIdStr The ID of the order (as String).
+     * @return A Mono emitting the count.
+     * @throws InvalidDeliveryDataException if the orderId format is invalid.
+     */
+    public Mono<Long> countDeliveriesByOrderId(String orderIdStr) {
+        Long orderId;
+        try {
+            orderId = Long.parseLong(orderIdStr);
+        } catch (NumberFormatException e) {
+            return Mono.error(new InvalidDeliveryDataException("Invalid Order ID format: " + orderIdStr));
+        }
+        log.info("Counting deliveries for order ID: {}", orderId);
+        return deliveryRepository.countByOrderId(orderId);
+    }
+
+    /**
+     * Counts deliveries by their status.
+     *
+     * @param status The delivery status.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countDeliveriesByStatus(DeliveryStatus status) {
+        log.info("Counting deliveries with status: {}", status);
+        return deliveryRepository.countByStatus(status);
+    }
+
+    /**
+     * Counts deliveries by the delivery agent.
+     *
+     * @param deliveryAgent The name of the delivery agent.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countDeliveriesByAgent(String deliveryAgent) {
+        log.info("Counting deliveries by agent: {}", deliveryAgent);
+        return deliveryRepository.countByDeliveryAgent(deliveryAgent);
+    }
+
+    /**
+     * Counts deliveries with an estimated delivery date before a specific date.
+     *
+     * @param date The cutoff date.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countDeliveriesByEstimatedDeliveryDateBefore(LocalDateTime date) {
+        log.info("Counting deliveries with estimated delivery date before {}", date);
+        return deliveryRepository.countByEstimatedDeliveryDateBefore(date);
+    }
+
+    /**
+     * Counts deliveries whose current location contains the specified string (case-insensitive).
+     *
+     * @param location The location string to search for.
+     * @return A Mono emitting the count.
+     */
+    public Mono<Long> countDeliveriesByCurrentLocationContaining(String location) {
+        log.info("Counting deliveries by current location containing '{}'", location);
+        return deliveryRepository.countByCurrentLocationContainingIgnoreCase(location);
+    }
+
+    /**
+     * Checks if a delivery record exists for a given tracking number.
+     *
+     * @param trackingNumber The tracking number.
+     * @return A Mono emitting true if it exists, false otherwise.
+     */
+    public Mono<Boolean> existsByTrackingNumber(String trackingNumber) {
+        log.info("Checking if delivery exists for tracking number: {}", trackingNumber);
+        return deliveryRepository.existsByTrackingNumber(trackingNumber);
+    }
+
+    /**
+     * Deletes a delivery by its tracking number.
+     *
+     * @param trackingNumber The tracking number of the delivery to delete.
+     * @return A Mono<Void> indicating completion.
+     * @throws DeliveryNotFoundException if the delivery is not found.
+     */
     public Mono<Void> deleteDelivery(String trackingNumber) {
         return deliveryRepository.findByTrackingNumber(trackingNumber)
                 .switchIfEmpty(Mono.error(new DeliveryNotFoundException(ApiResponseMessages.DELIVERY_NOT_FOUND_FOR_DELETE + trackingNumber)))
                 .flatMap(deliveryRepository::delete)
                 .onErrorResume(e -> {
-                    System.err.println("Error deleting delivery " + trackingNumber + ": " + e.getMessage());
+                    log.error("Error deleting delivery {}: {}", trackingNumber, e.getMessage());
                     if (e instanceof DeliveryNotFoundException) {
                         return Mono.error(e);
                     }

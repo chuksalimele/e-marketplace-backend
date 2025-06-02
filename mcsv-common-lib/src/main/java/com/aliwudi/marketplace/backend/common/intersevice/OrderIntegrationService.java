@@ -32,7 +32,7 @@ public class OrderIntegrationService {
      * @return Mono<Boolean> true if order exists, false otherwise.
      * Throws ServiceUnavailableException if the Order Service itself is unavailable or returns an error.
      */
-    public Mono<Boolean> orderExistsById(String orderId) {
+    public Mono<Boolean> orderExistsById(Long orderId) {
         return webClient.head() // Use HEAD request for efficiency
                 .uri("/api/orders/{orderId}", orderId) // Adjust URI based on your Order Service API
                 .retrieve()
@@ -85,7 +85,7 @@ public class OrderIntegrationService {
      * @param orderId The ID of the order to retrieve.
      * @return Mono<OrderDto> if order is found, Mono.empty() if not found, Mono.error() on other service errors.
      */
-    public Mono<OrderDto> getOrderById(String orderId) {
+    public Mono<OrderDto> getOrderById(Long orderId) {
         return webClient.get()
                 .uri("/api/orders/{orderId}", orderId) // Adjust URI based on your Order Service API
                 .retrieve()

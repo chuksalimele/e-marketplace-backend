@@ -3,14 +3,17 @@ package com.aliwudi.marketplace.backend.user.repository;
 import com.aliwudi.marketplace.backend.user.model.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public interface UserRepository extends ReactiveCrudRepository<User, Long> {
+public interface UserRepository extends R2dbcRepository<User, Long> {
 
     // --- Basic CRUD operations are inherited from ReactiveCrudRepository ---
 
+    public Flux<User> findAll(Pageable pageable);
+    
     // Find a user by username
     Mono<User> findByUsername(String username);
 
@@ -47,6 +50,6 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
     Flux<User> findByShippingAddressContainingIgnoreCase(String shippingAddress, Pageable pageable);
 
     // Count users with a specific shipping address
-    Mono<Long> countByShippingAddressContainingIgnoreCase(String shippingAddress);
+    Mono<Long> countByShippingAddressContainingIgnoreCase(String shippingAddress);    
 
 }
