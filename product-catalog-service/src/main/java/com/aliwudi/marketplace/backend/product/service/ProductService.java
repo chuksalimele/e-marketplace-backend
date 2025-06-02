@@ -114,6 +114,33 @@ public class ProductService {
     }
 
     /**
+     * Decreases the stock quantity of a product.
+     *
+     * @param productId The ID of the product whose stock to decrease.
+     * @param quantity The amount to decrease the stock by. Must be positive.
+     * @return A Mono emitting the updated Product with decreased stock.
+     * @throws ResourceNotFoundException if the product is not found.
+     * @throws InvalidProductDataException if the quantity is invalid (negative or exceeds current stock).
+     */
+    public Mono<Product> decreaseAndSaveStock(Long productId, Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            return Mono.error(new InvalidProductDataException(ApiResponseMessages.INVALID_STOCK_DECREMENT_QUANTITY));
+        }
+
+        return productRepository.findById(productId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .flatMap(existingProduct -> {
+                    int currentStock = existingProduct.getStockQuantity();
+                    if (currentStock < quantity) {
+                        return Mono.error(new InvalidProductDataException(ApiResponseMessages.INSUFFICIENT_STOCK));
+                    }
+                    existingProduct.setStockQuantity(currentStock - quantity);
+                    existingProduct.setUpdatedAt(LocalDateTime.now());
+                    return productRepository.save(existingProduct);
+                });
+    }
+    
+    /**
      * Deletes a product by its ID.
      *
      * @param id The ID of the product to delete.

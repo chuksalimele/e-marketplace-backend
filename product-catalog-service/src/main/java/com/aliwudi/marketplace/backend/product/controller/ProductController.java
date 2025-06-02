@@ -85,7 +85,37 @@ public class ProductController {
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_PRODUCT + ": " + e.getMessage())));
     }
+    /**
+     * Endpoint to decrease the stock quantity of a specific product.
+     * Accessible by 'USER', 'SELLER', or 'ADMIN' roles.
+     * Uses a PUT mapping to reflect an update operation on a resource.
+     *
+     * @param productId The ID of the product whose stock needs to be decreased.
+     * @param quantity The amount to decrease the stock by, provided as a request parameter.
+     * @return A Mono emitting a StandardResponseEntity containing the updated ProductDto.
+     */
+    @PutMapping("/{productId}/decrease-stock")
+    @PreAuthorize("hasAnyRole('USER', 'SELLER', 'ADMIN')") // Adjust roles as per business logic (e.g., only 'USER' for purchases)
+    public Mono<StandardResponseEntity> decreaseProductStock(
+            @PathVariable Long productId,
+            @RequestParam Integer quantity) {
 
+        // Basic validation for quantity at the controller level
+        if (quantity == null || quantity <= 0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STOCK_DECREMENT_QUANTITY));
+        }
+
+        return productService.decreaseAndSaveStock(productId, quantity)
+                .map(this::mapProductToProductDto)
+                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCT_STOCK_DECREASED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(InvalidProductDataException.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(Exception.class, e ->
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.PRODUCT_STOCK_UPDATE_FAILED + ": " + e.getMessage())));
+    }
+    
     @GetMapping
     public Mono<StandardResponseEntity> getAllProducts(
             @RequestParam(defaultValue = "0") int page,

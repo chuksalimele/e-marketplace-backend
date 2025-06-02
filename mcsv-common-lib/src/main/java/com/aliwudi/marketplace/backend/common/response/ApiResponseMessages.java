@@ -2,6 +2,11 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
+    public static String ERROR_COUNTING_ORDER_ITEMS = "Error counting order items";
+    public static String ERROR_CHECKING_ORDER_ITEM_EXISTENCE;
+
+    public String INVALID_STOCK_DECREMENT_QUANTITY = "Invalid stock decrement quantity.";
+    public String PRODUCT_STOCK_DECREASED_SUCCESS = "Product stock decrease success.";
     public String ERROR_RETRIEVING_PRODUCT_COUNT_BY_PRICE_RANGE = "Error retrieving product count by price range";
     public String ERROR_RETRIEVING_PRODUCTS_BY_PRICE_RANGE = "Error retrieving products by price range";
     public String ERROR_RETRIEVING_PRODUCT_COUNT_BY_STORE_AND_CATEGORY = "Error retrieving product count by store and category";
