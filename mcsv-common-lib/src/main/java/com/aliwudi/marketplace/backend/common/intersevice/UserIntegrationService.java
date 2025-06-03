@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.common.intersevice;
 
-import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -78,12 +78,12 @@ public class UserIntegrationService {
      * @param userId The ID of the user to retrieve.
      * @return Mono<UserDto> if user is found, Mono.empty() if not found, Mono.error() on other service errors.
      */
-    public Mono<UserDto> getUserDtoById(Long userId) {
-        Mono<UserDto> responseMono = webClient.get()
+    public Mono<User> getUserDtoById(Long userId) {
+        Mono<User> responseMono = webClient.get()
                 .uri("/api/users/{userId}", userId)
                 .retrieve()
                 // Removed explicit onStatus for 4xx/5xx as common error handler will catch WebClientResponseException
-                .bodyToMono(UserDto.class);
+                .bodyToMono(User.class);
 
         return handleUserServiceErrors(responseMono, "fetching user", userId, true);
     }

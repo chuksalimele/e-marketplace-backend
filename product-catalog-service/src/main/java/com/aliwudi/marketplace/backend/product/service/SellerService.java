@@ -4,7 +4,7 @@ import com.aliwudi.marketplace.backend.product.dto.SellerRequest;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidSellerDataException;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.product.model.Seller;
+import com.aliwudi.marketplace.backend.common.model.Seller;
 import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
 
 import lombok.RequiredArgsConstructor;

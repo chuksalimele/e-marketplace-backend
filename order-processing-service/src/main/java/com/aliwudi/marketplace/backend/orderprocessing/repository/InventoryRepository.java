@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.repository;
 
-import com.aliwudi.marketplace.backend.orderprocessing.model.Inventory;
+import com.aliwudi.marketplace.backend.common.model.Inventory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.Modifying; // For update operations
 import org.springframework.data.r2dbc.repository.Query; // For custom queries

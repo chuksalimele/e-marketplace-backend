@@ -1,11 +1,12 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.StoreDto;
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.Seller;
+import com.aliwudi.marketplace.backend.common.model.Store;
 import com.aliwudi.marketplace.backend.product.dto.StoreRequest;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidStoreDataException;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.product.model.Store;
 import com.aliwudi.marketplace.backend.product.service.StoreService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 
@@ -20,33 +21,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
+import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
+import com.aliwudi.marketplace.backend.product.service.SellerService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @RestController
 @RequestMapping("/api/stores")
 @RequiredArgsConstructor
 public class StoreController {
 
+    private final SellerRepository sellerRepository;
+    private final ProductRepository productRepository;
     private final StoreService storeService;
 
     /**
-     * Helper method to map Store entity to StoreDto DTO for public exposure.
+     * Helper method to map Store entity to Store DTO for public exposure.
      */
-    private StoreDto mapStoreToStoreDto(Store store) {
+    private Mono<Store> prepareDto(Store store) {
         if (store == null) {
-            return null;
+            return Mono.just(null);
         }
-        return StoreDto.builder()
-                .id(store.getId())
-                .name(store.getName())
-                .description(store.getDescription())
-                .phoneNumber(store.getPhoneNumber())
-                .address(store.getAddress())
-                .sellerId(store.getSellerId())
-                .locationId(store.getLocationId()) // Include locationId in response
-                .rating(store.getRating()) // Include rating in response
-                .createdAt(store.getCreatedAt())
-                .updatedAt(store.getUpdatedAt())
-                .build();
+        Pageable pageable = PageRequest.of(0, 10); //default values
+        Mono<Seller> sellerMono = sellerRepository.findById(store.getSellerId());
+        Flux<Product> products = productRepository.findByStoreId(store.getId(), pageable);
+        
+        return Mono.zip(sellerMono);    //come back             
     }
 
     @PostMapping
@@ -59,7 +60,9 @@ public class StoreController {
         }
 
         return storeService.createStore(storeRequest)
-                .map(createdStore -> (StandardResponseEntity) StandardResponseEntity.created(mapStoreToStoreDto(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS))
+                .map(createdStore -> {
+                         return (StandardResponseEntity) StandardResponseEntity.created(prepareDto(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS);
+                })
                 .onErrorResume(DuplicateResourceException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage()))) // Use e.getMessage() for more specific duplicate error
                 .onErrorResume(InvalidStoreDataException.class, e ->
@@ -79,7 +82,7 @@ public class StoreController {
         }
 
         return storeService.getAllStores(page, size) // Updated method call
-                .map(this::mapStoreToStoreDto)
+                .map(this::prepareDto)
                 .collectList()
                 .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -101,7 +104,7 @@ public class StoreController {
         }
 
         return storeService.getStoreById(id)
-                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(mapStoreToStoreDto(store), ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
+                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(store), ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e -> // Catch specific exception
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -119,7 +122,7 @@ public class StoreController {
         }
 
         return storeService.getStoresBySeller(sellerId, page, size) // Updated method call
-                .map(this::mapStoreToStoreDto)
+                .map(this::prepareDto)
                 .collectList()
                 .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage()))) // User not found
@@ -149,7 +152,7 @@ public class StoreController {
         // Additional validation for update request can be added here if needed, e.g., name cannot be blank
 
         return storeService.updateStore(id, storeRequest)
-                .map(updatedStore -> (StandardResponseEntity) StandardResponseEntity.ok(mapStoreToStoreDto(updatedStore), ApiResponseMessages.STORE_UPDATED_SUCCESS))
+                .map(updatedStore -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(updatedStore), ApiResponseMessages.STORE_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(DuplicateResourceException.class, e -> // Catch specific duplicate error for update
@@ -188,7 +191,7 @@ public class StoreController {
         }
 
         return storeService.searchStoresByName(name, page, size)
-                .map(this::mapStoreToStoreDto)
+                .map(this::prepareDto)
                 .collectList()
                 .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -218,7 +221,7 @@ public class StoreController {
         }
 
         return storeService.searchStoresByLocationId(locationId, page, size)
-                .map(this::mapStoreToStoreDto)
+                .map(this::prepareDto)
                 .collectList()
                 .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -252,7 +255,7 @@ public class StoreController {
         }
         
         return storeService.getStoresByMinRating(minRating, page, size)
-                .map(this::mapStoreToStoreDto)
+                .map(this::prepareDto)
                 .collectList()
                 .map(storeResponses -> (StandardResponseEntity) StandardResponseEntity.ok(storeResponses, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(InvalidStoreDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))

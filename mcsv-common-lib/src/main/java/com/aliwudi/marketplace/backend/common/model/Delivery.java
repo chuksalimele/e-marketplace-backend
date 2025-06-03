@@ -1,20 +1,22 @@
-package com.aliwudi.marketplace.backend.lgtmed.model;
+package com.aliwudi.marketplace.backend.common.model;
 
 import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
-import java.time.LocalDateTime;
+
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table("deliveries") // Ensure your table name is correct
+@Table("deliveries")
 public class Delivery {
     @Id
     private Long id; // Using Long for auto-incrementing ID
@@ -30,5 +32,5 @@ public class Delivery {
     private String notes; // Any additional notes or updates
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-       
+
 }

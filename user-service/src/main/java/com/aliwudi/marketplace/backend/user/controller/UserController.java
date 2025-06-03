@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.user.model.User;
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
@@ -148,12 +148,12 @@ public class UserController {
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
     }
-    // Helper method to map User entity to UserDto for public exposure
-    private UserDto mapUserToUserDto(User user) {
+    // Helper method to map User entity to User for public exposure
+    private User mapUserToUserDto(User user) {
         if (user == null) {
             return null;
         }
-        return UserDto.builder()
+        return User.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -168,7 +168,7 @@ public class UserController {
      * Endpoint to find a user by their username.
      *
      * @param username The username to search for.
-     * @return A Mono emitting StandardResponseEntity with the UserDto if found.
+     * @return A Mono emitting StandardResponseEntity with the User if found.
      */
     @GetMapping("/byUsername/{username}")
     public Mono<StandardResponseEntity> getUserByUsername(@PathVariable String username) {
@@ -183,7 +183,7 @@ public class UserController {
      * Endpoint to find a user by their email.
      *
      * @param email The email to search for.
-     * @return A Mono emitting StandardResponseEntity with the UserDto if found.
+     * @return A Mono emitting StandardResponseEntity with the User if found.
      */
     @GetMapping("/byEmail/{email}")
     public Mono<StandardResponseEntity> getUserByEmail(@PathVariable String email) {
@@ -202,11 +202,11 @@ public class UserController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of UserDto records.
+     * @return A Flux of User records.
      */
     @GetMapping("/byFirstName/{firstName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<UserDto> getUsersByFirstNameContainingIgnoreCase(
+    public Flux<User> getUsersByFirstNameContainingIgnoreCase(
             @PathVariable String firstName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -241,11 +241,11 @@ public class UserController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of UserDto records.
+     * @return A Flux of User records.
      */
     @GetMapping("/byLastName/{lastName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<UserDto> getUsersByLastNameContainingIgnoreCase(
+    public Flux<User> getUsersByLastNameContainingIgnoreCase(
             @PathVariable String lastName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -280,11 +280,11 @@ public class UserController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of UserDto records.
+     * @return A Flux of User records.
      */
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<UserDto> getUsersByUsernameOrEmailContainingIgnoreCase(
+    public Flux<User> getUsersByUsernameOrEmailContainingIgnoreCase(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -319,11 +319,11 @@ public class UserController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of UserDto records.
+     * @return A Flux of User records.
      */
     @GetMapping("/createdAtAfter")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<UserDto> getUsersByCreatedAtAfter(
+    public Flux<User> getUsersByCreatedAtAfter(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -368,11 +368,11 @@ public class UserController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of UserDto records.
+     * @return A Flux of User records.
      */
     @GetMapping("/byShippingAddress")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<UserDto> getUsersByShippingAddressContainingIgnoreCase(
+    public Flux<User> getUsersByShippingAddressContainingIgnoreCase(
             @RequestParam String shippingAddress,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

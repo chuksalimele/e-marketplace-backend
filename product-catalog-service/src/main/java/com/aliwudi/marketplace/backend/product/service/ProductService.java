@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.product.service;
 
+import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
-import com.aliwudi.marketplace.backend.product.model.Product;
 import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidProductDataException;

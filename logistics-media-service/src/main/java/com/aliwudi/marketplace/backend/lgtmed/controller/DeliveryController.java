@@ -1,10 +1,9 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.DeliveryDto;
+import com.aliwudi.marketplace.backend.common.model.Delivery;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryRequest;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryUpdateRequest;
 import com.aliwudi.marketplace.backend.lgtmed.service.DeliveryService;
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
 import com.aliwudi.marketplace.backend.lgtmed.exception.DeliveryNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidDeliveryDataException;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
@@ -34,24 +33,13 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     /**
-     * Helper method to map Delivery entity to DeliveryDto DTO for public exposure.
+     * Helper method to map Delivery entity to Delivery DTO for public exposure.
      */
-    private DeliveryDto mapDeliveryToDeliveryDto(Delivery delivery) {
+    private Mono<Delivery> prepareDto(Delivery delivery) {
         if (delivery == null) {
             return null;
         }
-        return DeliveryDto.builder()
-                .orderId(String.valueOf(delivery.getOrderId())) // Convert Long to String for DTO
-                .trackingNumber(delivery.getTrackingNumber())
-                .status(delivery.getStatus())
-                .currentLocation(delivery.getCurrentLocation())
-                .estimatedDeliveryDate(delivery.getEstimatedDeliveryDate())
-                .actualDeliveryDate(delivery.getActualDeliveryDate())
-                .recipientName(delivery.getRecipientName())
-                .recipientAddress(delivery.getRecipientAddress())
-                .deliveryAgent(delivery.getDeliveryAgent())
-                .notes(delivery.getNotes())
-                .build();
+        return Mono.just(delivery);// COME BACK
     }
 
     @PostMapping
@@ -72,7 +60,7 @@ public class DeliveryController {
                 request.getDeliveryAgent(),
                 request.getEstimatedDeliveryDate()
             )
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.created(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_CREATED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.created(prepareDto(delivery), ApiResponseMessages.DELIVERY_CREATED_SUCCESS))
             .onErrorResume(InvalidDeliveryDataException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
             .onErrorResume(Exception.class, e ->
@@ -86,7 +74,7 @@ public class DeliveryController {
         }
 
         return deliveryService.getDeliveryByOrderId(orderId) // String orderId
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
             .onErrorResume(InvalidDeliveryDataException.class, e -> // Catch for NumberFormatException from service
@@ -102,7 +90,7 @@ public class DeliveryController {
         }
 
         return deliveryService.getDeliveryByTrackingNumber(trackingNumber)
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(delivery), ApiResponseMessages.DELIVERY_RETRIEVED_SUCCESS))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
             .onErrorResume(Exception.class, e ->
@@ -123,7 +111,7 @@ public class DeliveryController {
                 request.getCurrentLocation(),
                 request.getNotes()
             )
-            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_STATUS_UPDATED_SUCCESS))
+            .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(delivery), ApiResponseMessages.DELIVERY_STATUS_UPDATED_SUCCESS))
             .onErrorResume(DeliveryNotFoundException.class, e ->
                     Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
             .onErrorResume(InvalidDeliveryDataException.class, e ->
@@ -142,7 +130,7 @@ public class DeliveryController {
         }
 
         return deliveryService.cancelDelivery(trackingNumber, reason)
-                .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(mapDeliveryToDeliveryDto(delivery), ApiResponseMessages.DELIVERY_CANCELED_SUCCESS))
+                .map(delivery -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(delivery), ApiResponseMessages.DELIVERY_CANCELED_SUCCESS))
                 .onErrorResume(DeliveryNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(InvalidDeliveryDataException.class, e ->
@@ -160,11 +148,11 @@ public class DeliveryController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of DeliveryDto records.
+     * @return A Flux of Delivery records.
      */
     @GetMapping("/admin/all-paginated") // Renamed to avoid conflict with existing /
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<DeliveryDto> getAllDeliveriesPaginated(
+    public Flux<Delivery> getAllDeliveriesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
@@ -172,7 +160,7 @@ public class DeliveryController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return deliveryService.findAllDeliveries(pageable)
-                .map(this::mapDeliveryToDeliveryDto);
+                .map(this::prepareDto);
     }
 
     /**
@@ -183,11 +171,11 @@ public class DeliveryController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of DeliveryDto records.
+     * @return A Flux of Delivery records.
      */
     @GetMapping("/admin/byStatus/{status}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
-    public Flux<DeliveryDto> getDeliveriesByStatus(
+    public Flux<Delivery> getDeliveriesByStatus(
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -202,7 +190,7 @@ public class DeliveryController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return deliveryService.findDeliveriesByStatus(deliveryStatus, pageable)
-                .map(this::mapDeliveryToDeliveryDto);
+                .map(this::prepareDto);
     }
 
     /**
@@ -213,11 +201,11 @@ public class DeliveryController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of DeliveryDto records.
+     * @return A Flux of Delivery records.
      */
     @GetMapping("/admin/byAgent/{deliveryAgent}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
-    public Flux<DeliveryDto> getDeliveriesByDeliveryAgent(
+    public Flux<Delivery> getDeliveriesByDeliveryAgent(
             @PathVariable String deliveryAgent,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -226,7 +214,7 @@ public class DeliveryController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return deliveryService.findDeliveriesByDeliveryAgent(deliveryAgent, pageable)
-                .map(this::mapDeliveryToDeliveryDto);
+                .map(this::prepareDto);
     }
 
     /**
@@ -237,11 +225,11 @@ public class DeliveryController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of DeliveryDto records.
+     * @return A Flux of Delivery records.
      */
     @GetMapping("/admin/estimatedBefore")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<DeliveryDto> getDeliveriesByEstimatedDeliveryDateBefore(
+    public Flux<Delivery> getDeliveriesByEstimatedDeliveryDateBefore(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -252,7 +240,7 @@ public class DeliveryController {
             Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
             Pageable pageable = PageRequest.of(page, size, sort);
             return deliveryService.findDeliveriesByEstimatedDeliveryDateBefore(dateTime, pageable)
-                    .map(this::mapDeliveryToDeliveryDto);
+                    .map(this::prepareDto);
         } catch (DateTimeParseException e) {
             return Flux.error(new InvalidDeliveryDataException("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
         }
@@ -266,11 +254,11 @@ public class DeliveryController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of DeliveryDto records.
+     * @return A Flux of Delivery records.
      */
     @GetMapping("/admin/byLocation")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<DeliveryDto> getDeliveriesByCurrentLocationContaining(
+    public Flux<Delivery> getDeliveriesByCurrentLocationContaining(
             @RequestParam String location,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -279,7 +267,7 @@ public class DeliveryController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return deliveryService.findDeliveriesByCurrentLocationContaining(location, pageable)
-                .map(this::mapDeliveryToDeliveryDto);
+                .map(this::prepareDto);
     }
 
     /**

@@ -1,8 +1,7 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.ProductDto;
+import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
-import com.aliwudi.marketplace.backend.product.model.Product;
 import com.aliwudi.marketplace.backend.product.service.ProductService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
@@ -28,26 +27,13 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * Helper method to map Product entity to ProductDto DTO for public exposure.
+     * Helper method to map Product entity to Product DTO for public exposure.
      */
-    private ProductDto mapProductToProductDto(Product product) {
+    private Product prepareDto(Product product) {
         if (product == null) {
             return null;
         }
-        return ProductDto.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .description(product.getDescription())
-                .price(product.getPrice())
-                .stockQuantity(product.getStockQuantity())
-                .category(product.getCategory())
-                .store(product.getStoreId())
-                .sellerId(product.getSellerId()) // Include sellerId in response
-                .imageUrl(product.getImageUrl())
-                .location(product.getLocationId())
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .build();
+        return product;
     }
 
     @PostMapping
@@ -62,7 +48,7 @@ public class ProductController {
         }
 
         return productService.createProduct(productRequest)
-                .map(createdProduct -> (StandardResponseEntity) StandardResponseEntity.created(mapProductToProductDto(createdProduct), ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
+                .map(createdProduct -> (StandardResponseEntity) StandardResponseEntity.created(prepareDto(createdProduct), ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
                 .onErrorResume(InvalidProductDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_DATA + e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -77,7 +63,7 @@ public class ProductController {
         }
 
         return productService.updateProduct(id, productRequest)
-                .map(updatedProduct -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductDto(updatedProduct), ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
+                .map(updatedProduct -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(updatedProduct), ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(InvalidProductDataException.class, e ->
@@ -92,7 +78,7 @@ public class ProductController {
      *
      * @param productId The ID of the product whose stock needs to be decreased.
      * @param quantity The amount to decrease the stock by, provided as a request parameter.
-     * @return A Mono emitting a StandardResponseEntity containing the updated ProductDto.
+     * @return A Mono emitting a StandardResponseEntity containing the updated Product.
      */
     @PutMapping("/{productId}/decrease-stock")
     @PreAuthorize("hasAnyRole('USER', 'SELLER', 'ADMIN')") // Adjust roles as per business logic (e.g., only 'USER' for purchases)
@@ -106,7 +92,7 @@ public class ProductController {
         }
 
         return productService.decreaseAndSaveStock(productId, quantity)
-                .map(this::mapProductToProductDto)
+                .map(this::prepareDto)
                 .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCT_STOCK_DECREASED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -127,7 +113,7 @@ public class ProductController {
 
         return productService.getAllProducts(page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -149,7 +135,7 @@ public class ProductController {
         }
 
         return productService.getProductById(id)
-                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(mapProductToProductDto(product), ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(product), ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -186,7 +172,7 @@ public class ProductController {
 
         return productService.getProductsByStore(storeId, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -216,7 +202,7 @@ public class ProductController {
 
         return productService.getProductsBySeller(sellerId, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -246,7 +232,7 @@ public class ProductController {
 
         return productService.getProductsByCategory(category, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -277,7 +263,7 @@ public class ProductController {
 
         return productService.getProductsByPriceRange(minPrice, maxPrice, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -312,7 +298,7 @@ public class ProductController {
 
         return productService.getProductsByStoreAndCategory(storeId, category, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -347,7 +333,7 @@ public class ProductController {
 
         return productService.getProductsBySellerAndCategory(sellerId, category, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -370,7 +356,7 @@ public class ProductController {
 
         return productService.getProductsByCategoryAndPriceBetween(category, minPrice, maxPrice, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -391,7 +377,7 @@ public class ProductController {
 
         return productService.searchProducts(name, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -423,7 +409,7 @@ public class ProductController {
 
         return productService.getProductsByLocationId(locationId, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -454,7 +440,7 @@ public class ProductController {
 
         return productService.getProductsByCountryAndCity(country, city, page, size).collectList()
                 .map(products -> products.stream()
-                        .map(this::mapProductToProductDto)
+                        .map(this::prepareDto)
                         .collect(Collectors.toList()))
                 .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->

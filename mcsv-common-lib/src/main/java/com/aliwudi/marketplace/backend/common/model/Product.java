@@ -1,11 +1,8 @@
 // Product.java
-package com.aliwudi.marketplace.backend.product.model;
+package com.aliwudi.marketplace.backend.common.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonBackReference;   // NEW IMPORT
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,24 +11,25 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("products")
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table("products")
 public class Product {
-
     @Id
     private Long id;
     private String name;
-    private String description;
-    private String imageUrl;
-    private BigDecimal price;
-    private Integer stockQuantity; 
-    private String category;
-    private Long storeId;
+    private Long storeId;// required for db  
     private Long sellerId;
-    private Long locationId;
+    private Long locationId;     
+    private String description;
+    private BigDecimal price;
+    private Integer stockQuantity; // Make sure this is initialized or set upon creation
+    private String category;
+    private Location location;
+    private String imageUrl;   
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;     
 }

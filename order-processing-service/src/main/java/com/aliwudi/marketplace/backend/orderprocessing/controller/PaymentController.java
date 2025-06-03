@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.PaymentDto;
+import com.aliwudi.marketplace.backend.common.model.Payment;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentRequest;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Payment; // Import Payment model
 import com.aliwudi.marketplace.backend.orderprocessing.service.PaymentService;
@@ -38,7 +38,7 @@ public class PaymentController {
                 request.getOrderId(),
                 request.getAmount()
             )
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(PaymentDto.builder()
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(Payment.builder()
                     .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
@@ -84,7 +84,7 @@ public class PaymentController {
         }
 
         return paymentService.getPaymentDetails(orderId)
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(PaymentDto.builder()
+            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(Payment.builder()
                     .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())

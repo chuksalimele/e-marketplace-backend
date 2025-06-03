@@ -2,7 +2,7 @@ package com.aliwudi.marketplace.backend.orderprocessing.service;
 
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InventoryNotFoundException;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Inventory;
+import com.aliwudi.marketplace.backend.common.model.Inventory;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.InventoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

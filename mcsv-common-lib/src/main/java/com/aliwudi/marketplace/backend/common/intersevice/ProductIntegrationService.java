@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.common.intersevice;
 
-import com.aliwudi.marketplace.backend.common.dto.ProductDto;
+import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -77,10 +77,10 @@ public class ProductIntegrationService {
      * micro service using WebClient.
      *
      * @param productId The ID of the product to fetch.
-     * @return A Mono of the ProductDto object.
+     * @return A Mono of the Product object.
      */
-    public Mono<ProductDto> getProductDtoById(Long productId) {
-        Mono<ProductDto> responseMono = webClient.get()
+    public Mono<Product> getProductDtoById(Long productId) {
+        Mono<Product> responseMono = webClient.get()
                 .uri("/{id}", productId) // Append the product ID to the base URL
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError() && status != HttpStatus.NOT_FOUND,
@@ -91,7 +91,7 @@ public class ProductIntegrationService {
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> Mono.error(new ServiceUnavailableException(
                                         "Product Service returned server error for product ID " + productId + " (Status: " + clientResponse.statusCode() + "): " + errorBody))))
-                .bodyToMono(ProductDto.class) // Convert the response body to a Mono of a single ProductDto object
+                .bodyToMono(Product.class) // Convert the response body to a Mono of a single Product object
                 .doOnNext(
                         // For logging - REMOVE IN PRODUCTION
                         product -> System.out.println("WebClient fetched product by ID: " + product)
@@ -106,10 +106,10 @@ public class ProductIntegrationService {
      *
      * @param productId The ID of the product whose stock to decrease.
      * @param quantity The amount to decrease the stock by.
-     * @return A Mono of the updated ProductDto object.
+     * @return A Mono of the updated Product object.
      */
-    public Mono<ProductDto> decreaseAndSaveStock(Long productId, Integer quantity) {
-        Mono<ProductDto> responseMono = webClient.put()
+    public Mono<Product> decreaseAndSaveStock(Long productId, Integer quantity) {
+        Mono<Product> responseMono = webClient.put()
                 .uri("/{productId}/decrease-stock?quantity={quantity}", productId, quantity)
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError() && status != HttpStatus.NOT_FOUND,
@@ -120,7 +120,7 @@ public class ProductIntegrationService {
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> Mono.error(new ServiceUnavailableException(
                                         "Product Service returned server error for product ID " + productId + " (Status: " + clientResponse.statusCode() + "): " + errorBody))))
-                .bodyToMono(ProductDto.class)
+                .bodyToMono(Product.class)
                 .doOnNext(
                         product -> System.out.println("WebClient decreased stock for product ID: " + productId + ", new stock: " + product.getStockQuantity())
                 );

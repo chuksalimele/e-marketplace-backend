@@ -1,14 +1,14 @@
 // src/main/java/com/marketplace/emarketplacebackend/service/OrderService.java
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.common.dto.ProductDto;
-import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Order;
-import com.aliwudi.marketplace.backend.orderprocessing.model.OrderItem;
+import com.aliwudi.marketplace.backend.common.model.Order;
+import com.aliwudi.marketplace.backend.common.model.OrderItem;
 import com.aliwudi.marketplace.backend.common.status.OrderStatus;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.OrderItemRepository;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.OrderRepository;

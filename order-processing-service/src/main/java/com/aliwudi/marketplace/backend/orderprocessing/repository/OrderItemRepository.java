@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.repository;
 
-import com.aliwudi.marketplace.backend.orderprocessing.model.OrderItem;
+import com.aliwudi.marketplace.backend.common.model.OrderItem;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;

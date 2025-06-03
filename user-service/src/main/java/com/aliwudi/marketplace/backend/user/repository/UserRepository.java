@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.user.repository;
 
-import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.common.model.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;

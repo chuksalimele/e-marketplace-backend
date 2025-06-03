@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.user.service;
 
-import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService; // NEW: Import ReactiveUserDetailsService

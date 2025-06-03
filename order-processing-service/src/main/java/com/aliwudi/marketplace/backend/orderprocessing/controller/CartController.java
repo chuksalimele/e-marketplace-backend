@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.CartDto;
+import com.aliwudi.marketplace.backend.common.model.Cart;
 import com.aliwudi.marketplace.backend.orderprocessing.model.Cart; // Import Cart model
 import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem;
 import com.aliwudi.marketplace.backend.orderprocessing.service.CartService;

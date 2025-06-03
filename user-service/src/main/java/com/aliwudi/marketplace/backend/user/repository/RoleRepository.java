@@ -2,7 +2,7 @@
 package com.aliwudi.marketplace.backend.user.repository;
 
 import com.aliwudi.marketplace.backend.common.role.ERole;
-import com.aliwudi.marketplace.backend.user.model.Role;
+import com.aliwudi.marketplace.backend.common.model.Role;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;

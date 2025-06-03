@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.product.repository;
 
-import com.aliwudi.marketplace.backend.product.model.Seller;
+import com.aliwudi.marketplace.backend.common.model.Seller;
 import org.springframework.data.domain.Pageable; // For pagination
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;

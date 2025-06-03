@@ -1,32 +1,33 @@
-package com.aliwudi.marketplace.backend.orderprocessing.model;
+package com.aliwudi.marketplace.backend.common.model;
 
 import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Table;
 
-
-@Table("payments")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table("payments")
 public class Payment {
-
     @Id
     private Long id;
     private Long userId;
-    private Long orderId; 
+    private Long orderId; // required for db
+    @Transient
+    private Order order;// skip for db but required for response dto
     private String transactionRef;
     private BigDecimal amount;
-    private PaymentStatus status;
+    private PaymentStatus status; // PENDING, SUCCESS, FAILED, REFUNDED
     private LocalDateTime paymentTime;
     private String gatewayResponse; // Raw response from payment gateway
+ 
 }

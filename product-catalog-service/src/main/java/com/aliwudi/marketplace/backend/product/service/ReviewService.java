@@ -5,8 +5,8 @@ import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidReviewDataException;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.product.model.Product;
-import com.aliwudi.marketplace.backend.product.model.Review;
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.Review;
 import com.aliwudi.marketplace.backend.product.repository.ProductRepository;
 import com.aliwudi.marketplace.backend.product.repository.ReviewRepository;
 

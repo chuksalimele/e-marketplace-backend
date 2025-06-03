@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
-import com.aliwudi.marketplace.backend.common.dto.MediaDto;
+import com.aliwudi.marketplace.backend.common.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.dto.MediaUploadRequest;
 import com.aliwudi.marketplace.backend.lgtmed.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.service.MediaService;
@@ -29,13 +29,13 @@ public class MediaController {
     private final MediaService mediaService;
 
     /**
-     * Helper method to map MediaAsset entity to MediaDto DTO for public exposure.
+     * Helper method to map MediaAsset entity to MediaAsset DTO for public exposure.
      */
-    private MediaDto mapMediaAssetToMediaDto(MediaAsset asset) {
+    private MediaAsset mapMediaAssetToMediaDto(MediaAsset asset) {
         if (asset == null) {
             return null;
         }
-        return MediaDto.builder()
+        return MediaAsset.builder()
                 .id(asset.getId())
                 .assetName(asset.getAssetName())
                 .uniqueFileName(asset.getUniqueFileName())
@@ -146,11 +146,11 @@ public class MediaController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of MediaDto records.
+     * @return A Flux of MediaAsset records.
      */
     @GetMapping("/admin/all-paginated") // Renamed to avoid conflict with existing /
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<MediaDto> getAllMediaAssetsPaginated(
+    public Flux<MediaAsset> getAllMediaAssetsPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
@@ -172,11 +172,11 @@ public class MediaController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of MediaDto records.
+     * @return A Flux of MediaAsset records.
      */
     @GetMapping("/admin/byEntityType/{entityType}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<MediaDto> getMediaAssetsByEntityType(
+    public Flux<MediaAsset> getMediaAssetsByEntityType(
             @PathVariable String entityType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -199,11 +199,11 @@ public class MediaController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of MediaDto records.
+     * @return A Flux of MediaAsset records.
      */
     @GetMapping("/admin/byFileType/{fileType}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<MediaDto> getMediaAssetsByFileType(
+    public Flux<MediaAsset> getMediaAssetsByFileType(
             @PathVariable String fileType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -226,11 +226,11 @@ public class MediaController {
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of MediaDto records.
+     * @return A Flux of MediaAsset records.
      */
     @GetMapping("/admin/byAssetNameContaining")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<MediaDto> getMediaAssetsByAssetNameContaining(
+    public Flux<MediaAsset> getMediaAssetsByAssetNameContaining(
             @RequestParam String assetName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

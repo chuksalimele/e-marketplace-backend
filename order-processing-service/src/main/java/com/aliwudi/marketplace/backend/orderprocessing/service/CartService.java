@@ -1,15 +1,15 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.common.dto.CartDto;
-import com.aliwudi.marketplace.backend.common.dto.CartItemDto;
-import com.aliwudi.marketplace.backend.common.dto.ProductDto;
-import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.model.Cart;
+import com.aliwudi.marketplace.backend.common.model.CartItem;
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Cart;
-import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem;
+import com.aliwudi.marketplace.backend.common.model.Cart;
+import com.aliwudi.marketplace.backend.common.model.CartItem;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.CartItemRepository;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.CartRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,15 +108,15 @@ public class CartService {
      * representation.
      *
      * @param userId The ID of the user whose cart to retrieve.
-     * @return A Mono emitting the CartDto object of the user.
+     * @return A Mono emitting the Cart object of the user.
      */
-    public Mono<CartDto> getUserCartDetails(Long userId) {
+    public Mono<Cart> getUserCartDetails(Long userId) {
         // Step 1: Find the user's cart
         Mono<Cart> cartMono = cartRepository.findByUserId(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Cart not found for user ID: " + userId)));
 
         // Step 2: Fetch user details from User Service
-        Mono<UserDto> userDtoMono = userIntegrationService.getUserDtoById(userId)
+        Mono<User> userDtoMono = userIntegrationService.getUserDtoById(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found for ID: " + userId + " from User Service.")))
                 .onErrorResume(e -> {
                     System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
@@ -128,12 +128,12 @@ public class CartService {
         return Mono.zip(cartMono, userDtoMono)
                 .flatMap(tuple -> {
                     Cart userCart = tuple.getT1();
-                    UserDto userDto = tuple.getT2();
+                    User userDto = tuple.getT2();
 
                     return cartItemRepository.findByCartId(userCart.getId(), Pageable.unpaged())
                             .flatMap(item -> productIntegrationService.getProductDtoById(item.getProductId())
                                     .map(productDto -> {
-                                        CartItemDto cartItemDto = new CartItemDto();
+                                        CartItem cartItemDto = new CartItem();
                                         cartItemDto.setId(item.getId());
                                         cartItemDto.setProduct(productDto);
                                         cartItemDto.setQuantity(item.getQuantity());
@@ -141,7 +141,7 @@ public class CartService {
                                     })
                                     .onErrorResume(ResourceNotFoundException.class, e -> {
                                         System.err.println("Product details not found for productId: " + item.getProductId() + " in Product Catalog Service. Error: " + e.getMessage());
-                                        CartItemDto cartItemDto = new CartItemDto();
+                                        CartItem cartItemDto = new CartItem();
                                         cartItemDto.setId(item.getId());
                                         cartItemDto.setQuantity(item.getQuantity());
                                         cartItemDto.setProduct(null);
@@ -149,7 +149,7 @@ public class CartService {
                                     })
                                     .onErrorResume(RuntimeException.class, e -> {
                                         System.err.println("Error fetching product " + item.getProductId() + " from Product Catalog Service: " + e.getMessage());
-                                        CartItemDto cartItemDto = new CartItemDto();
+                                        CartItem cartItemDto = new CartItem();
                                         cartItemDto.setId(item.getId());
                                         cartItemDto.setQuantity(item.getQuantity());
                                         cartItemDto.setProduct(null);
@@ -163,7 +163,7 @@ public class CartService {
                                         .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                                CartDto cartDto = new CartDto();
+                                Cart cartDto = new Cart();
                                 cartDto.setId(userCart.getId());
                                 cartDto.setItems(cartItemDtos);
                                 cartDto.setUser(userDto);

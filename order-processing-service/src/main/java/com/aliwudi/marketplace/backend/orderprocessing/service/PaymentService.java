@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
 import com.aliwudi.marketplace.backend.common.status.PaymentStatus;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Payment;
+import com.aliwudi.marketplace.backend.common.model.Payment;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.PaymentRepository;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException; // Import ResourceNotFoundException
 import lombok.RequiredArgsConstructor;

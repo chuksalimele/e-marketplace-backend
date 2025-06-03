@@ -1,7 +1,7 @@
 // src/main/java/com/marketplace/emarketplacebackend/dto/UserProfileUpdateRequest.java
 package com.aliwudi.marketplace.backend.user.dto;
 
-import com.aliwudi.marketplace.backend.common.dto.UserDto;
+import com.aliwudi.marketplace.backend.common.model.User;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
@@ -10,6 +10,6 @@ import jakarta.validation.constraints.Size;
 
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateRequest extends UserDto{
+public class UserUpdateRequest extends User{
      
 }

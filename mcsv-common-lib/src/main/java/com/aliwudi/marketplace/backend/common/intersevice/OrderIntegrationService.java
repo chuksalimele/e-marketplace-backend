@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.common.intersevice;
 
-import com.aliwudi.marketplace.backend.common.dto.OrderDto;
+import com.aliwudi.marketplace.backend.common.model.Order;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -144,12 +144,12 @@ public class OrderIntegrationService {
      * @param orderId The ID of the order to retrieve.
      * @return Mono<OrderDto> if order is found, Mono.empty() if not found, Mono.error() on other service errors.
      */
-    public Mono<OrderDto> getOrderById(Long orderId) {
-        Mono<OrderDto> responseMono = webClient.get()
+    public Mono<Order> getOrderById(Long orderId) {
+        Mono<Order> responseMono = webClient.get()
                 .uri("/api/orders/{orderId}", orderId) // Adjust URI based on your Order Service API
                 .retrieve()
                 // Removed onStatus calls as WebClientResponseException will handle them
-                .bodyToMono(OrderDto.class);
+                .bodyToMono(Order.class);
 
         return handleOrderServiceErrors(responseMono, "fetching order", orderId, true);
     }
@@ -161,12 +161,12 @@ public class OrderIntegrationService {
      * @param userId The ID of the user whose orders to retrieve.
      * @return Flux<OrderDto> if orders are found, Flux.empty() if not found, Mono.error() on other service errors.
      */
-    public Flux<OrderDto> getOrdersByUserId(Long userId) {
-        Flux<OrderDto> responseFlux = webClient.get()
+    public Flux<Order> getOrdersByUserId(Long userId) {
+        Flux<Order> responseFlux = webClient.get()
                 .uri("/api/orders/user/{userId}", userId) // Adjust URI based on your Order Service API
                 .retrieve()
                 // Removed onStatus calls as WebClientResponseException will handle them
-                .bodyToFlux(OrderDto.class); // Expecting a Flux of OrderDto
+                .bodyToFlux(Order.class); // Expecting a Flux of Order
 
         return handleOrderServiceErrors(responseFlux, "fetching user's orders", userId, true);
     }

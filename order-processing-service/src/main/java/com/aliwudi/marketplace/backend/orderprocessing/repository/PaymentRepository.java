@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.repository;
 
+import com.aliwudi.marketplace.backend.common.model.Payment;
 import com.aliwudi.marketplace.backend.common.status.PaymentStatus; // Assuming this enum is defined
-import com.aliwudi.marketplace.backend.orderprocessing.model.Payment;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;

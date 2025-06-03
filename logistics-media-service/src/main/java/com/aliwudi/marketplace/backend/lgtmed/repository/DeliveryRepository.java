@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.lgtmed.repository;
 
+import com.aliwudi.marketplace.backend.common.model.Delivery;
 import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;

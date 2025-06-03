@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.user.service;
 
 import com.aliwudi.marketplace.backend.user.dto.UserUpdateRequest;
-import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.user.exception.RoleNotFoundException;

@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.product.repository;
 
-import com.aliwudi.marketplace.backend.product.model.Review;
+import com.aliwudi.marketplace.backend.common.model.Review;
 import org.springframework.data.domain.Pageable; // For pagination
 import org.springframework.data.r2dbc.repository.Query; // For custom queries
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
