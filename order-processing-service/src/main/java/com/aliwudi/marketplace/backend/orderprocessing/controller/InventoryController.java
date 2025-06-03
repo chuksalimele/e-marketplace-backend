@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
+import com.aliwudi.marketplace.backend.common.model.Inventory;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.InventoryUpdateRequest;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.StockOperationRequest;
@@ -7,7 +8,6 @@ import com.aliwudi.marketplace.backend.orderprocessing.dto.StockResponse;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.orderprocessing.service.InventoryService;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Inventory; // Import Inventory model
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

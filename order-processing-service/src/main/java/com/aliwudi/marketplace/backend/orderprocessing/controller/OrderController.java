@@ -5,8 +5,8 @@ import com.aliwudi.marketplace.backend.orderprocessing.service.OrderService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.CheckoutRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Order; // Import Order model
-import com.aliwudi.marketplace.backend.orderprocessing.model.OrderItem; // Import OrderItem model
+import com.aliwudi.marketplace.backend.common.model.Order; // Import Order model
+import com.aliwudi.marketplace.backend.common.model.OrderItem; // Import OrderItem model
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

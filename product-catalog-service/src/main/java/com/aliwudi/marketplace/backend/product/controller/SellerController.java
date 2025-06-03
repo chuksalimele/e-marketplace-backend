@@ -30,7 +30,7 @@ public class SellerController {
     /**
      * Helper method to map Seller entity to Seller DTO for public exposure.
      */
-    private Seller prepareDto(Seller seller) {
+    private Mono<Seller> prepareDto(Seller seller) {
         if (seller == null) {
             return null;
         }
@@ -47,7 +47,7 @@ public class SellerController {
         }
 
         return sellerService.getAllSellers(page, size)
-                .map(this::prepareDto)
+                .flatMap(this::prepareDto)
                 .collectList()
                 .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
@@ -69,7 +69,8 @@ public class SellerController {
         }
 
         return sellerService.getSellerById(id)
-                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(seller), ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -87,7 +88,8 @@ public class SellerController {
         }
 
         return sellerService.createSeller(sellerRequest)
-                .map(createdSeller -> (StandardResponseEntity) StandardResponseEntity.created(prepareDto(createdSeller), ApiResponseMessages.SELLER_CREATED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(seller -> (StandardResponseEntity) StandardResponseEntity.created(seller, ApiResponseMessages.SELLER_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
@@ -107,7 +109,8 @@ public class SellerController {
         }
 
         return sellerService.updateSeller(id, sellerRequest)
-                .map(updatedSeller -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(updatedSeller), ApiResponseMessages.SELLER_UPDATED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
@@ -145,7 +148,7 @@ public class SellerController {
         }
 
         return sellerService.searchSellers(query, page, size)
-                .map(this::prepareDto)
+                .flatMap(this::prepareDto)
                 .collectList()
                 .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->

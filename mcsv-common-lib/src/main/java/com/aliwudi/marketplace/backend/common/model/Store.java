@@ -1,6 +1,7 @@
 package com.aliwudi.marketplace.backend.common.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,7 +30,7 @@ public class Store {
     private Location Location;// skip for db but required for response dto   
     
     @Transient
-    private Set<Product> products;// skip for db but required for response dto   
+    private List<Product> products;// skip for db but required for response dto   
     private String address;
     private String phoneNumber;
     private String description;    

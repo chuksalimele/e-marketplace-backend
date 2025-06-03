@@ -29,7 +29,7 @@ public class ProductController {
     /**
      * Helper method to map Product entity to Product DTO for public exposure.
      */
-    private Product prepareDto(Product product) {
+    private Mono<Product> prepareDto(Product product) {
         if (product == null) {
             return null;
         }
@@ -48,7 +48,8 @@ public class ProductController {
         }
 
         return productService.createProduct(productRequest)
-                .map(createdProduct -> (StandardResponseEntity) StandardResponseEntity.created(prepareDto(createdProduct), ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.created(product, ApiResponseMessages.PRODUCT_CREATED_SUCCESS))
                 .onErrorResume(InvalidProductDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_DATA + e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -63,7 +64,8 @@ public class ProductController {
         }
 
         return productService.updateProduct(id, productRequest)
-                .map(updatedProduct -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(updatedProduct), ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(product, ApiResponseMessages.PRODUCT_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(InvalidProductDataException.class, e ->
@@ -92,8 +94,8 @@ public class ProductController {
         }
 
         return productService.decreaseAndSaveStock(productId, quantity)
-                .map(this::prepareDto)
-                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCT_STOCK_DECREASED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(product, ApiResponseMessages.PRODUCT_STOCK_DECREASED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(InvalidProductDataException.class, e ->
@@ -111,11 +113,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getAllProducts(page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getAllProducts(page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS + ": " + e.getMessage())));
     }
@@ -135,7 +136,8 @@ public class ProductController {
         }
 
         return productService.getProductById(id)
-                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(prepareDto(product), ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(product -> (StandardResponseEntity) StandardResponseEntity.ok(product, ApiResponseMessages.PRODUCT_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
@@ -170,11 +172,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsByStore(storeId, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByStore(storeId, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_STORE + ": " + e.getMessage())));
     }
@@ -200,11 +201,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsBySeller(sellerId, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsBySeller(sellerId, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_SELLER + ": " + e.getMessage())));
     }
@@ -230,11 +230,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsByCategory(category, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByCategory(category, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY + ": " + e.getMessage())));
     }
@@ -261,11 +260,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRICE_RANGE_PARAMETERS));
         }
 
-        return productService.getProductsByPriceRange(minPrice, maxPrice, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByPriceRange(minPrice, maxPrice, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_PRICE_RANGE + ": " + e.getMessage())));
     }
@@ -296,11 +294,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsByStoreAndCategory(storeId, category, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByStoreAndCategory(storeId, category, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_STORE_AND_CATEGORY + ": " + e.getMessage())));
     }
@@ -331,11 +328,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsBySellerAndCategory(sellerId, category, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsBySellerAndCategory(sellerId, category, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_SELLER_AND_CATEGORY + ": " + e.getMessage())));
     }
@@ -354,11 +350,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRICE_RANGE_PARAMETERS));
         }
 
-        return productService.getProductsByCategoryAndPriceBetween(category, minPrice, maxPrice, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByCategoryAndPriceBetween(category, minPrice, maxPrice, page, size)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY_AND_PRICE_RANGE + ": " + e.getMessage())));
     }
@@ -375,11 +370,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
-        return productService.searchProducts(name, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productResponses -> (StandardResponseEntity) StandardResponseEntity.ok(productResponses, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.searchProducts(name, page, size)   
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_PRODUCTS + ": " + e.getMessage())));
     }
@@ -407,11 +401,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsByLocationId(locationId, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByLocationId(locationId, page, size)         
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS + ": " + e.getMessage())));
     }
@@ -438,11 +431,10 @@ public class ProductController {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
-        return productService.getProductsByCountryAndCity(country, city, page, size).collectList()
-                .map(products -> products.stream()
-                        .map(this::prepareDto)
-                        .collect(Collectors.toList()))
-                .map(productDto -> (StandardResponseEntity) StandardResponseEntity.ok(productDto, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
+        return productService.getProductsByCountryAndCity(country, city, page, size)           
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(productList -> (StandardResponseEntity) StandardResponseEntity.ok(productList, ApiResponseMessages.PRODUCTS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_PRODUCTS + ": " + e.getMessage())));
     }
