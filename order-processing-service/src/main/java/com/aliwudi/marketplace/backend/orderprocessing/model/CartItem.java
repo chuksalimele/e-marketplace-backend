@@ -22,4 +22,11 @@ public class CartItem {
     private Long cartId;
     private Long productId; 
     private Integer quantity;
+
+    public CartItem(Long cartId, Long productId, Integer quantity) {
+        this.cartId = cartId;
+        this.productId = productId;
+        this.quantity = quantity;
+        
+    }
 }

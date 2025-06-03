@@ -84,14 +84,14 @@ public class OrderService {
                             orderItem.setProductId(product.getId());
                             orderItem.setQuantity(request.getQuantity());
                             orderItem.setPriceAtTimeOfOrder(product.getPrice());
-                            orderItem.setOrder(order); // Link order item to the order (important for persistence)
+                            orderItem.setOrderId(order.getId()); // Link order item to the order
                             totalOrderAmount[0] = totalOrderAmount[0].add(product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
                             return orderItem;
                         })
                 )
                 .collectList() // Collect all processed OrderItems into a List
                 .flatMap(orderItems -> {
-                    order.setOrderItems(orderItems); // Set the collected items on the order
+                    //order.setOrderItems(orderItems); // Set the collected items on the order
                     order.setTotalAmount(totalOrderAmount[0]); // Set the calculated total amount
 
                     // Save the order
@@ -99,7 +99,7 @@ public class OrderService {
                             .flatMap(savedOrder ->
                                 // Save each order item linked to the saved order
                                 Flux.fromIterable(orderItems)
-                                    .doOnNext(item -> item.setOrder(savedOrder)) // Ensure item has the saved order's ID
+                                    .doOnNext(item -> item.setOrderId(savedOrder.getId())) // Ensure item has the saved order's ID
                                     .flatMap(orderItemRepository::save)
                                     .then(Mono.just(savedOrder)) // Return the saved order after all items are saved
                             );

@@ -29,6 +29,7 @@ public class Seller {
     private Long id;
     private String name;
     private String email;
+    private String phnoneNumber;// personal phone number - this can be different from the Store phone number which is the office line
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;    
 

@@ -157,9 +157,8 @@ public class UserController {
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .roles(user.getRoles() != null ?
-                       user.getRoles().stream().map(role -> role.getName().name()).collect(Collectors.toSet()) :
-                       null)
+                .roles(user.getRoles()
+                       )
                 .build();
     }
 

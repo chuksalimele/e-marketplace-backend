@@ -4,7 +4,6 @@ import com.aliwudi.marketplace.backend.common.dto.ReviewDto;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidReviewDataException;
 import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
-import com.aliwudi.marketplace.backend.product.dto.ReviewDto;
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.product.model.Review;
 import com.aliwudi.marketplace.backend.product.service.ReviewService;
@@ -40,12 +39,11 @@ public class ReviewController {
         }
         return ReviewDto.builder()
                 .id(review.getId())
-                .productId(review.getProduct() != null ? review.getProduct().getId() : review.getProductId()) // Use productId from Review entity if product is null
-                .productName(review.getProduct() != null ? review.getProduct().getName() : null) // productName might be null if product is not fetched
+                .product(review.getProductId()) 
                 .userId(review.getUserId())
                 .rating(review.getRating())
                 .comment(review.getComment())
-                .reviewDate(review.getReviewDate())
+                .reviewTime(review.getReviewTime())
                 .build();
     }
 
@@ -63,7 +61,7 @@ public class ReviewController {
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage()))) // Catch specific ResourceNotFound
                 .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION)))
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION)))
                 .onErrorResume(InvalidReviewDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->

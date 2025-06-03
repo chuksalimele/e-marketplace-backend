@@ -39,6 +39,7 @@ public class StoreController {
                 .id(store.getId())
                 .name(store.getName())
                 .description(store.getDescription())
+                .phoneNumber(store.getPhoneNumber())
                 .address(store.getAddress())
                 .sellerId(store.getSellerId())
                 .locationId(store.getLocationId()) // Include locationId in response
@@ -60,7 +61,7 @@ public class StoreController {
         return storeService.createStore(storeRequest)
                 .map(createdStore -> (StandardResponseEntity) StandardResponseEntity.created(mapStoreToStoreDto(createdStore), ApiResponseMessages.STORE_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(e.getMessage()))) // Use e.getMessage() for more specific duplicate error
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage()))) // Use e.getMessage() for more specific duplicate error
                 .onErrorResume(InvalidStoreDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage()))) // User not found
@@ -152,7 +153,7 @@ public class StoreController {
                 .onErrorResume(ResourceNotFoundException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(DuplicateResourceException.class, e -> // Catch specific duplicate error for update
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.conflict(e.getMessage())))
+                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(InvalidStoreDataException.class, e ->
                         Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
@@ -242,10 +243,14 @@ public class StoreController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        if (minRating == null || minRating < 0.0 || minRating > 5.0 || page < 0 || size <= 0) {
+        if (page < 0 || size <= 0) {
             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
+        if (minRating == null || minRating < 0.0 || minRating > 5.0) {
+            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_RATING_RANGE));
+        }
+        
         return storeService.getStoresByMinRating(minRating, page, size)
                 .map(this::mapStoreToStoreDto)
                 .collectList()

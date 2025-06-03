@@ -15,6 +15,8 @@ import jakarta.validation.constraints.Size;
 @AllArgsConstructor
 public class ReviewRequest {
 
+    private Long id;
+    
     @NotNull(message = "Product ID is required")
     private Long productId;
 

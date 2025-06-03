@@ -25,7 +25,7 @@ public class PaymentService {
     private final InventoryService inventoryService; // To interact with inventory after payment
 
     @Transactional
-    public Mono<Payment> initiatePayment(String orderId, BigDecimal amount) {
+    public Mono<Payment> initiatePayment(Long orderId, BigDecimal amount) {
         log.info("Initiating payment for orderId: {}, amount: {}", orderId, amount);
 
         // 1. Create a pending payment record
@@ -34,7 +34,7 @@ public class PaymentService {
                 .amount(amount)
                 .transactionRef(UUID.randomUUID().toString()) // Generate a unique transaction reference
                 .status(PaymentStatus.PENDING)
-                .paymentDate(LocalDateTime.now())
+                .paymentTime(LocalDateTime.now())
                 .gatewayResponse("SIMULATED_INITIATED")
                 .build();
 
@@ -59,7 +59,7 @@ public class PaymentService {
 
     // This method would typically be called by a webhook from the payment gateway
     @Transactional
-    public Mono<Payment> processGatewayCallback(String transactionRef, PaymentStatus newStatus, String gatewayResponse, String orderId, int quantityConfirmed) {
+    public Mono<Payment> processGatewayCallback(String transactionRef, PaymentStatus newStatus, String gatewayResponse, Long orderId, int quantityConfirmed) {
         log.info("Processing payment gateway callback for transactionRef: {} with status: {}", transactionRef, newStatus);
 
         return paymentRepository.findByTransactionRef(transactionRef) // Returns Mono<Payment>
@@ -68,7 +68,7 @@ public class PaymentService {
                     if (payment.getStatus().equals(PaymentStatus.PENDING)) {
                         payment.setStatus(newStatus);
                         payment.setGatewayResponse(gatewayResponse);
-                        payment.setPaymentDate(LocalDateTime.now()); // Update payment date to confirmation time
+                        payment.setPaymentTime(LocalDateTime.now()); // Update payment date to confirmation time
 
                         return paymentRepository.save(payment) // Save the updated payment
                                 .flatMap(savedPayment -> {

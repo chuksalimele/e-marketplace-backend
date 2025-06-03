@@ -21,7 +21,7 @@ public class UserDto {
     private String lastName;
     private String phoneNumber;
     private String shippingAddress;
-    private Set<RoleDto> roles = new HashSet<>();
+    private Set<RoleDto> roles;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -9,6 +9,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Repository
 public interface OrderRepository extends R2dbcRepository<Order, Long> {
@@ -64,4 +65,6 @@ public interface OrderRepository extends R2dbcRepository<Order, Long> {
      * Count orders by a specific user and status.
      */
     Mono<Long> countByUserIdAndOrderStatus(Long userId, OrderStatus orderStatus);
+
+    public Mono<Object> deleteAll(List<Object> orders);
 }

@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.product.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -27,11 +28,14 @@ public class Store {
     private String name; // e.g., "Downtown Branch", "Online Warehouse"
     private Long locationId; // with the it we can get its country, state and city
     private String description;
-    private String contactInfo;
+    private String phoneNumber;//office phone number
+    private String address;
     private String profileImageUrl;
     private Double rating; // Store-specific rating
     private Long sellerId;
-
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    
     // Optional: Constructor for convenience
     public Store(String name, Long locationId, Long sellerId) {
         this.name = name;

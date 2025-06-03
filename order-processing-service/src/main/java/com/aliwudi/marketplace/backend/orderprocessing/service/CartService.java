@@ -79,16 +79,16 @@ public class CartService {
                         .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
                         .flatMap(productDto -> {
                             // Check for sufficient stock before adding/updating
-                            if (productDto.getStock() == null || productDto.getStock() < quantity) {
-                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + productDto.getStock()));
+                            if (productDto.getStockQuantity() == null || productDto.getStockQuantity() < quantity) {
+                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + productDto.getStockQuantity()));
                             }
 
                             return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
                                     .flatMap(existingCartItem -> {
                                         // Item exists, update quantity
                                         int newTotalQuantity = existingCartItem.getQuantity() + quantity;
-                                        if (productDto.getStock() != null && newTotalQuantity > productDto.getStock()) {
-                                            return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + productDto.getStock()));
+                                        if (productDto.getStockQuantity() != null && newTotalQuantity > productDto.getStockQuantity()) {
+                                            return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + productDto.getStockQuantity()));
                                         }
                                         existingCartItem.setQuantity(newTotalQuantity);
                                         return cartItemRepository.save(existingCartItem);
@@ -200,8 +200,8 @@ public class CartService {
                                         .then(Mono.empty()); // Return empty Mono to indicate removal
                             } else {
                                 // Check for sufficient stock before updating
-                                if (productDto.getStock() == null || newQuantity > productDto.getStock()) {
-                                    return Mono.error(new InsufficientStockException("Cannot set quantity to " + newQuantity + " for product " + productId + ". Available: " + productDto.getStock()));
+                                if (productDto.getStockQuantity() == null || newQuantity > productDto.getStockQuantity()) {
+                                    return Mono.error(new InsufficientStockException("Cannot set quantity to " + newQuantity + " for product " + productId + ". Available: " + productDto.getStockQuantity()));
                                 }
 
                                 return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)

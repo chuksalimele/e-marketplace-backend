@@ -6,7 +6,6 @@ import com.aliwudi.marketplace.backend.product.exception.InvalidStoreDataExcepti
 import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.product.model.Store;
 import com.aliwudi.marketplace.backend.product.repository.StoreRepository;
-import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -18,13 +17,14 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.product.repository.SellerRepository;
 
 @Service
 @RequiredArgsConstructor
 public class StoreService{
 
     private final StoreRepository storeRepository;
-    private final UserRepository userRepository; // To validate sellerId
+    private final SellerRepository sellerRepository;
 
     /**
      * Creates a new store.
@@ -35,9 +35,9 @@ public class StoreService{
      */
     public Mono<Store> createStore(StoreRequest storeRequest) {
         // Validate seller existence
-        Mono<Boolean> sellerExistsMono = userRepository.existsById(storeRequest.getSellerId())
+        Mono<Boolean> sellerExistsMono = sellerRepository.existsById(storeRequest.getSellerId())
                 .filter(exists -> exists)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + storeRequest.getSellerId())));
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND +": "+ storeRequest.getSellerId())));
 
         // Check for duplicate store name for this specific seller
         Mono<Boolean> duplicateNameCheckMono = storeRepository.existsByNameIgnoreCaseAndSellerId(storeRequest.getName(), storeRequest.getSellerId())
@@ -176,7 +176,7 @@ public class StoreService{
      */
     public Flux<Store> getStoresBySeller(Long sellerId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return userRepository.existsById(sellerId)
+        return sellerRepository.existsById(sellerId)
                 .filter(exists -> exists)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
                 .flatMapMany(exists -> storeRepository.findBySellerId(sellerId, pageable));
@@ -189,7 +189,7 @@ public class StoreService{
      * @return A Mono emitting the total count of stores for the seller.
      */
     public Mono<Long> countStoresBySeller(Long sellerId) {
-        return userRepository.existsById(sellerId)
+        return sellerRepository.existsById(sellerId)
                 .filter(exists -> exists)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
                 .flatMap(exists -> storeRepository.countBySellerId(sellerId));
@@ -250,10 +250,23 @@ public class StoreService{
      * @return A Flux emitting filtered stores.
      */
     public Flux<Store> getStoresByMinRating(Double minRating, int page, int size) {
+        // Validate minRating
         if (minRating == null || minRating < 0.0 || minRating > 5.0) {
-            return Mono.error(new InvalidStoreDataException(ApiResponseMessages.INVALID_RATING_RANGE));
+            // It's good practice to throw an IllegalArgumentException or a custom validation exception
+            // rather than a generic InvalidStoreDataException if the data itself is invalid for the request.
+            // However, if InvalidStoreDataException is designed for any invalid input related to store, then it's fine.
+            return Flux.error(new InvalidStoreDataException(ApiResponseMessages.INVALID_RATING_RANGE));
         }
-        Pageable pageable = PageRequest.of(page, size, Sort.by("rating").descending()); // Sort by rating descending
+
+        // Validate page and size for reasonable values
+        if (page < 0) {
+            return Flux.error(new IllegalArgumentException("Page number cannot be negative"));
+        }
+        if (size <= 0) {
+            return Flux.error(new IllegalArgumentException("Page size must be greater than zero"));
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("rating").descending());
         return storeRepository.findByRatingGreaterThanEqual(minRating, pageable);
     }
 

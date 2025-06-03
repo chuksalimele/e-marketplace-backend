@@ -16,8 +16,9 @@ public class StoreDto {
     private Long id;
     private String name; // e.g., "Downtown Branch", "Online Warehouse"
     private String location; // e.g., "Lagos, Nigeria", "123 Main St, Anytown" - consider splitting into city, street, postal code etc.
-    private String description;
-    private String contactInfo;
+    private String address;
+    private String phoneNumber;
+    private String description;    
     private String profileImageUrl;
     private Double rating; // StoreDto-specific rating
     private SellerDto seller;

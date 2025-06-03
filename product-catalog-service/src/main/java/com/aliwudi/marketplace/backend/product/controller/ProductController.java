@@ -41,10 +41,10 @@ public class ProductController {
                 .price(product.getPrice())
                 .stockQuantity(product.getStockQuantity())
                 .category(product.getCategory())
-                .storeId(product.getStoreId())
+                .store(product.getStoreId())
                 .sellerId(product.getSellerId()) // Include sellerId in response
                 .imageUrl(product.getImageUrl())
-                .location(product.getLocation())
+                .location(product.getLocationId())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();

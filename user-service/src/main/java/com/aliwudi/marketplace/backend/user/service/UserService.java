@@ -5,8 +5,6 @@ import com.aliwudi.marketplace.backend.user.model.User;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.user.exception.RoleNotFoundException;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,6 +17,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.role.ERole;
+import com.aliwudi.marketplace.backend.user.exception.ResourceNotFoundException;
 
 @Service
 @RequiredArgsConstructor

@@ -109,9 +109,9 @@ public class InventoryService {
      * @throws IllegalArgumentException if attempting to release more than reserved quantity.
      */
     @Transactional
-    public Mono<Void> releaseStock(String productId, Integer quantityToRelease) {
+    public Mono<Void> releaseStock(Long productId, Integer quantityToRelease) {
         log.info("Attempting to release {} units for product: {}", quantityToRelease, productId);
-        return Mono.just(Long.parseLong(productId)) // Convert String to Long
+        return Mono.just(productId) // Convert String to Long
                 .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
                         .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                         .flatMap(inventory -> {
@@ -142,9 +142,9 @@ public class InventoryService {
      * @throws IllegalArgumentException if attempting to confirm more than reserved quantity.
      */
     @Transactional
-    public Mono<Void> confirmReservationAndDeductStock(String productId, Integer quantityConfirmed) {
+    public Mono<Void> confirmReservationAndDeductStock(Long productId, Integer quantityConfirmed) {
         log.info("Confirming reservation and deducting stock for product: {} with quantity: {}", productId, quantityConfirmed);
-        return Mono.just(Long.parseLong(productId)) // Convert String to Long
+        return Mono.just(productId) // Convert String to Long
                 .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
                         .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                         .flatMap(inventory -> {

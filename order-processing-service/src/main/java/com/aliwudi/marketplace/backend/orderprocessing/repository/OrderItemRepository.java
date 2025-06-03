@@ -51,4 +51,6 @@ public interface OrderItemRepository extends R2dbcRepository<OrderItem, Long> {
      * Check if a specific product exists within a specific order.
      */
     Mono<Boolean> existsByOrderIdAndProductId(Long orderId, Long productId);
+
+    Mono<Boolean>  deleteByOrderId(Long orderId);
 }

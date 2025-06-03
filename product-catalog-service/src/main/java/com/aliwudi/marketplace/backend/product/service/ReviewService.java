@@ -64,11 +64,11 @@ public class ReviewService {
 
                     Review review = Review.builder()
                             .productId(reviewRequest.getProductId())
-                            .product(product) // Link to the product entity for convenience (if mapped)
+                            .productId(product.getId()) // Link to the product entity for convenience (if mapped)
                             .userId(reviewRequest.getUserId())
                             .rating(reviewRequest.getRating())
                             .comment(reviewRequest.getComment())
-                            .reviewDate(LocalDateTime.now())
+                            .reviewTime(LocalDateTime.now())
                             .build();
 
                     return reviewRepository.save(review);
@@ -222,7 +222,7 @@ public class ReviewService {
      */
     public Flux<Review> getReviewsByProductIdAndMinRating(Long productId, Integer minRating, int page, int size) {
         if (minRating == null || minRating < 1 || minRating > 5) {
-            return Mono.error(new InvalidReviewDataException(ApiResponseMessages.INVALID_REVIEW_RATING));
+            return Flux.error(new InvalidReviewDataException(ApiResponseMessages.INVALID_REVIEW_RATING));
         }
         Pageable pageable = PageRequest.of(page, size);
         return productRepository.findById(productId)

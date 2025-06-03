@@ -1,9 +1,78 @@
 package com.aliwudi.marketplace.backend.common.response;
 
+
 public interface ApiResponseMessages {
 
-    public static String ERROR_COUNTING_ORDER_ITEMS = "Error counting order items";
-    public static String ERROR_CHECKING_ORDER_ITEM_EXISTENCE;
+    public static String DUPLICATE_STORE_NAME_FOR_SELLER = "Duplicate store name for seller.";
+
+    public String ERROR_CHECKING_CART_ITEM_EXISTENCE = "Error checking cart item existence.";
+    public String ERROR_COUNTING_ORDERS = "Error counting orders.";
+    public String ERROR_CHECKING_MEDIA_EXISTENCE = "Error checking media existence.";
+    public String ERROR_COUNTING_MEDIA_BY_ASSET_NAME = "Error counting media by asset name.";
+    public String INVALID_ASSET_NAME = "Invalid asset name provided.";
+    public String ERROR_COUNTING_MEDIA_BY_FILE_TYPE = "Error counting media by file type.";
+    public String INVALID_FILE_TYPE = "Invalid file type provided.";
+    public String ERROR_CHECKING_DELIVERY_EXISTENCE = "Error checking delivery existence.";
+    public String ERROR_COUNTING_DELIVERIES_BY_LOCATION = "Error counting deliveries by location.";
+    public String ERROR_COUNTING_DELIVERIES_BY_ESTIMATED_DATE = "Error counting deliveries by estimated date.";
+    public String ERROR_COUNTING_DELIVERIES_BY_STATUS = "Error counting deliveries by status.";
+    public String ERROR_COUNTING_DELIVERIES_BY_ORDER = "Error counting deliveries by order.";
+
+    public String CART_DELETED_SUCCESS = "Cart deleted successfully.";
+    public String CART_EXISTS_CHECK_SUCCESS = "Cart existence check successful.";
+    public String INVALID_QUANTITY_PROVIDED = "Invalid quantity provided.";
+    public String CART_ITEMS_DELETED_SUCCESS = "Cart items deleted successfully.";
+    public String CART_ITEM_COUNT_SUCCESS = "Cart item count retrieved successfully.";
+    public String CART_ITEM_RETRIEVED_SUCCESS = "Cart item retrieved successfully.";
+    public String CART_COUNT_SUCCESS = "Cart count success.";
+    public String CART_ITEM_EXISTS_CHECK_SUCCESS = "Cart item exists check success.";
+    public String ERROR_RETRIEVING_ORDER_ITEM = "Error retrieving order item.";
+    public String ORDER_COUNT_SUCCESS = "Order count retrieved successfully.";
+    public String ORDER_ITEM_EXISTS_CHECK_SUCCESS = "Order item existence check successful.";
+    public String ORDER_ITEM_COUNT_SUCCESS = "Order item count retrieved successfully.";
+    public String ORDER_ITEM_RETRIEVED_SUCCESS = "Order item retrieved successfully.";
+    public String ORDERS_DELETED_SUCCESS_FOR_USER = "Orders deleted successfully for user.";
+    public String MEDIA_EXISTS_CHECK_SUCCESS = "Media existence check successful.";
+    public String DELIVERY_EXISTS_CHECK_SUCCESS = "Delivery existence check successful.";
+
+    public String ERROR_COUNTING_ROLES = "Error counting roles.";
+    public String ERROR_RETRIEVING_ROLE = "Error retrieing role.";
+    public String ERROR_COUNTING_USERS = "Error count users.";
+    public String INVALID_PRICE_RANGE_PARAMETERS = "Invalid price parameters.";
+
+    public String ROLE_COUNT_RETRIEVED_SUCCESS = "Role count retrived success.";
+    public String ROLE_RETRIEVED_SUCCESS = "Role retrieved success.";
+    public String USER_COUNT_RETRIEVED_SUCCESS = "User count retrieved success.";
+
+    public String ERROR_RETRIEVING_REVIEWS = "Error Retrieving reviews.";
+    public String ERROR_RETRIEVING_REVIEW_COUNT_BY_USER = "Error Retrieving review count by user.";
+    public String REVIEW_RETRIEVED_SUCCESS = "Review retriewed success.";
+    public String REVIEW_EXISTS_CHECK_SUCCESS = "Review exist check success.";
+    public String REVIEW_COUNT_RETRIEVED_SUCCESS = "Review count retrieved success.";
+
+    public String ERROR_COUNTING_ORDER_ITEMS = "Error counting order items.";
+    public String ERROR_CHECKING_ORDER_ITEM_EXISTENCE = "Error checking order item existence.";
+    public String ERROR_RETRIEVING_CART_ITEM = "Error retrieving cart item.";
+    public String ERROR_COUNTING_CART_ITEMS = "Error counting cart items.";
+    public String ERROR_CHECKING_CART_EXISTENCE = "Error checking cart existence.";
+    public String ERROR_COUNTING_CARTS = "Error counting carts.";
+    public String ERROR_DELETING_CART = "Error deleting cart.";
+    public String ERROR_DELETING_CART_ITEMS = "Error deleting cart items.";
+    public String ERROR_RETRIEVING_PRODUCT_COUNT_BY_SELLER = "Error retrieving product count by seller.";
+    public String PRODUCT_STOCK_UPDATE_FAILED = "Product stock update failed.";
+    public String ERROR_CHECKING_REVIEW_EXISTENCE = "Error checking review existence.";
+    public String ERROR_RETRIEVING_STORE_COUNT = "Error retrieving store count.";
+    public String ERROR_RETRIEVING_REVIEW = "Error retrieving review.";
+    public String ERROR_RETRIEVING_REVIEW_COUNT_FOR_PRODUCT = "Error retrieving review count for product.";
+    public String ERROR_RETRIEVING_REVIEW_COUNT = "Error retrieving review count."; // Duplicated in original, kept for consistency
+    public String SELLER_NOT_FOUND_BY_EMAIL = "Seller not found by email.";
+    public String INVALID_RATING_RANGE = "Invalid rating range. Rating must be between 1 and 5.";
+    public String ERROR_RETRIEVING_PRODUCTS_BY_CATEGORY_AND_PRICE_RANGE = "Error retrieving products by category and price range.";
+    public String ERROR_CHECKING_STORE_EXISTENCE = "Error checking store existence.";
+    public String ERROR_SEARCHING_STORE_COUNT = "Error searching store count.";
+    public String ERROR_SEARCHING_STORES = "Error searching stores.";
+    public String STORE_EXISTS_CHECK_SUCCESS = "Store existence check successful.";
+    public String INVALID_PARAMETERS = "Invalid parameters provided.";
 
     public String INVALID_STOCK_DECREMENT_QUANTITY = "Invalid stock decrement quantity.";
     public String PRODUCT_STOCK_DECREASED_SUCCESS = "Product stock decrease success.";

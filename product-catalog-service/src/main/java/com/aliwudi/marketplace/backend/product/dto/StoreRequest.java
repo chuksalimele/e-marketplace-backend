@@ -7,16 +7,16 @@ import lombok.Data;
 
 @Data
 public class StoreRequest {
-    @NotBlank
-    private String name;
-    @NotBlank
-    private String location;
+    
+    private Long id;
+    @NotNull(message = "Store name cannot be null")
+    private String name; // e.g., "Downtown Branch", "Online Warehouse"
+    private Long locationId; // with the it we can get its country, state and city
     private String description;
-    private String contactInfo;
-    private String profileImageUrl;
-    private Double rating;
-    private String categories; // Comma-separated string if applicable
-
+    private String phoneNumber;//office phone number
+    private String address;
+    private Double rating; // Store-specific rating
     @NotNull(message = "Seller ID cannot be null")
-    private Long sellerId; // When creating a store, you link it to a seller
+    private Long sellerId;
+
 }

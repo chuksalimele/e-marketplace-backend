@@ -52,4 +52,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     // Count users with a specific shipping address
     Mono<Long> countByShippingAddressContainingIgnoreCase(String shippingAddress);    
 
+    Mono<Boolean> existsByEmail(String email);
+
+    Mono<Boolean> existsByUsername(String username);
+
 }
