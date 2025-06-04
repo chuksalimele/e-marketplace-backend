@@ -29,9 +29,9 @@ public class InventoryService {
      * @throws InventoryNotFoundException if inventory for the product is not found.
      */
     @Transactional(readOnly = true)
-    public Mono<Integer> getAvailableStock(String productId) {
+    public Mono<Integer> getAvailableStock(Long productId) {
         log.info("Checking available stock for product: {}", productId);
-        return Mono.just(Long.parseLong(productId)) // Convert String to Long
+        return Mono.just(productId) // Convert String to Long
                 .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId))
                 .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                 .map(Inventory::getAvailableQuantity)
@@ -47,12 +47,11 @@ public class InventoryService {
      * @return A Mono<Void> indicating completion.
      */
     @Transactional
-    public Mono<Void> createOrUpdateInventory(String productId, Integer quantity) {
+    public Mono<Void> createOrUpdateInventory(Long productId, Integer quantity) {
         log.info("Creating or updating inventory for product: {} with quantity: {}", productId, quantity);
-        return Mono.just(Long.parseLong(productId)) // Convert String to Long
-                .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
+        return inventoryRepository.findByProductId(productId)
                         .switchIfEmpty(Mono.defer(() -> Mono.just(Inventory.builder()
-                                .productId(longProductId) // Use Long productId
+                                .productId(productId)
                                 .reservedQuantity(0) // Start with 0 reserved
                                 .build())))
                         .flatMap(inventory -> {
@@ -60,7 +59,7 @@ public class InventoryService {
                             return inventoryRepository.save(inventory);
                         })
                         .doOnSuccess(savedInventory -> log.info("Successfully created or updated inventory for product: {}", productId))
-                        .then());
+                        .then();
     }
 
     /**
@@ -75,10 +74,9 @@ public class InventoryService {
      * @throws InsufficientStockException if there's insufficient stock.
      */
     @Transactional
-    public Mono<Void> reserveStock(String productId, Integer quantityToReserve) {
+    public Mono<Void> reserveStock(Long productId, Integer quantityToReserve) {
         log.info("Attempting to reserve {} units for product: {}", quantityToReserve, productId);
-        return Mono.just(Long.parseLong(productId)) // Convert String to Long
-                .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
+        return  inventoryRepository.findByProductId(productId)
                         .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                         .flatMap(inventory -> {
                             if (inventory.getAvailableQuantity() < quantityToReserve) {
@@ -94,7 +92,7 @@ public class InventoryService {
                         .doOnSuccess(savedInventory -> log.info("Successfully reserved {} units for product: {}. New available: {}, New reserved: {}",
                                 quantityToReserve, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
                         .doOnError(throwable -> log.error("Failed to reserve stock for product {}: {}", productId, throwable.getMessage()))
-                        .then());
+                        .then();
     }
 
     /**
@@ -111,8 +109,7 @@ public class InventoryService {
     @Transactional
     public Mono<Void> releaseStock(Long productId, Integer quantityToRelease) {
         log.info("Attempting to release {} units for product: {}", quantityToRelease, productId);
-        return Mono.just(productId) // Convert String to Long
-                .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
+        return inventoryRepository.findByProductId(productId)
                         .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                         .flatMap(inventory -> {
                             if (inventory.getReservedQuantity() < quantityToRelease) {
@@ -128,7 +125,7 @@ public class InventoryService {
                         .doOnSuccess(savedInventory -> log.info("Successfully released {} units for product: {}. New available: {}, New reserved: {}",
                                 quantityToRelease, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
                         .doOnError(throwable -> log.error("Failed to release stock for product {}: {}", productId, throwable.getMessage()))
-                        .then());
+                        .then();
     }
 
     /**
@@ -144,8 +141,7 @@ public class InventoryService {
     @Transactional
     public Mono<Void> confirmReservationAndDeductStock(Long productId, Integer quantityConfirmed) {
         log.info("Confirming reservation and deducting stock for product: {} with quantity: {}", productId, quantityConfirmed);
-        return Mono.just(productId) // Convert String to Long
-                .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId)
+        return inventoryRepository.findByProductId(productId)
                         .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                         .flatMap(inventory -> {
                             if (inventory.getReservedQuantity() < quantityConfirmed) {
@@ -161,7 +157,7 @@ public class InventoryService {
                         })
                         .doOnSuccess(savedInventory -> log.info("Reservation confirmed and stock deducted for product: {}. New reserved: {}", productId, savedInventory.getReservedQuantity()))
                         .doOnError(throwable -> log.error("Failed to confirm reservation and deduct stock for product {}: {}", productId, throwable.getMessage()))
-                        .then());
+                        .then();
     }
 
     // --- NEW: InventoryRepository Implementations ---
@@ -200,10 +196,9 @@ public class InventoryService {
      * @return A Mono emitting the number of rows updated.
      */
     @Transactional
-    public Mono<Integer> decrementAvailableQuantity(String productId, Integer quantity) {
+    public Mono<Integer> decrementAvailableQuantity(Long productId, Integer quantity) {
         log.info("Attempting to decrement available quantity for product {} by {}", productId, quantity);
-        return Mono.just(Long.parseLong(productId))
-                .flatMap(longProductId -> inventoryRepository.decrementAvailableQuantity(longProductId, quantity))
+        return inventoryRepository.decrementAvailableQuantity(productId, quantity)
                 .doOnSuccess(rows -> log.info("Decremented available quantity for product {}. Rows updated: {}", productId, rows))
                 .doOnError(throwable -> log.error("Failed to decrement available quantity for product {}: {}", productId, throwable.getMessage()));
     }
@@ -217,10 +212,9 @@ public class InventoryService {
      * @return A Mono emitting the number of rows updated.
      */
     @Transactional
-    public Mono<Integer> incrementAvailableQuantity(String productId, Integer quantity) {
+    public Mono<Integer> incrementAvailableQuantity(Long productId, Integer quantity) {
         log.info("Attempting to increment available quantity for product {} by {}", productId, quantity);
-        return Mono.just(Long.parseLong(productId))
-                .flatMap(longProductId -> inventoryRepository.incrementAvailableQuantity(longProductId, quantity))
+        return inventoryRepository.incrementAvailableQuantity(productId, quantity)
                 .doOnSuccess(rows -> log.info("Incremented available quantity for product {}. Rows updated: {}", productId, rows))
                 .doOnError(throwable -> log.error("Failed to increment available quantity for product {}: {}", productId, throwable.getMessage()));
     }
@@ -234,10 +228,9 @@ public class InventoryService {
      * @return A Mono emitting the number of rows updated.
      */
     @Transactional
-    public Mono<Integer> updateReservedQuantity(String productId, Integer reservedQuantity) {
+    public Mono<Integer> updateReservedQuantity(Long productId, Integer reservedQuantity) {
         log.info("Attempting to update reserved quantity for product {} to {}", productId, reservedQuantity);
-        return Mono.just(Long.parseLong(productId))
-                .flatMap(longProductId -> inventoryRepository.updateReservedQuantity(longProductId, reservedQuantity))
+        return inventoryRepository.updateReservedQuantity(productId, reservedQuantity)
                 .doOnSuccess(rows -> log.info("Updated reserved quantity for product {}. Rows updated: {}", productId, rows))
                 .doOnError(throwable -> log.error("Failed to update reserved quantity for product {}: {}", productId, throwable.getMessage()));
     }
@@ -277,10 +270,9 @@ public class InventoryService {
      * @return A Mono emitting true if it exists, false otherwise.
      */
     @Transactional(readOnly = true)
-    public Mono<Boolean> existsInventoryByProductId(String productId) {
+    public Mono<Boolean> existsInventoryByProductId(Long productId) {
         log.info("Checking if inventory exists for product: {}", productId);
-        return Mono.just(Long.parseLong(productId))
-                .flatMap(longProductId -> inventoryRepository.existsByProductId(longProductId))
+        return inventoryRepository.existsByProductId(productId)
                 .doOnSuccess(exists -> log.info("Inventory for product {} exists: {}", productId, exists))
                 .doOnError(throwable -> log.error("Failed to check existence of inventory for product {}: {}", productId, throwable.getMessage()));
     }

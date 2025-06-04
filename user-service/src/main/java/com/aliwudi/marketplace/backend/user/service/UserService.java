@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.service;
 
+import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.user.dto.UserUpdateRequest;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
@@ -279,7 +280,7 @@ public class UserService {
      * @param name The ERole enum representing the role name.
      * @return A Mono emitting the Role if found.
      */
-    public Mono<com.aliwudi.marketplace.backend.user.model.Role> findRoleByName(ERole name) {
+    public Mono<Role> findRoleByName(ERole name) {
         return roleRepository.findByName(name);
     }
 
@@ -290,7 +291,7 @@ public class UserService {
      * @param pageable Pagination information.
      * @return A Flux of Role records.
      */
-    public Flux<com.aliwudi.marketplace.backend.user.model.Role> findRolesByNameContainingIgnoreCase(String name, Pageable pageable) {
+    public Flux<Role> findRolesByNameContainingIgnoreCase(String name, Pageable pageable) {
         return roleRepository.findByNameContainingIgnoreCase(name, pageable);
     }
 
@@ -310,7 +311,7 @@ public class UserService {
      * @param pageable Pagination information.
      * @return A Flux of Role records.
      */
-    public Flux<com.aliwudi.marketplace.backend.user.model.Role> findAllRoles(Pageable pageable) {
+    public Flux<Role> findAllRoles(Pageable pageable) {
         return roleRepository.findAllByIdNotNull(pageable);
     }
 

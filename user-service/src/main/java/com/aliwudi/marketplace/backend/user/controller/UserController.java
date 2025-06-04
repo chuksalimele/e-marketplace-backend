@@ -1,12 +1,11 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
+import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.common.model.User;
-import com.aliwudi.marketplace.backend.user.model.User;
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.user.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.user.dto.UserUpdateRequest; // Import for update requests
-import com.aliwudi.marketplace.backend.common.enumeration.ERole; // Import ERole for role search
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -435,7 +434,7 @@ public class UserController {
      */
     @GetMapping("/roles/search")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<com.aliwudi.marketplace.backend.user.model.Role> searchRolesByNameContainingIgnoreCase(
+    public Flux<Role> searchRolesByNameContainingIgnoreCase(
             @RequestParam String name,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -472,7 +471,7 @@ public class UserController {
      */
     @GetMapping("/roles/all")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<com.aliwudi.marketplace.backend.user.model.Role> getAllRoles(
+    public Flux<Role> getAllRoles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,

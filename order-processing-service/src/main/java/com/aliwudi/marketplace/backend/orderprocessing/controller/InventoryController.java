@@ -26,9 +26,17 @@ import org.springframework.data.domain.Sort;
 public class InventoryController {
 
     private final InventoryService inventoryService;
-
+    /**
+     * Helper method to map Inventory entity to Inventory DTO for public exposure.
+     */
+    private Mono<Inventory> prepareDto(Inventory inventory) {
+        if (inventory == null) {
+            return Mono.empty();
+        }
+        return inventory;
+    }
     @GetMapping("/{productId}")
-    public Mono<StandardResponseEntity> getAvailableStock(@PathVariable String productId) {
+    public Mono<StandardResponseEntity> getAvailableStock(@PathVariable Long productId) {
         return inventoryService.getAvailableStock(productId)
                 .map(availableQuantity -> StandardResponseEntity.ok(StockResponse.builder()
                                 .productId(productId)
@@ -241,7 +249,7 @@ public class InventoryController {
      * @return A Mono emitting StandardResponseEntity with a boolean indicating existence.
      */
     @GetMapping("/exists/{productId}")
-    public Mono<StandardResponseEntity> existsInventoryByProductId(@PathVariable String productId) {
+    public Mono<StandardResponseEntity> existsInventoryByProductId(@PathVariable Long productId) {
         return inventoryService.existsInventoryByProductId(productId)
                 .map(exists -> StandardResponseEntity.ok(exists, "Inventory existence check for product " + productId + " completed."))
                 .onErrorResume(NumberFormatException.class, e ->

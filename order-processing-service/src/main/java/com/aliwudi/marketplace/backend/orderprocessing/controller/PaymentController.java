@@ -2,7 +2,6 @@ package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
 import com.aliwudi.marketplace.backend.common.model.Payment;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.PaymentRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Payment; // Import Payment model
 import com.aliwudi.marketplace.backend.orderprocessing.service.PaymentService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;

@@ -79,7 +79,7 @@ public class ProductIntegrationService {
      * @param productId The ID of the product to fetch.
      * @return A Mono of the Product object.
      */
-    public Mono<Product> getProductDtoById(Long productId) {
+    public Mono<Product> getProductById(Long productId) {
         Mono<Product> responseMono = webClient.get()
                 .uri("/{id}", productId) // Append the product ID to the base URL
                 .retrieve()

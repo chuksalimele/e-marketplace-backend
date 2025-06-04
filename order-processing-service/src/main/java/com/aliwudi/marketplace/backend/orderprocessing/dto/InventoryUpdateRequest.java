@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class InventoryUpdateRequest {
-    private String productId;
+    private Long productId;
     private Integer quantity;
 }

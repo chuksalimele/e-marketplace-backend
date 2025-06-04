@@ -192,7 +192,7 @@ public class ReviewService {
      */
     public Flux<Review> getReviewsByUserId(Long userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return userIntegrationService.getUserDtoById(userId)
+        return userIntegrationService.getUserById(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + userId)))
                 .flatMapMany(user -> reviewRepository.findByUserId(userId, pageable));
     }
@@ -204,7 +204,7 @@ public class ReviewService {
      * @return A Mono emitting the total count of reviews by the user.
      */
     public Mono<Long> countReviewsByUserId(Long userId) {
-        return userIntegrationService.getUserDtoById(userId)
+        return userIntegrationService.getUserById(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + userId)))
                 .flatMap(user -> reviewRepository.countByUserId(userId));
     }

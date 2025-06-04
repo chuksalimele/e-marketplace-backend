@@ -78,7 +78,7 @@ public class UserIntegrationService {
      * @param userId The ID of the user to retrieve.
      * @return Mono<UserDto> if user is found, Mono.empty() if not found, Mono.error() on other service errors.
      */
-    public Mono<User> getUserDtoById(Long userId) {
+    public Mono<User> getUserById(Long userId) {
         Mono<User> responseMono = webClient.get()
                 .uri("/api/users/{userId}", userId)
                 .retrieve()

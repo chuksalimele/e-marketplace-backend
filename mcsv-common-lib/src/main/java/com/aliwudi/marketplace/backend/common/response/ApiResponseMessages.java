@@ -3,8 +3,13 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
-    public static String DUPLICATE_STORE_NAME_FOR_SELLER = "Duplicate store name for seller.";
-
+    public String DUPLICATE_STORE_NAME_FOR_SELLER = "Duplicate store name for seller.";
+    public String ERROR_RETRIEVING_CART_ITEMS = "Error retrieving cart items.";
+    public String CART_ITEMS_RETRIEVED_SUCCESS = "Cart items retrieved success";    
+    public String CART_ITEM_NOT_FOUND = "Cart item not found";    
+    public String CART_NOT_FOUND = "Cart not found";      
+    public String ORDER_NOT_FOUND_FOR_USER = "Order not found for user";
+            
     public String ERROR_CHECKING_CART_ITEM_EXISTENCE = "Error checking cart item existence.";
     public String ERROR_COUNTING_ORDERS = "Error counting orders.";
     public String ERROR_CHECKING_MEDIA_EXISTENCE = "Error checking media existence.";
@@ -94,11 +99,11 @@ public interface ApiResponseMessages {
     String OPERATION_SUCCESSFUL = "Operation successful."; // Generic success message
 
     // --- Error Messages (Specific) ---
-    String ORDER_NOT_FOUND = "Order not found with ID: "; // Append ID
-    String USER_NOT_FOUND = "User not found with ID: "; // Append ID
-    String PRODUCT_NOT_FOUND = "Product not found with ID: "; // Append ID
-    String ORDER_ITEM_NOT_FOUND = "Order item not found with ID: "; // Append ID
-    String INSUFFICIENT_STOCK = "Insufficient stock for product: "; // Append product details
+    String ORDER_NOT_FOUND = "Order not found"; 
+    String USER_NOT_FOUND = "User not found"; 
+    String PRODUCT_NOT_FOUND = "Product not found"; 
+    String ORDER_ITEM_NOT_FOUND = "Order item not found"; 
+    String INSUFFICIENT_STOCK = "Insufficient stock for product"; 
     
     // --- Product Messages ---
     String PRODUCT_CREATED_SUCCESS = "Product created successfully.";
@@ -110,7 +115,7 @@ public interface ApiResponseMessages {
 
     // --- Product Error Messages ---
     String INVALID_PRODUCT_CREATION_REQUEST = "Invalid product creation request: Name, positive price, non-negative stock, and storeId are required.";
-    String INVALID_PRODUCT_DATA = "Invalid product data: "; // Append specific reason
+    String INVALID_PRODUCT_DATA = "Invalid product data"; 
     String INVALID_PRODUCT_ID = "Invalid product ID provided.";
     String INVALID_CATEGORY_NAME = "Invalid category name provided.";
     String INVALID_STORE_ID = "Invalid store ID provided.";
@@ -136,7 +141,7 @@ public interface ApiResponseMessages {
     String AVERAGE_RATING_RETRIEVED_SUCCESS = "Average rating retrieved successfully.";
 
     // --- Review Error Messages ---
-    String REVIEW_NOT_FOUND = "Review not found with ID: "; // Append ID
+    String REVIEW_NOT_FOUND = "Review not found"; // Append ID
     String INVALID_REVIEW_SUBMISSION = "Invalid review submission: Product ID, User ID, and a rating between 1 and 5 are required.";
     String INVALID_REVIEW_RATING = "Invalid review rating: Rating must be between 1 and 5.";
     String INVALID_REVIEW_ID = "Invalid review ID provided.";
@@ -156,7 +161,7 @@ public interface ApiResponseMessages {
     String STORE_COUNT_RETRIEVED_SUCCESS = "Store count retrieved successfully.";
 
     // --- Store Error Messages ---
-    String STORE_NOT_FOUND = "Store not found with ID: "; // Append ID
+    String STORE_NOT_FOUND = "Store not found"; // Append ID
     String INVALID_STORE_CREATION_REQUEST = "Invalid store creation request: Name and seller ID are required.";
     String DUPLICATE_STORE_NAME = "A store with this name already exists.";
     String ERROR_CREATING_STORE = "An error occurred while creating the store.";
@@ -175,7 +180,7 @@ public interface ApiResponseMessages {
     String SELLER_COUNT_RETRIEVED_SUCCESS = "Seller count retrieved successfully.";
 
     // --- Seller Error Messages ---
-    String SELLER_NOT_FOUND = "Seller not found with ID: "; // Append ID
+    String SELLER_NOT_FOUND = "Seller not found"; // Append ID
     String INVALID_SELLER_CREATION_REQUEST = "Invalid seller creation request: Name and email are required.";
     String INVALID_SELLER_UPDATE_REQUEST = "Invalid seller update request: Name cannot be blank.";
     String INVALID_SELLER_ID = "Invalid seller ID provided.";
@@ -202,16 +207,16 @@ public interface ApiResponseMessages {
     String INVALID_ORDER_ID = "Invalid order ID provided.";
     String INVALID_TRACKING_NUMBER = "Invalid tracking number provided.";
     String INVALID_DELIVERY_STATUS_UPDATE_REQUEST = "Invalid delivery status update request: Tracking number and new status are required.";
-    String INVALID_DELIVERY_STATUS = "Invalid delivery status: "; // Append status
-    String DELIVERY_NOT_FOUND_FOR_ORDER = "Delivery not found for order ID: "; // Append orderId
-    String DELIVERY_NOT_FOUND_FOR_TRACKING = "Delivery not found for tracking number: "; // Append trackingNumber
-    String DELIVERY_NOT_FOUND_FOR_UPDATE = "Delivery not found for update with tracking number: "; // Append trackingNumber
-    String DELIVERY_NOT_FOUND_FOR_CANCEL = "Delivery not found for cancellation with tracking number: "; // NEW
-    String DELIVERY_NOT_FOUND_FOR_DELETE = "Delivery not found for deletion with tracking number: "; // NEW
-    String DELIVERY_ALREADY_EXISTS_FOR_ORDER = "A delivery already exists for order ID: "; // Append orderId
+    String INVALID_DELIVERY_STATUS = "Invalid delivery status"; // Append status
+    String DELIVERY_NOT_FOUND_FOR_ORDER = "Delivery not found for order"; // Append orderId
+    String DELIVERY_NOT_FOUND_FOR_TRACKING = "Delivery not found for tracking number"; // Append trackingNumber
+    String DELIVERY_NOT_FOUND_FOR_UPDATE = "Delivery not found for update with tracking number"; // Append trackingNumber
+    String DELIVERY_NOT_FOUND_FOR_CANCEL = "Delivery not found for cancellation with tracking number"; // NEW
+    String DELIVERY_NOT_FOUND_FOR_DELETE = "Delivery not found for deletion with tracking number"; // NEW
+    String DELIVERY_ALREADY_EXISTS_FOR_ORDER = "A delivery already exists for order"; // Append orderId
     String INVALID_DELIVERY_STATUS_TRANSITION_FROM_DELIVERED = "Cannot change status from DELIVERED to any other status.";
     String INVALID_DELIVERY_STATUS_TRANSITION_FROM_CANCELED = "Cannot change status from CANCELED to any other status.";
-    String INVALID_DELIVERY_STATUS_FOR_CANCELLATION = "Delivery cannot be canceled in current status: "; // NEW
+    String INVALID_DELIVERY_STATUS_FOR_CANCELLATION = "Delivery cannot be canceled in current status"; // NEW
     String INVALID_DELIVERY_AGENT = "Invalid delivery agent provided."; // NEW
 
     String ERROR_CREATING_DELIVERY = "An error occurred while creating the delivery.";
@@ -238,9 +243,9 @@ public interface ApiResponseMessages {
     String INVALID_MEDIA_UPLOAD_REQUEST = "Invalid media upload request: assetName, fileContent, fileType, entityId, and entityType are required.";
     String INVALID_UNIQUE_FILE_NAME = "Invalid unique file name provided.";
     String INVALID_ENTITY_IDENTIFIERS = "Invalid entity ID or entity type provided.";
-    String MEDIA_NOT_FOUND = "Media asset not found with unique file name: "; // Append uniqueFileName
-    String MEDIA_NOT_FOUND_FOR_DELETE = "Media asset not found for deletion with unique file name: "; // Append uniqueFileName
-    String UNSUPPORTED_FILE_TYPE = "Unsupported file type: "; // Append fileType
+    String MEDIA_NOT_FOUND = "Media asset not found with unique file name"; // Append uniqueFileName
+    String MEDIA_NOT_FOUND_FOR_DELETE = "Media asset not found for deletion with unique file name"; // Append uniqueFileName
+    String UNSUPPORTED_FILE_TYPE = "Unsupported file type"; // Append fileType
     String INVALID_BASE64_CONTENT = "Invalid Base64 file content provided.";
 
     String ERROR_UPLOADING_MEDIA = "An error occurred while uploading media.";
@@ -257,7 +262,7 @@ public interface ApiResponseMessages {
     
     // --- Error Messages (General) ---
     String MISSING_NEW_STATUS_BAD_REQUEST = "Missing or empty 'newStatus' in request body.";
-    String INVALID_ORDER_STATUS_VALUE = "Invalid OrderStatus value: "; // Append value
+    String INVALID_ORDER_STATUS_VALUE = "Invalid OrderStatus value"; // Append value
     String ERROR_DURING_ORDER_CREATION = "An error occurred during order creation.";
     String ERROR_UPDATING_ORDER_STATUS = "An error occurred updating order status.";
     String ERROR_RETRIEVING_ORDERS = "An error occurred retrieving orders.";
@@ -267,13 +272,13 @@ public interface ApiResponseMessages {
     String PAYMENT_INITIATED_SUCCESS = "Payment initiated successfully. Awaiting gateway confirmation.";
     String PAYMENT_CALLBACK_PROCESSED_SUCCESS = "Payment callback processed successfully.";
     String PAYMENT_STATUS_FETCHED_SUCCESS = "Payment status fetched successfully.";
-    String PAYMENT_NOT_FOUND_FOR_ORDER = "Payment details not found for order ID: "; // Append ID
-    String PAYMENT_NOT_FOUND = "Payment not found with transaction reference: "; // Append ID
+    String PAYMENT_NOT_FOUND_FOR_ORDER = "Payment details not found for order"; // Append ID
+    String PAYMENT_NOT_FOUND = "Payment not found with transaction reference"; // Append ID
 
     // --- Payment Error Messages ---
     String INVALID_PAYMENT_INITIATION_REQUEST = "Invalid payment initiation request: orderId and positive amount are required.";
     String INVALID_WEBHOOK_CALLBACK_REQUEST = "Invalid webhook callback request: transactionRef, status, and orderId are required.";
-    String INVALID_PAYMENT_STATUS_VALUE = "Invalid payment status value: "; // Append value
+    String INVALID_PAYMENT_STATUS_VALUE = "Invalid payment status value"; // Append value
     String MISSING_ORDER_ID_FOR_PAYMENT_STATUS = "Missing or empty orderId for payment status request.";
     String ERROR_INITIATING_PAYMENT = "An error occurred during payment initiation.";
     String ERROR_PROCESSING_CALLBACK = "An error occurred while processing payment callback.";
@@ -298,8 +303,8 @@ public interface ApiResponseMessages {
     String EMAIL_ALREADY_IN_USE = "Error: Email is already in use!";
     String USER_REGISTERED_SUCCESS = "User registered successfully!";
     String ROLE_USER_NOT_FOUND = "Error: Default role 'ROLE_USER' is not found in the database. Please ensure it's configured.";
-    String ROLE_NOT_FOUND = "Error: Role is not found in the database: "; // Append role name
-    String INVALID_ROLE_PROVIDED = "Error: Invalid role provided: "; // Append role name
+    String ROLE_NOT_FOUND = "Error: Role is not found in the database"; // Append role name
+    String INVALID_ROLE_PROVIDED = "Error: Invalid role provided"; // Append role name
     String ERROR_REGISTERING_USER = "An error occurred during user registration.";
     
     // Potentially for sign-in:
@@ -314,7 +319,7 @@ public interface ApiResponseMessages {
     String CART_ITEM_REMOVED_SUCCESS = "Product removed from cart successfully.";
     String CART_CLEARED_SUCCESS = "Cart cleared successfully.";
     String CART_NOT_FOUND_FOR_USER = "Cart not found for user."; // Could be for empty cart too
-    String PRODUCT_NOT_FOUND_IN_CART = "Product not found in cart: "; // Append ID
+    String PRODUCT_NOT_FOUND_IN_CART = "Product not found in cart"; // Append ID
 
     // --- Cart Error Messages ---
     String INVALID_CART_ADD_REQUEST = "Invalid request: productId and positive quantity are required.";

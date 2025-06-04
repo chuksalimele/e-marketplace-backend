@@ -33,12 +33,11 @@ public class OrderService {
     private final UserIntegrationService userIntegrationService;
     private final ProductIntegrationService productIntegrationService;
 
-
     @Autowired
     public OrderService(OrderRepository orderRepository,
-                        OrderItemRepository orderItemRepository,
-                        UserIntegrationService userIntegrationService,
-                        ProductIntegrationService productIntegrationService) {
+            OrderItemRepository orderItemRepository,
+            UserIntegrationService userIntegrationService,
+            ProductIntegrationService productIntegrationService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.userIntegrationService = userIntegrationService;
@@ -50,7 +49,8 @@ public class OrderService {
      * decreases stock, and saves the order.
      *
      * @param userId The ID of the user placing the order.
-     * @param itemRequests A list of requested order items (productId, quantity).
+     * @param itemRequests A list of requested order items (productId,
+     * quantity).
      * @param shippingAddress The shipping address for the order.
      * @param paymentMethod The payment method for the order.
      * @return A Mono emitting the created Order.
@@ -65,47 +65,49 @@ public class OrderService {
 
         // Process each item request reactively
         return Flux.fromIterable(itemRequests)
-                .flatMap(request -> productIntegrationService.getProductDtoById(request.getProductId())
-                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with ID: " + request.getProductId())))
-                        .flatMap(product -> {
-                            if (product.getStockQuantity() == null || product.getStockQuantity() < request.getQuantity()) {
-                                return Mono.error(new InsufficientStockException(
-                                        "Insufficient stock for product: " + product.getName() +
-                                                ". Available: " + (product.getStockQuantity() != null ? product.getStockQuantity() : 0) +
-                                                ", Requested: " + request.getQuantity()));
-                            }
+                .flatMap(request -> productIntegrationService.getProductById(request.getProductId())
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with ID: " + request.getProductId())))
+                .flatMap(product -> {
+                    if (product.getStockQuantity() == null || product.getStockQuantity() < request.getQuantity()) {
+                        return Mono.error(new InsufficientStockException(
+                                "Insufficient stock for product: " + product.getName()
+                                + ". Available: " + (product.getStockQuantity() != null ? product.getStockQuantity() : 0)
+                                + ", Requested: " + request.getQuantity()));
+                    }
 
-                            // Decrease stock reactively
-                            return productIntegrationService.decreaseAndSaveStock(product.getId(), request.getQuantity())
-                                    .thenReturn(product); // Pass the product along the chain
-                        })
-                        .map(product -> {
-                            OrderItem orderItem = new OrderItem();
-                            orderItem.setProductId(product.getId());
-                            orderItem.setQuantity(request.getQuantity());
-                            orderItem.setPriceAtTimeOfOrder(product.getPrice());
-                            orderItem.setOrderId(order.getId()); // Link order item to the order
-                            totalOrderAmount[0] = totalOrderAmount[0].add(product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
-                            return orderItem;
-                        })
+                    // Decrease stock reactively
+                    return productIntegrationService.decreaseAndSaveStock(product.getId(), request.getQuantity())
+                            .thenReturn(product); // Pass the product along the chain
+                })
+                .map(product -> {
+                    OrderItem orderItem = OrderItem.builder()
+                            .orderId(order.getId())// Link order item to the order
+                            .productId(product.getId())
+                            .product(product)
+                            .quantity(request.getQuantity())
+                            .priceAtTimeOfOrder(product.getPrice())                            
+                            .build(); 
+
+                    totalOrderAmount[0] = totalOrderAmount[0].add(product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
+                    return orderItem;
+                })
                 )
                 .collectList() // Collect all processed OrderItems into a List
                 .flatMap(orderItems -> {
-                    //order.setOrderItems(orderItems); // Set the collected items on the order
+                    order.setItems(orderItems); // Set the collected items on the order
                     order.setTotalAmount(totalOrderAmount[0]); // Set the calculated total amount
 
                     // Save the order
                     return orderRepository.save(order)
-                            .flatMap(savedOrder ->
-                                // Save each order item linked to the saved order
-                                Flux.fromIterable(orderItems)
+                            .flatMap(savedOrder
+                                    -> // Save each order item linked to the saved order
+                                    Flux.fromIterable(orderItems)
                                     .doOnNext(item -> item.setOrderId(savedOrder.getId())) // Ensure item has the saved order's ID
                                     .flatMap(orderItemRepository::save)
                                     .then(Mono.just(savedOrder)) // Return the saved order after all items are saved
                             );
                 });
     }
-
 
     /**
      * Retrieves all orders.
@@ -153,9 +155,9 @@ public class OrderService {
     }
 
     /**
-     * Deletes an order by its ID.
-     * This will also cascade delete associated OrderItems if configured in your entity mapping.
-     * If not, you might need to manually delete OrderItems first.
+     * Deletes an order by its ID. This will also cascade delete associated
+     * OrderItems if configured in your entity mapping. If not, you might need
+     * to manually delete OrderItems first.
      *
      * @param id The ID of the order to delete.
      * @return A Mono<Void> indicating completion.
@@ -163,33 +165,33 @@ public class OrderService {
     public Mono<Void> deleteOrderById(Long id) {
         return orderRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order not found with ID: " + id)))
-                .flatMap(order ->
-                    // First delete associated order items to avoid foreign key constraints
-                    orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
-                                      .then(orderRepository.delete(order)) // Then delete the order itself
+                .flatMap(order
+                        -> // First delete associated order items to avoid foreign key constraints
+                        orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
+                        .then(orderRepository.delete(order)) // Then delete the order itself
                 )
                 .then(); // Ensure it returns Mono<Void>
     }
 
     /**
-     * Deletes all orders associated with a specific user ID.
-     * This will first delete all order items belonging to those orders,
-     * then delete the orders themselves.
+     * Deletes all orders associated with a specific user ID. This will first
+     * delete all order items belonging to those orders, then delete the orders
+     * themselves.
      *
      * @param userId The ID of the user whose orders are to be deleted.
      * @return A Mono<Void> indicating completion.
      */
     public Mono<Void> deleteOrdersByUserId(Long userId) {
         return orderRepository.findByUserId(userId, Pageable.unpaged()) // Find all orders for the user
-                .flatMap(order ->
-                    // For each order, first delete its items
-                    orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
+                .flatMap(order
+                        -> // For each order, first delete its items
+                        orderItemRepository.deleteByOrderId(order.getId()) // Assuming deleteByOrderId exists
                         .then(Mono.just(order)) // Pass the order along
                 )
                 .collectList() // Collect all orders into a list
-                .flatMap(orders ->
-                    // After all items are deleted, delete the orders themselves
-                    orderRepository.deleteAll(orders) // Use deleteAll with a collection
+                .flatMap(orders
+                        -> // After all items are deleted, delete the orders themselves
+                        orderRepository.deleteAll(orders) // Use deleteAll with a collection
                 )
                 .then(); // Ensure it returns Mono<Void>
     }
@@ -199,38 +201,39 @@ public class OrderService {
      *
      * @param orderId The ID of the order the item belongs to.
      * @param orderItemId The ID of the order item to delete.
-     * @return A Mono<Void> indicating completion, or Mono.error(ResourceNotFoundException) if not found.
+     * @return A Mono<Void> indicating completion, or
+     * Mono.error(ResourceNotFoundException) if not found.
      */
     public Mono<Void> deleteOrderItem(Long orderId, Long orderItemId) {
         return orderRepository.findById(orderId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order not found with ID: " + orderId)))
-                .flatMap(order ->
-                    orderItemRepository.findById(orderItemId)
-                            .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order Item not found with ID: " + orderItemId + " in order " + orderId)))
-                            .flatMap(orderItem -> {
-                                if (!orderItem.getOrderId().equals(order.getId())) { // Use getOrderId() instead of getOrder().getId()
-                                    return Mono.error(new IllegalArgumentException("Order item " + orderItemId + " does not belong to order " + orderId));
-                                }
-                                // Before deleting, you might want to return stock (if needed)
-                                return orderItemRepository.delete(orderItem)
-                                        .doOnSuccess(v -> {
-                                            // Optional: Update the order's total amount and save it if you want to reflect changes immediately
-                                            // This requires re-fetching items or maintaining a collection
-                                            // For simplicity, we're just deleting the item here.
-                                            // If Order has a collection of OrderItems and is eagerly loaded, update it
-                                            // order.getOrderItems().remove(orderItem); // This line might cause issues if OrderItems is not eagerly loaded or managed
-                                            // Recalculate total amount or adjust it
-                                            order.setTotalAmount(order.getTotalAmount().subtract(orderItem.getPriceAtTimeOfOrder().multiply(BigDecimal.valueOf(orderItem.getQuantity()))));
-                                            orderRepository.save(order).subscribe(); // Non-blocking fire-and-forget for order update
-                                        })
-                                        .then(); // Return Mono<Void> after deletion
-                            })
+                .flatMap(order
+                        -> orderItemRepository.findById(orderItemId)
+                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order Item not found with ID: " + orderItemId + " in order " + orderId)))
+                        .flatMap(orderItem -> {
+                            if (!orderItem.getOrderId().equals(order.getId())) { // Use getOrderId() instead of getOrder().getId()
+                                return Mono.error(new IllegalArgumentException("Order item " + orderItemId + " does not belong to order " + orderId));
+                            }
+                            // Before deleting, you might want to return stock (if needed)
+                            return orderItemRepository.delete(orderItem)
+                                    .doOnSuccess(v -> {
+                                        // Optional: Update the order's total amount and save it if you want to reflect changes immediately
+                                        // This requires re-fetching items or maintaining a collection
+                                        // For simplicity, we're just deleting the item here.
+                                        // If Order has a collection of OrderItems and is eagerly loaded, update it
+                                        // order.getOrderItems().remove(orderItem); // This line might cause issues if OrderItems is not eagerly loaded or managed
+                                        // Recalculate total amount or adjust it
+                                        order.setTotalAmount(order.getTotalAmount().subtract(orderItem.getPriceAtTimeOfOrder().multiply(BigDecimal.valueOf(orderItem.getQuantity()))));
+                                        orderRepository.save(order).subscribe(); // Non-blocking fire-and-forget for order update
+                                    })
+                                    .then(); // Return Mono<Void> after deletion
+                        })
                 );
     }
 
     /**
-     * Clears all orders from the system.
-     * Use with extreme caution, typically only for testing or specific reset scenarios.
+     * Clears all orders from the system. Use with extreme caution, typically
+     * only for testing or specific reset scenarios.
      *
      * @return A Mono<Void> indicating completion.
      */
@@ -246,14 +249,15 @@ public class OrderService {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OrderItemRequest {
+
         private Long productId;
         private Integer quantity;
     }
 
     // --- OrderItemRepository Implementations ---
-
     /**
      * Retrieves all order items with pagination.
+     *
      * @param pageable Pagination information.
      * @return A Flux of OrderItem.
      */
@@ -263,6 +267,7 @@ public class OrderService {
 
     /**
      * Retrieves all order items belonging to a specific order with pagination.
+     *
      * @param orderId The ID of the order.
      * @param pageable Pagination information.
      * @return A Flux of OrderItem.
@@ -273,6 +278,7 @@ public class OrderService {
 
     /**
      * Retrieves all order items containing a specific product with pagination.
+     *
      * @param productId The ID of the product.
      * @param pageable Pagination information.
      * @return A Flux of OrderItem.
@@ -283,6 +289,7 @@ public class OrderService {
 
     /**
      * Finds a specific order item by order ID and product ID.
+     *
      * @param orderId The ID of the order.
      * @param productId The ID of the product.
      * @return A Mono emitting the OrderItem.
@@ -293,6 +300,7 @@ public class OrderService {
 
     /**
      * Counts all order items.
+     *
      * @return A Mono emitting the count.
      */
     public Mono<Long> countAllOrderItems() {
@@ -301,6 +309,7 @@ public class OrderService {
 
     /**
      * Counts all order items for a specific order.
+     *
      * @param orderId The ID of the order.
      * @return A Mono emitting the count.
      */
@@ -310,6 +319,7 @@ public class OrderService {
 
     /**
      * Counts all order items for a specific product.
+     *
      * @param productId The ID of the product.
      * @return A Mono emitting the count.
      */
@@ -319,6 +329,7 @@ public class OrderService {
 
     /**
      * Check if a specific product exists within a specific order.
+     *
      * @param orderId The ID of the order.
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise.
@@ -328,9 +339,9 @@ public class OrderService {
     }
 
     // --- OrderRepository Implementations ---
-
     /**
      * Retrieves all orders with pagination.
+     *
      * @param pageable Pagination information.
      * @return A Flux of Order.
      */
@@ -340,6 +351,7 @@ public class OrderService {
 
     /**
      * Finds orders placed by a specific user with pagination.
+     *
      * @param userId The ID of the user.
      * @param pageable Pagination information.
      * @return A Flux of Order.
@@ -350,6 +362,7 @@ public class OrderService {
 
     /**
      * Finds orders by their current status with pagination.
+     *
      * @param orderStatus The status of the order.
      * @param pageable Pagination information.
      * @return A Flux of Order.
@@ -360,6 +373,7 @@ public class OrderService {
 
     /**
      * Finds orders placed within a specific time range with pagination.
+     *
      * @param startTime The start time of the range.
      * @param endTime The end time of the range.
      * @param pageable Pagination information.
@@ -371,6 +385,7 @@ public class OrderService {
 
     /**
      * Finds orders by a specific user and status with pagination.
+     *
      * @param userId The ID of the user.
      * @param orderStatus The status of the order.
      * @param pageable Pagination information.
@@ -382,6 +397,7 @@ public class OrderService {
 
     /**
      * Counts all orders.
+     *
      * @return A Mono emitting the count.
      */
     public Mono<Long> countAllOrders() {
@@ -390,6 +406,7 @@ public class OrderService {
 
     /**
      * Counts orders placed by a specific user.
+     *
      * @param userId The ID of the user.
      * @return A Mono emitting the count.
      */
@@ -399,6 +416,7 @@ public class OrderService {
 
     /**
      * Counts orders by their current status.
+     *
      * @param orderStatus The status of the order.
      * @return A Mono emitting the count.
      */
@@ -408,6 +426,7 @@ public class OrderService {
 
     /**
      * Counts orders placed within a specific time range.
+     *
      * @param startTime The start time of the range.
      * @param endTime The end time of the range.
      * @return A Mono emitting the count.
@@ -418,6 +437,7 @@ public class OrderService {
 
     /**
      * Counts orders by a specific user and status.
+     *
      * @param userId The ID of the user.
      * @param orderStatus The status of the order.
      * @return A Mono emitting the count.

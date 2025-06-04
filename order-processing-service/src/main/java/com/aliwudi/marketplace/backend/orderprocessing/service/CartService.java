@@ -20,6 +20,7 @@ import reactor.util.function.Tuples;
 import org.springframework.data.domain.Pageable; // For pagination
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -75,27 +76,35 @@ public class CartService {
         }
 
         return getOrCreateCartForUser(userId)
-                .flatMap(userCart -> productIntegrationService.getProductDtoById(productId)
+                .flatMap(userCart -> productIntegrationService.getProductById(productId)
                         .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
-                        .flatMap(productDto -> {
+                        .flatMap(product -> {
                             // Check for sufficient stock before adding/updating
-                            if (productDto.getStockQuantity() == null || productDto.getStockQuantity() < quantity) {
-                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + productDto.getStockQuantity()));
+                            if (product.getStockQuantity() == null || product.getStockQuantity() < quantity) {
+                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + product.getStockQuantity()));
                             }
 
                             return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
                                     .flatMap(existingCartItem -> {
                                         // Item exists, update quantity
                                         int newTotalQuantity = existingCartItem.getQuantity() + quantity;
-                                        if (productDto.getStockQuantity() != null && newTotalQuantity > productDto.getStockQuantity()) {
-                                            return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + productDto.getStockQuantity()));
+                                        if (product.getStockQuantity() != null && newTotalQuantity > product.getStockQuantity()) {
+                                            return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + product.getStockQuantity()));
                                         }
+                                        existingCartItem.setProduct(product);
                                         existingCartItem.setQuantity(newTotalQuantity);
+                                        existingCartItem.setUpdatedAt(LocalDateTime.now());
                                         return cartItemRepository.save(existingCartItem);
                                     })
                                     .switchIfEmpty(Mono.defer(() -> {
                                         // Item does not exist, create new
-                                        CartItem newCartItem = new CartItem(userCart.getId(), productId, quantity);
+                                        CartItem newCartItem = CartItem.builder()
+                                                .cartId(userCart.getId())
+                                                .productId(productId)
+                                                .product(product)
+                                                .quantity(quantity)
+                                                .createdAt(LocalDateTime.now())                                                
+                                                .build();
                                         return cartItemRepository.save(newCartItem);
                                     }));
                         })
@@ -110,13 +119,13 @@ public class CartService {
      * @param userId The ID of the user whose cart to retrieve.
      * @return A Mono emitting the Cart object of the user.
      */
-    public Mono<Cart> getUserCartDetails(Long userId) {
+    public Mono<Cart> getUserCart(Long userId) {
         // Step 1: Find the user's cart
         Mono<Cart> cartMono = cartRepository.findByUserId(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Cart not found for user ID: " + userId)));
 
         // Step 2: Fetch user details from User Service
-        Mono<User> userDtoMono = userIntegrationService.getUserDtoById(userId)
+        Mono<User> userDtoMono = userIntegrationService.getUserById(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found for ID: " + userId + " from User Service.")))
                 .onErrorResume(e -> {
                     System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
@@ -131,7 +140,7 @@ public class CartService {
                     User userDto = tuple.getT2();
 
                     return cartItemRepository.findByCartId(userCart.getId(), Pageable.unpaged())
-                            .flatMap(item -> productIntegrationService.getProductDtoById(item.getProductId())
+                            .flatMap(item -> productIntegrationService.getProductById(item.getProductId())
                                     .map(productDto -> {
                                         CartItem cartItemDto = new CartItem();
                                         cartItemDto.setId(item.getId());
@@ -191,7 +200,7 @@ public class CartService {
         }
 
         return getOrCreateCartForUser(userId)
-                .flatMap(userCart -> productIntegrationService.getProductDtoById(productId)
+                .flatMap(userCart -> productIntegrationService.getProductById(productId)
                         .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
                         .flatMap(productDto -> {
                             if (newQuantity == 0) {

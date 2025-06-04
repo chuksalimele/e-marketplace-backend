@@ -27,21 +27,12 @@ public class Order {
     private User user; // skip for db but required for response dto
     private LocalDateTime orderTime;    
     private BigDecimal totalAmount;
-    private OrderStatusDto orderStatus;
+    private OrderStatus orderStatus;
     private String shippingAddress;
     private String paymentMethod;
     @Transient
     private List<OrderItem> items;// skip for db but required for response dto
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    public enum OrderStatusDto {
-        PENDING,
-        PROCESSING,
-        SHIPPED,
-        DELIVERED,
-        CANCELLED,
-        RETURNED
-    }    
+    private LocalDateTime updatedAt;  
 
 }

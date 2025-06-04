@@ -1,8 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
 import com.aliwudi.marketplace.backend.common.model.Cart;
-import com.aliwudi.marketplace.backend.orderprocessing.model.Cart; // Import Cart model
-import com.aliwudi.marketplace.backend.orderprocessing.model.CartItem;
+import com.aliwudi.marketplace.backend.common.model.CartItem;
 import com.aliwudi.marketplace.backend.orderprocessing.service.CartService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
@@ -29,10 +28,32 @@ public class CartController {
     private final CartService cartService;
 
     /**
-     * Helper method to get the authenticated user's ID from the reactive SecurityContextHolder.
-     * This ID is propagated by the API Gateway.
+     * Helper method to map Cart entity to Cart DTO for public exposure.
+     */
+    private Mono<Cart> prepareDto(Cart cart) {
+        if (cart == null) {
+            return Mono.empty();
+        }
+        return cart;
+    }
+
+    /**
+     * Helper method to map CartItem entity to CartItem DTO for public exposure.
+     */
+    private Mono<CartItem> prepareDto(CartItem cartItem) {
+        if (cartItem == null) {
+            return Mono.empty();
+        }
+        return cartItem;
+    }
+
+    /**
+     * Helper method to get the authenticated user's ID from the reactive
+     * SecurityContextHolder. This ID is propagated by the API Gateway.
+     *
      * @return A Mono emitting the authenticated user's ID.
-     * @throws IllegalStateException if the user is not authenticated or ID cannot be retrieved.
+     * @throws IllegalStateException if the user is not authenticated or ID
+     * cannot be retrieved.
      */
     private Mono<Long> getAuthenticatedUserId() {
         return ReactiveSecurityContextHolder.getContext()
@@ -56,9 +77,9 @@ public class CartController {
     }
 
     /**
-     * Endpoint to add a product to the authenticated user's cart.
-     * If the product is already in the cart, its quantity will be updated.
-     * Requires the user to be authenticated.
+     * Endpoint to add a product to the authenticated user's cart. If the
+     * product is already in the cart, its quantity will be updated. Requires
+     * the user to be authenticated.
      */
     @PostMapping("/add")
     public Mono<StandardResponseEntity> addProductToCart(@RequestBody Map<String, Long> payload) {
@@ -71,33 +92,35 @@ public class CartController {
 
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.addItemToCart(userId, productId, quantity))
-                .map(updatedCartItem -> (StandardResponseEntity) StandardResponseEntity.ok(updatedCartItem, ApiResponseMessages.CART_ITEM_ADDED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
-                .onErrorResume(InsufficientStockException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+                .flatMap(this::prepareDto)
+                .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_ADDED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .onErrorResume(InsufficientStockException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_ADDING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
-     * Endpoint to retrieve the authenticated user's entire cart, enriched with details.
-     * Requires the user to be authenticated.
+     * Endpoint to retrieve the authenticated user's entire cart, enriched with
+     * details. Requires the user to be authenticated.
      */
     @GetMapping
     public Mono<StandardResponseEntity> getUserCart() {
         return getAuthenticatedUserId()
-                .flatMap(userId -> cartService.getUserCartDetails(userId))
-                .map(userCartDetails -> (StandardResponseEntity) StandardResponseEntity.ok(userCartDetails, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
+                .flatMap(userId -> cartService.getUserCart(userId))
+                .flatMap(this::prepareDto)
+                .map(cart -> (StandardResponseEntity) StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER)))
                 .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
-     * Endpoint to update the quantity of a product in the authenticated user's cart.
-     * If the new quantity is 0, the item will be removed.
-     * Requires the user to be authenticated.
+     * Endpoint to update the quantity of a product in the authenticated user's
+     * cart. If the new quantity is 0, the item will be removed. Requires the
+     * user to be authenticated.
      */
     @PutMapping("/update")
     public Mono<StandardResponseEntity> updateCartItem(@RequestBody Map<String, Long> payload) {
@@ -110,19 +133,20 @@ public class CartController {
 
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.updateCartItemQuantity(userId, productId, quantity))
-                .map(updatedCartItem -> (StandardResponseEntity) StandardResponseEntity.ok(updatedCartItem, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS))
                 .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
-                .onErrorResume(InsufficientStockException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                .onErrorResume(InsufficientStockException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
-     * Endpoint to remove a product from the authenticated user's cart.
-     * Requires the user to be authenticated.
+     * Endpoint to remove a product from the authenticated user's cart. Requires
+     * the user to be authenticated.
      */
     @DeleteMapping("/remove")
     public Mono<StandardResponseEntity> removeProductFromCart(@RequestBody Map<String, Long> payload) {
@@ -141,8 +165,8 @@ public class CartController {
     }
 
     /**
-     * Endpoint to clear the authenticated user's entire cart.
-     * Requires the user to be authenticated.
+     * Endpoint to clear the authenticated user's entire cart. Requires the user
+     * to be authenticated.
      */
     @DeleteMapping("/clear")
     public Mono<StandardResponseEntity> clearCart() {
@@ -154,10 +178,10 @@ public class CartController {
     }
 
     // --- CartItem Controller Endpoints (from previous update) ---
-
     /**
-     * Endpoint to retrieve all cart items with pagination.
-     * Accessible by authenticated users (e.g., for admin purposes or general listing).
+     * Endpoint to retrieve all cart items with pagination. Accessible by
+     * authenticated users (e.g., for admin purposes or general listing).
+     *
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -176,7 +200,9 @@ public class CartController {
     }
 
     /**
-     * Endpoint to retrieve all cart items for a specific cart ID with pagination.
+     * Endpoint to retrieve all cart items for a specific cart ID with
+     * pagination.
+     *
      * @param cartId The ID of the cart.
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -185,7 +211,7 @@ public class CartController {
      * @return A Flux of CartItem.
      */
     @GetMapping("/items/byCart/{cartId}")
-    public Flux<CartItem> getCartItemsByCartId(
+    public Mono<StandardResponseEntity> getCartItemsByCartId(
             @PathVariable Long cartId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -193,11 +219,18 @@ public class CartController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return cartService.findCartItemsByCartId(cartId, pageable);
+        return cartService.findCartItemsByCartId(cartId, pageable)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(cartItemList -> (StandardResponseEntity) StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
-     * Endpoint to retrieve all cart items containing a specific product ID with pagination.
+     * Endpoint to retrieve all cart items containing a specific product ID with
+     * pagination.
+     *
      * @param productId The ID of the product.
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -206,7 +239,7 @@ public class CartController {
      * @return A Flux of CartItem.
      */
     @GetMapping("/items/byProduct/{productId}")
-    public Flux<CartItem> getCartItemsByProductId(
+    public Mono<StandardResponseEntity> getCartItemsByProductId(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -214,11 +247,17 @@ public class CartController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return cartService.findCartItemsByProductId(productId, pageable);
+        return cartService.findCartItemsByProductId(productId, pageable)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(cartItemList -> (StandardResponseEntity) StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
      * Endpoint to find a specific cart item by cart ID and product ID.
+     *
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
      * @return A Mono emitting the CartItem.
@@ -228,13 +267,15 @@ public class CartController {
             @PathVariable Long cartId,
             @PathVariable Long productId) {
         return cartService.findSpecificCartItem(cartId, productId)
+                .flatMap(this::prepareDto)
                 .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART + productId)))
+                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART +": "+ productId)))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
      * Endpoint to count all cart items.
+     *
      * @return A Mono emitting the count.
      */
     @GetMapping("/items/count/all")
@@ -246,6 +287,7 @@ public class CartController {
 
     /**
      * Endpoint to count all cart items for a specific cart.
+     *
      * @param cartId The ID of the cart.
      * @return A Mono emitting the count.
      */
@@ -258,6 +300,7 @@ public class CartController {
 
     /**
      * Endpoint to count all cart items for a specific product.
+     *
      * @param productId The ID of the product.
      * @return A Mono emitting the count.
      */
@@ -270,6 +313,7 @@ public class CartController {
 
     /**
      * Endpoint to check if a specific product exists in a specific cart.
+     *
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise.
@@ -284,8 +328,10 @@ public class CartController {
     }
 
     /**
-     * Endpoint to delete all cart items for a given cart ID.
-     * This is a direct deletion and should be used with caution. The /clear endpoint is preferred for user-facing actions.
+     * Endpoint to delete all cart items for a given cart ID. This is a direct
+     * deletion and should be used with caution. The /clear endpoint is
+     * preferred for user-facing actions.
+     *
      * @param cartId The ID of the cart.
      * @return A Mono<Void> indicating completion.
      */
@@ -297,8 +343,10 @@ public class CartController {
     }
 
     /**
-     * Endpoint to delete a cart item by user ID and product ID.
-     * This is an administrative endpoint or for specific use cases where a userId is known.
+     * Endpoint to delete a cart item by user ID and product ID. This is an
+     * administrative endpoint or for specific use cases where a userId is
+     * known.
+     *
      * @param userId The ID of the user.
      * @param productId The ID of the product.
      * @return A Mono<Void> indicating completion.
@@ -313,8 +361,10 @@ public class CartController {
     }
 
     /**
-     * Endpoint to directly update the quantity of a cart item by cart ID and product ID.
-     * This is a direct update, potentially for administrative purposes.
+     * Endpoint to directly update the quantity of a cart item by cart ID and
+     * product ID. This is a direct update, potentially for administrative
+     * purposes.
+     *
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
      * @param payload A map containing the "quantity" to update.
@@ -332,15 +382,15 @@ public class CartController {
         }
 
         return cartService.directUpdateCartItemQuantity(quantity, cartId, productId)
-                .map(rowsUpdated -> (StandardResponseEntity) StandardResponseEntity.ok(rowsUpdated, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS + " Rows updated: " + rowsUpdated))
+                .map(rowsUpdatedCount -> (StandardResponseEntity) StandardResponseEntity.ok(rowsUpdatedCount, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS + " Rows updated: " + rowsUpdatedCount))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
     }
 
     // --- NEW: Cart Repository Controller Endpoints ---
-
     /**
-     * Endpoint to retrieve all carts with pagination.
-     * Accessible by authenticated users (e.g., for admin purposes).
+     * Endpoint to retrieve all carts with pagination. Accessible by
+     * authenticated users (e.g., for admin purposes).
+     *
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -348,24 +398,31 @@ public class CartController {
      * @return A Flux of Cart.
      */
     @GetMapping("/admin/all")
-    public Flux<Cart> getAllCarts(
+    public Mono<StandardResponseEntity> getAllCarts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return cartService.findAllCarts(pageable);
+        return cartService.findAllCarts(pageable)
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(cartList -> (StandardResponseEntity) StandardResponseEntity.ok(cartList, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
      * Endpoint to find a cart by its associated user ID.
+     *
      * @param userId The ID of the user.
      * @return A Mono emitting the Cart.
      */
     @GetMapping("/byUser/{userId}")
     public Mono<StandardResponseEntity> getCartByUserId(@PathVariable Long userId) {
         return cartService.findCartByUserId(userId)
+                .flatMap(this::prepareDto)
                 .map(cart -> (StandardResponseEntity) StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER + userId)))
                 .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
@@ -373,6 +430,7 @@ public class CartController {
 
     /**
      * Endpoint to count all carts.
+     *
      * @return A Mono emitting the count.
      */
     @GetMapping("/count")
@@ -384,6 +442,7 @@ public class CartController {
 
     /**
      * Endpoint to check if a cart exists for a given user ID.
+     *
      * @param userId The ID of the user.
      * @return A Mono emitting true if it exists, false otherwise.
      */
@@ -395,8 +454,9 @@ public class CartController {
     }
 
     /**
-     * Endpoint to delete a cart by user ID.
-     * This will also delete all cart items associated with this cart.
+     * Endpoint to delete a cart by user ID. This will also delete all cart
+     * items associated with this cart.
+     *
      * @param userId The ID of the user whose cart to delete.
      * @return A Mono<Void> indicating completion.
      */
