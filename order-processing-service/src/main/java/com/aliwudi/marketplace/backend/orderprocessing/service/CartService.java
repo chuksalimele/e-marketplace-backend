@@ -1,8 +1,5 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.common.model.Cart;
-import com.aliwudi.marketplace.backend.common.model.CartItem;
-import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
@@ -10,20 +7,18 @@ import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoun
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.common.model.Cart;
 import com.aliwudi.marketplace.backend.common.model.CartItem;
+import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.CartItemRepository;
 import com.aliwudi.marketplace.backend.orderprocessing.repository.CartRepository;
+import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuples;
 import org.springframework.data.domain.Pageable; // For pagination
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.List;
 
 @Service
 public class CartService {
@@ -35,12 +30,19 @@ public class CartService {
 
     @Autowired
     public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository,
-                       ProductIntegrationService productIntegrationService,
-                       UserIntegrationService userIntegrationService) {
+            ProductIntegrationService productIntegrationService,
+            UserIntegrationService userIntegrationService) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.productIntegrationService = productIntegrationService;
         this.userIntegrationService = userIntegrationService;
+    }
+
+    BigDecimal totalCartItemsAmount(List<CartItem> cartItemList) {
+        return cartItemList.stream()
+                .filter(itemDto -> itemDto.getProduct() != null && itemDto.getProduct().getPrice() != null)
+                .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -53,7 +55,10 @@ public class CartService {
     public Mono<Cart> getOrCreateCartForUser(Long userId) {
         return cartRepository.findByUserId(userId)
                 .switchIfEmpty(Mono.defer(() -> {
-                    Cart newCart = new Cart(userId);
+                    Cart newCart = Cart.builder()
+                            .userId(userId)
+                            .createdAt(LocalDateTime.now())
+                            .build();
                     return cartRepository.save(newCart);
                 }));
     }
@@ -62,52 +67,71 @@ public class CartService {
      * Adds a product to the specified user's cart or updates its quantity if
      * already present.
      *
-     * @param userId    The ID of the user whose cart to modify.
+     * @param userId The ID of the user whose cart to modify.
      * @param productId The ID of the product to add.
-     * @param quantity  The quantity to add/update.
+     * @param quantity The quantity to add/update.
      * @return A Mono emitting the updated CartItem.
      * @throws IllegalArgumentException if quantity is invalid.
      * @throws ResourceNotFoundException if the product is not found.
      * @throws InsufficientStockException if there's not enough stock.
      */
-    public Mono<CartItem> addItemToCart(Long userId, Long productId, Integer quantity) {
+    public Mono<Cart> addItemToCart(Long userId, Long productId, Integer quantity) {
         if (quantity <= 0) {
             return Mono.error(new IllegalArgumentException("Quantity must be greater than zero."));
         }
+        Mono<User> userMono = userIntegrationService.getUserById(userId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found for ID: " + userId + " from User Service.")))
+                .onErrorResume(e -> {
+                    System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
+                    return Mono.error(new RuntimeException("Could not fetch user details for ID: " + userId, e));
+                });
 
-        return getOrCreateCartForUser(userId)
-                .flatMap(userCart -> productIntegrationService.getProductById(productId)
-                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
-                        .flatMap(product -> {
-                            // Check for sufficient stock before adding/updating
-                            if (product.getStockQuantity() == null || product.getStockQuantity() < quantity) {
-                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + product.getStockQuantity()));
-                            }
+        return Mono.zip(userMono, getOrCreateCartForUser(userId))
+                //getOrCreateCartForUser(userId)
+                .flatMap(tuple -> productIntegrationService.getProductById(productId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
+                .flatMap((Product product) -> {
+                    // Check for sufficient stock before adding/updating
+                    if (product.getStockQuantity() == null || product.getStockQuantity() < quantity) {
+                        return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId + ". Available: " + product.getStockQuantity()));
+                    }
+                    User user = tuple.getT1();
+                    Cart userCart = tuple.getT2();
+                    return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
+                            .flatMap(existingCartItem -> {
+                                // Item exists, update quantity
+                                int newTotalQuantity = existingCartItem.getQuantity() + quantity;
+                                if (product.getStockQuantity() != null && newTotalQuantity > product.getStockQuantity()) {
+                                    return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + product.getStockQuantity()));
+                                }
+                                existingCartItem.setProduct(product);
+                                existingCartItem.setQuantity(newTotalQuantity);
+                                existingCartItem.setUpdatedAt(LocalDateTime.now());
+                                return cartItemRepository.save(existingCartItem);
+                            })
+                            .switchIfEmpty(Mono.defer(() -> {
 
-                            return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
-                                    .flatMap(existingCartItem -> {
-                                        // Item exists, update quantity
-                                        int newTotalQuantity = existingCartItem.getQuantity() + quantity;
-                                        if (product.getStockQuantity() != null && newTotalQuantity > product.getStockQuantity()) {
-                                            return Mono.error(new InsufficientStockException("Adding " + quantity + " units would exceed available stock for product " + productId + ". Available: " + product.getStockQuantity()));
-                                        }
-                                        existingCartItem.setProduct(product);
-                                        existingCartItem.setQuantity(newTotalQuantity);
-                                        existingCartItem.setUpdatedAt(LocalDateTime.now());
-                                        return cartItemRepository.save(existingCartItem);
-                                    })
-                                    .switchIfEmpty(Mono.defer(() -> {
-                                        // Item does not exist, create new
-                                        CartItem newCartItem = CartItem.builder()
-                                                .cartId(userCart.getId())
-                                                .productId(productId)
-                                                .product(product)
-                                                .quantity(quantity)
-                                                .createdAt(LocalDateTime.now())                                                
-                                                .build();
-                                        return cartItemRepository.save(newCartItem);
-                                    }));
-                        })
+                                // Item does not exist, create new
+                                CartItem newCartItem = CartItem.builder()
+                                        .cartId(userCart.getId())
+                                        .productId(productId)
+                                        .product(product)
+                                        .quantity(quantity)
+                                        .createdAt(LocalDateTime.now())
+                                        .build();
+                                return cartItemRepository.save(newCartItem);
+                            }))
+                            .flatMap(cartItem -> findCartItemsByCartId(userCart.getId())
+                            .collectList()
+                            .map(cartItemList -> {
+                                BigDecimal totalAmount = totalCartItemsAmount(cartItemList);
+                                userCart.setItems(cartItemList);
+                                userCart.setUser(user);
+                                userCart.setTotalAmount(totalAmount);
+                                return userCart;
+                            }));
+
+                })
                 );
     }
 
@@ -132,52 +156,47 @@ public class CartService {
                     return Mono.error(new RuntimeException("Could not fetch user details for ID: " + userId, e));
                 });
 
-
         // Step 3: Combine cart and user details, and process cart items
         return Mono.zip(cartMono, userDtoMono)
                 .flatMap(tuple -> {
                     Cart userCart = tuple.getT1();
-                    User userDto = tuple.getT2();
-
+                    User user = tuple.getT2();
+                    userCart.setUser(user);
                     return cartItemRepository.findByCartId(userCart.getId(), Pageable.unpaged())
                             .flatMap(item -> productIntegrationService.getProductById(item.getProductId())
-                                    .map(productDto -> {
-                                        CartItem cartItemDto = new CartItem();
-                                        cartItemDto.setId(item.getId());
-                                        cartItemDto.setProduct(productDto);
-                                        cartItemDto.setQuantity(item.getQuantity());
-                                        return cartItemDto;
-                                    })
-                                    .onErrorResume(ResourceNotFoundException.class, e -> {
-                                        System.err.println("Product details not found for productId: " + item.getProductId() + " in Product Catalog Service. Error: " + e.getMessage());
-                                        CartItem cartItemDto = new CartItem();
-                                        cartItemDto.setId(item.getId());
-                                        cartItemDto.setQuantity(item.getQuantity());
-                                        cartItemDto.setProduct(null);
-                                        return Mono.just(cartItemDto);
-                                    })
-                                    .onErrorResume(RuntimeException.class, e -> {
-                                        System.err.println("Error fetching product " + item.getProductId() + " from Product Catalog Service: " + e.getMessage());
-                                        CartItem cartItemDto = new CartItem();
-                                        cartItemDto.setId(item.getId());
-                                        cartItemDto.setQuantity(item.getQuantity());
-                                        cartItemDto.setProduct(null);
-                                        return Mono.just(cartItemDto);
-                                    })
+                            .map(product -> {
+                                CartItem cartItemDto = new CartItem();
+                                cartItemDto.setId(item.getId());
+                                cartItemDto.setProduct(product);
+                                cartItemDto.setQuantity(item.getQuantity());
+                                return cartItemDto;
+                            })
+                            .onErrorResume(ResourceNotFoundException.class, e -> {
+                                System.err.println("Product details not found for productId: " + item.getProductId() + " in Product Catalog Service. Error: " + e.getMessage());
+                                CartItem cartItemDto = new CartItem();
+                                cartItemDto.setId(item.getId());
+                                cartItemDto.setQuantity(item.getQuantity());
+                                cartItemDto.setProduct(null);
+                                return Mono.just(cartItemDto);
+                            })
+                            .onErrorResume(RuntimeException.class, e -> {
+                                System.err.println("Error fetching product " + item.getProductId() + " from Product Catalog Service: " + e.getMessage());
+                                CartItem cartItemDto = new CartItem();
+                                cartItemDto.setId(item.getId());
+                                cartItemDto.setQuantity(item.getQuantity());
+                                cartItemDto.setProduct(null);
+                                return Mono.just(cartItemDto);
+                            })
                             )
-                            .collect(Collectors.toSet())
-                            .map(cartItemDtos -> {
-                                BigDecimal totalAmount = cartItemDtos.stream()
-                                        .filter(itemDto -> itemDto.getProduct() != null && itemDto.getProduct().getPrice() != null)
-                                        .map(item -> item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                                Cart cartDto = new Cart();
-                                cartDto.setId(userCart.getId());
-                                cartDto.setItems(cartItemDtos);
-                                cartDto.setUser(userDto);
-                                cartDto.setTotalAmount(totalAmount);
-                                return cartDto;
+                            .collectList()
+                            .map(cartItemList -> {
+                                BigDecimal totalAmount = totalCartItemsAmount(cartItemList);
+                                Cart cart = new Cart();
+                                cart.setId(userCart.getId());
+                                cart.setItems(cartItemList);
+                                cart.setUser(user);
+                                cart.setTotalAmount(totalAmount);
+                                return cart;
                             });
                 });
     }
@@ -186,12 +205,14 @@ public class CartService {
      * Updates the quantity of a specific product in the specified user's cart.
      * If the new quantity is 0, the item will be removed.
      *
-     * @param userId      The ID of the user whose cart to modify.
-     * @param productId   The ID of the product whose quantity to update.
+     * @param userId The ID of the user whose cart to modify.
+     * @param productId The ID of the product whose quantity to update.
      * @param newQuantity The new quantity for the product.
-     * @return A Mono emitting the updated CartItem, or Mono.empty() if the item was removed.
+     * @return A Mono emitting the updated CartItem, or Mono.empty() if the item
+     * was removed.
      * @throws IllegalArgumentException if newQuantity is negative.
-     * @throws ResourceNotFoundException if the product or cart item is not found.
+     * @throws ResourceNotFoundException if the product or cart item is not
+     * found.
      * @throws InsufficientStockException if there's not enough stock.
      */
     public Mono<CartItem> updateCartItemQuantity(Long userId, Long productId, Integer newQuantity) {
@@ -201,34 +222,35 @@ public class CartService {
 
         return getOrCreateCartForUser(userId)
                 .flatMap(userCart -> productIntegrationService.getProductById(productId)
-                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
-                        .flatMap(productDto -> {
-                            if (newQuantity == 0) {
-                                // If new quantity is 0, remove the item
-                                return cartItemRepository.deleteByCartIdAndProductId(userCart.getId(), productId)
-                                        .then(Mono.empty()); // Return empty Mono to indicate removal
-                            } else {
-                                // Check for sufficient stock before updating
-                                if (productDto.getStockQuantity() == null || newQuantity > productDto.getStockQuantity()) {
-                                    return Mono.error(new InsufficientStockException("Cannot set quantity to " + newQuantity + " for product " + productId + ". Available: " + productDto.getStockQuantity()));
-                                }
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found with id: " + productId)))
+                .flatMap(product -> {
+                    if (newQuantity == 0) {
+                        // If new quantity is 0, remove the item
+                        return cartItemRepository.deleteByCartIdAndProductId(userCart.getId(), productId)
+                                .then(Mono.empty()); // Return empty Mono to indicate removal
+                    } else {
+                        // Check for sufficient stock before updating
+                        if (product.getStockQuantity() == null || newQuantity > product.getStockQuantity()) {
+                            return Mono.error(new InsufficientStockException("Cannot set quantity to " + newQuantity + " for product " + productId + ". Available: " + product.getStockQuantity()));
+                        }
 
-                                return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
-                                        .flatMap(existingCartItem -> {
-                                            // Item exists, update quantity
-                                            existingCartItem.setQuantity(newQuantity);
-                                            return cartItemRepository.save(existingCartItem);
-                                        })
-                                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Cart item not found for product ID: " + productId + " in cart for user ID: " + userId)));
-                            }
-                        })
+                        return cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
+                                .flatMap(existingCartItem -> {
+                                    // Item exists, update quantity
+                                    existingCartItem.setQuantity(newQuantity);
+                                    existingCartItem.setProduct(product);
+                                    return cartItemRepository.save(existingCartItem);
+                                })
+                                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Cart item not found for product ID: " + productId + " in cart for user ID: " + userId)));
+                    }
+                })
                 );
     }
 
     /**
      * Removes a specific product from the specified user's cart.
      *
-     * @param userId    The ID of the user whose cart to modify.
+     * @param userId The ID of the user whose cart to modify.
      * @param productId The ID of the product to remove.
      * @return A Mono<Void> indicating completion.
      * @throws ResourceNotFoundException if the cart item is not found.
@@ -236,8 +258,8 @@ public class CartService {
     public Mono<Void> removeCartItem(Long userId, Long productId) {
         return getOrCreateCartForUser(userId)
                 .flatMap(userCart -> cartItemRepository.findByCartIdAndProductId(userCart.getId(), productId)
-                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product with ID " + productId + " not found in cart for user ID " + userId)))
-                        .flatMap(cartItem -> cartItemRepository.deleteById(cartItem.getId()))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product with ID " + productId + " not found in cart for user ID " + userId)))
+                .flatMap(cartItem -> cartItemRepository.deleteById(cartItem.getId()))
                 );
     }
 
@@ -256,9 +278,9 @@ public class CartService {
     }
 
     // --- CartItem Repository Implementations (from previous update) ---
-
     /**
      * Retrieves all cart items with pagination.
+     *
      * @param pageable Pagination information.
      * @return A Flux of CartItem.
      */
@@ -268,6 +290,7 @@ public class CartService {
 
     /**
      * Retrieves all cart items for a specific cart with pagination.
+     *
      * @param cartId The ID of the cart.
      * @param pageable Pagination information.
      * @return A Flux of CartItem.
@@ -277,7 +300,19 @@ public class CartService {
     }
 
     /**
+     * Retrieves all cart items for a specific cart without pagination. We
+     * already expect a maximum allowable cart items in a cart
+     *
+     * @param cartId The ID of the cart.
+     * @return A Flux of CartItem.
+     */
+    public Flux<CartItem> findCartItemsByCartId(Long cartId) {
+        return cartItemRepository.findByCartId(cartId);
+    }
+
+    /**
      * Retrieves all cart items containing a specific product with pagination.
+     *
      * @param productId The ID of the product.
      * @param pageable Pagination information.
      * @return A Flux of CartItem.
@@ -288,6 +323,7 @@ public class CartService {
 
     /**
      * Finds a specific cart item by cart ID and product ID.
+     *
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
      * @return A Mono emitting the CartItem.
@@ -298,6 +334,7 @@ public class CartService {
 
     /**
      * Counts all cart items.
+     *
      * @return A Mono emitting the count.
      */
     public Mono<Long> countAllCartItems() {
@@ -306,6 +343,7 @@ public class CartService {
 
     /**
      * Counts all cart items for a specific cart.
+     *
      * @param cartId The ID of the cart.
      * @return A Mono emitting the count.
      */
@@ -315,6 +353,7 @@ public class CartService {
 
     /**
      * Counts all cart items for a specific product.
+     *
      * @param productId The ID of the product.
      * @return A Mono emitting the count.
      */
@@ -324,6 +363,7 @@ public class CartService {
 
     /**
      * Checks if a specific product exists in a specific cart.
+     *
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise.
@@ -334,6 +374,7 @@ public class CartService {
 
     /**
      * Deletes all cart items for a given cart ID.
+     *
      * @param cartId The ID of the cart.
      * @return A Mono<Void> indicating completion.
      */
@@ -343,6 +384,7 @@ public class CartService {
 
     /**
      * Deletes a cart item for a given userId and ProductId.
+     *
      * @param userId The ID of the user.
      * @param productId The ID of the product.
      * @return A Mono<Void> indicating completion.
@@ -353,7 +395,9 @@ public class CartService {
     }
 
     /**
-     * Directly updates the quantity of a cart item using cart ID and product ID.
+     * Directly updates the quantity of a cart item using cart ID and product
+     * ID.
+     *
      * @param quantity The new quantity.
      * @param cartId The ID of the cart.
      * @param productId The ID of the product.
@@ -364,9 +408,9 @@ public class CartService {
     }
 
     // --- NEW: Cart Repository Implementations ---
-
     /**
      * Retrieves all carts with pagination.
+     *
      * @param pageable Pagination information.
      * @return A Flux of Cart.
      */
@@ -376,6 +420,7 @@ public class CartService {
 
     /**
      * Finds a cart by its associated user ID.
+     *
      * @param userId The ID of the user.
      * @return A Mono emitting the Cart, or Mono.empty() if not found.
      */
@@ -385,6 +430,7 @@ public class CartService {
 
     /**
      * Counts all carts.
+     *
      * @return A Mono emitting the count.
      */
     public Mono<Long> countAllCarts() {
@@ -393,6 +439,7 @@ public class CartService {
 
     /**
      * Checks if a cart exists for a given user ID.
+     *
      * @param userId The ID of the user.
      * @return A Mono emitting true if it exists, false otherwise.
      */
@@ -401,9 +448,10 @@ public class CartService {
     }
 
     /**
-     * Deletes a cart by user ID. This will also trigger deletion of associated cart items
-     * if cascading delete is configured in the database or if handled explicitly here.
-     * For now, it will explicitly delete cart items first.
+     * Deletes a cart by user ID. This will also trigger deletion of associated
+     * cart items if cascading delete is configured in the database or if
+     * handled explicitly here. For now, it will explicitly delete cart items
+     * first.
      *
      * @param userId The ID of the user whose cart to delete.
      * @return A Mono<Void> indicating completion.
@@ -412,7 +460,7 @@ public class CartService {
         return cartRepository.findByUserId(userId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Cart not found for user ID: " + userId + " to delete.")))
                 .flatMap(cart -> cartItemRepository.deleteByCartId(cart.getId()) // Delete associated cart items first
-                        .then(cartRepository.deleteById(cart.getId())) // Then delete the cart itself
+                .then(cartRepository.deleteById(cart.getId())) // Then delete the cart itself
                 );
     }
 }

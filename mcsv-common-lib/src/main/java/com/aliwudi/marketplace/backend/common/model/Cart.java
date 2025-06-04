@@ -3,6 +3,7 @@ package com.aliwudi.marketplace.backend.common.model;
 // Removed: import com.fasterxml.jackson.annotation.JsonBackReference; // No longer needed as User object is removed
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor; // Will be adjusted for the new constructor
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,7 +29,7 @@ public class Cart {
     private User user;  //skip for db but required for response
     
     @Transient
-    private Set<CartItem> items; //skip for db but required for response
+    private List<CartItem> items; //skip for db but required for response
     
     private BigDecimal totalAmount;
     private LocalDateTime createdAt;

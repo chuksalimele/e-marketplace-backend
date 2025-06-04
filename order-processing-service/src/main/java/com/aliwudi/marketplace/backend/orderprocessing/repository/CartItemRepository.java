@@ -23,6 +23,12 @@ public interface CartItemRepository extends R2dbcRepository<CartItem, Long> {
     Flux<CartItem> findByCartId(Long cartId, Pageable pageable);
 
     /**
+     * Find all cart items belonging to a specific cart without pagination.
+     * We already expect a maximum allowable cart items in a cart
+     */
+    Flux<CartItem> findByCartId(Long cartId);//IMPORTANT
+
+    /**
      * Find all cart items containing a specific product with pagination.
      */
     Flux<CartItem> findByProductId(Long productId, Pageable pageable);

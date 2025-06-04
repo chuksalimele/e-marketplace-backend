@@ -1,8 +1,7 @@
 // src/main/java/com/marketplace/emarketplacebackend/service/OrderService.java
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.common.model.Product;
-import com.aliwudi.marketplace.backend.common.model.User;
+
 import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
