@@ -2,7 +2,6 @@ package com.aliwudi.marketplace.backend.lgtmed.controller;
 
 import com.aliwudi.marketplace.backend.common.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.dto.MediaUploadRequest;
-import com.aliwudi.marketplace.backend.lgtmed.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.service.MediaService;
 import com.aliwudi.marketplace.backend.lgtmed.exception.MediaAssetNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidMediaDataException;
@@ -36,8 +35,8 @@ public class MediaController {
         if (asset == null) {
             return null;
         }
-        /*
-        MediaAsset.builder()
+        
+        MediaAsset media = MediaAsset.builder()
                 .id(asset.getId())
                 .assetName(asset.getAssetName())
                 .uniqueFileName(asset.getUniqueFileName())
@@ -46,9 +45,9 @@ public class MediaController {
                 .entityId(asset.getEntityId())
                 .entityType(asset.getEntityType())
                 .uploadTime(asset.getUploadTime())
-                .build()
-         */
-        return null;
+                .build();
+         
+        return Mono.just(media);
     }
 
     @PostMapping("/upload")

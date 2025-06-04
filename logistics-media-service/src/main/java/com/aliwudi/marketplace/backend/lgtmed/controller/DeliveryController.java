@@ -44,7 +44,7 @@ public class DeliveryController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
     public Mono<StandardResponseEntity> createDelivery(@Valid @RequestBody DeliveryRequest request) {
-        if (request.getOrderId() == null || request.getOrderId().isBlank()
+        if (request.getOrderId() == null || request.getOrderId() > 0
                 || request.getRecipientName() == null || request.getRecipientName().isBlank()
                 || request.getRecipientAddress() == null || request.getRecipientAddress().isBlank()
                 || request.getDeliveryAgent() == null || request.getDeliveryAgent().isBlank()
