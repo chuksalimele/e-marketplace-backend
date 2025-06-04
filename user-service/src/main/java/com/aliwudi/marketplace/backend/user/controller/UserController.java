@@ -33,11 +33,21 @@ public class UserController {
 
     private final UserService userService;
 
+    // Helper method to map User entity to User for public exposure
+    private Mono<User> prepareDto1(User user) {
+        if (user == null) {
+            return null;
+        }
+        return user;
+    }
+
     /**
-     * Helper method to get the authenticated user's ID from the reactive SecurityContextHolder.
-     * This ID is propagated by the API Gateway.
+     * Helper method to get the authenticated user's ID from the reactive
+     * SecurityContextHolder. This ID is propagated by the API Gateway.
+     *
      * @return A Mono emitting the authenticated user's ID.
-     * @throws IllegalStateException if the user is not authenticated or ID cannot be retrieved.
+     * @throws IllegalStateException if the user is not authenticated or ID
+     * cannot be retrieved.
      */
     private Mono<Long> getAuthenticatedUserId() {
         return ReactiveSecurityContextHolder.getContext()
@@ -61,57 +71,60 @@ public class UserController {
     }
 
     /**
-     * Get details of the currently authenticated user.
-     * Accessible by the user themselves.
+     * Get details of the currently authenticated user. Accessible by the user
+     * themselves.
      */
     @GetMapping("/me")
     public Mono<StandardResponseEntity> getMyUserDetails() {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.getUserById(userId))
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                .flatMap(this::prepareDto1)
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .onErrorResume(IllegalStateException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
-     * Get user details by ID (e.g., for admin users).
-     * This method requires role-based authorization (e.g., hasRole('ADMIN')).
+     * Get user details by ID (e.g., for admin users). This method requires
+     * role-based authorization (e.g., hasRole('ADMIN')).
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')") // Only ADMINs can access this endpoint
     public Mono<StandardResponseEntity> getUserById(@PathVariable Long id) {
         return userService.getUserById(id)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                .flatMap(this::prepareDto1)
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
-     * Update details of the currently authenticated user.
-     * Allows user to update their own profile (e.g., email, non-password fields).
+     * Update details of the currently authenticated user. Allows user to update
+     * their own profile (e.g., email, non-password fields).
      */
     @PutMapping("/me")
     public Mono<StandardResponseEntity> updateMyUserDetails(@RequestBody UserUpdateRequest userUpdateRequest) {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.updateUser(userId, userUpdateRequest))
-                .map(updatedUser -> (StandardResponseEntity) StandardResponseEntity.ok(mapUserToUserDto(updatedUser), ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
+                .flatMap(this::prepareDto1)
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(IllegalArgumentException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_USER_DETAILS + ": " + e.getMessage())));
+                .onErrorResume(IllegalStateException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
-     * Delete the currently authenticated user's account.
-     * This should be a highly protected endpoint.
+     * Delete the currently authenticated user's account. This should be a
+     * highly protected endpoint.
      */
     @DeleteMapping("/me")
     public Mono<StandardResponseEntity> deleteMyAccount() {
@@ -119,15 +132,15 @@ public class UserController {
                 .flatMap(userId -> userService.deleteUser(userId))
                 .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.USER_DELETED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_USER + ": " + e.getMessage())));
+                .onErrorResume(IllegalStateException.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_USER + ": " + e.getMessage())));
     }
 
     /**
-     * Admin method to get users.
-     * This method requires role-based authorization (e.g., hasRole('ADMIN')).
+     * Admin method to get users. This method requires role-based authorization
+     * (e.g., hasRole('ADMIN')).
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')") // Only ADMINs can access this endpoint
@@ -139,30 +152,14 @@ public class UserController {
         Pageable pageable = PageRequest.of(page, size);
 
         return userService.getAllUsers(pageable) // Modify your service to accept Pageable
-                .collectList() // Collect the Flux into a List for mapping
-                .map(users -> users.stream()
-                        .map(this::mapUserToUserDto)
-                        .collect(Collectors.toList()))
-                .map(userDtos -> (StandardResponseEntity) StandardResponseEntity.ok(userDtos, ApiResponseMessages.USERS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
-    }
-    // Helper method to map User entity to User for public exposure
-    private User mapUserToUserDto(User user) {
-        if (user == null) {
-            return null;
-        }
-        return User.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .roles(user.getRoles()
-                       )
-                .build();
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USERS_RETRIEVED_SUCCESS))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
     }
 
     // --- NEW: Controller Endpoints for all UserRepository methods ---
-
     /**
      * Endpoint to find a user by their username.
      *
@@ -172,10 +169,11 @@ public class UserController {
     @GetMapping("/byUsername/{username}")
     public Mono<StandardResponseEntity> getUserByUsername(@PathVariable String username) {
         return userService.findByUsername(username)
-                .map(user -> StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto1)
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with username: " + username)))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -187,10 +185,11 @@ public class UserController {
     @GetMapping("/byEmail/{email}")
     public Mono<StandardResponseEntity> getUserByEmail(@PathVariable String email) {
         return userService.findByEmail(email)
-                .map(user -> StandardResponseEntity.ok(mapUserToUserDto(user), ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto1)
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with email: " + email)))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -205,7 +204,7 @@ public class UserController {
      */
     @GetMapping("/byFirstName/{firstName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<User> getUsersByFirstNameContainingIgnoreCase(
+    public Mono<StandardResponseEntity> getUsersByFirstNameContainingIgnoreCase(
             @PathVariable String firstName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -214,7 +213,12 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByFirstNameContainingIgnoreCase(firstName, pageable)
-                .map(this::mapUserToUserDto);
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -228,8 +232,8 @@ public class UserController {
     public Mono<StandardResponseEntity> countUsersByFirstNameContainingIgnoreCase(@PathVariable String firstName) {
         return userService.countUsersByFirstNameContainingIgnoreCase(firstName)
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
     }
 
     /**
@@ -244,7 +248,7 @@ public class UserController {
      */
     @GetMapping("/byLastName/{lastName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<User> getUsersByLastNameContainingIgnoreCase(
+    public Mono<StandardResponseEntity> getUsersByLastNameContainingIgnoreCase(
             @PathVariable String lastName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -253,7 +257,12 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByLastNameContainingIgnoreCase(lastName, pageable)
-                .map(this::mapUserToUserDto);
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -267,8 +276,8 @@ public class UserController {
     public Mono<StandardResponseEntity> countUsersByLastNameContainingIgnoreCase(@PathVariable String lastName) {
         return userService.countUsersByLastNameContainingIgnoreCase(lastName)
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
     }
 
     /**
@@ -283,7 +292,7 @@ public class UserController {
      */
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<User> getUsersByUsernameOrEmailContainingIgnoreCase(
+    public Mono<StandardResponseEntity> getUsersByUsernameOrEmailContainingIgnoreCase(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -292,7 +301,12 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByUsernameOrEmailContainingIgnoreCase(searchTerm, pageable)
-                .map(this::mapUserToUserDto);
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -306,8 +320,8 @@ public class UserController {
     public Mono<StandardResponseEntity> countUsersByUsernameOrEmailContainingIgnoreCase(@RequestParam String searchTerm) {
         return userService.countUsersByUsernameOrEmailContainingIgnoreCase(searchTerm)
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
     }
 
     /**
@@ -322,21 +336,27 @@ public class UserController {
      */
     @GetMapping("/createdAtAfter")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<User> getUsersByCreatedAtAfter(
+    public Mono<StandardResponseEntity> getUsersByCreatedAtAfter(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        LocalDateTime dateTime;
         try {
-            LocalDateTime dateTime = LocalDateTime.parse(date);
-            Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-            Pageable pageable = PageRequest.of(page, size, sort);
-            return userService.findUsersByCreatedAtAfter(dateTime, pageable)
-                    .map(this::mapUserToUserDto);
+            dateTime = LocalDateTime.parse(date);
         } catch (DateTimeParseException e) {
-            return Flux.error(new IllegalArgumentException("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
+            return Mono.error(new IllegalArgumentException("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
         }
+        return userService.findUsersByCreatedAtAfter(dateTime, pageable)
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -352,8 +372,8 @@ public class UserController {
             LocalDateTime dateTime = LocalDateTime.parse(date);
             return userService.countUsersByCreatedAtAfter(dateTime)
                     .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                    .onErrorResume(Exception.class, e ->
-                            Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+                    .onErrorResume(Exception.class, e
+                            -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
         } catch (DateTimeParseException e) {
             return Mono.just(StandardResponseEntity.badRequest("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
         }
@@ -362,7 +382,8 @@ public class UserController {
     /**
      * Endpoint to find users with a specific shipping address, with pagination.
      *
-     * @param shippingAddress The shipping address to search for (case-insensitive).
+     * @param shippingAddress The shipping address to search for
+     * (case-insensitive).
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -371,7 +392,7 @@ public class UserController {
      */
     @GetMapping("/byShippingAddress")
     @PreAuthorize("hasRole('ADMIN')")
-    public Flux<User> getUsersByShippingAddressContainingIgnoreCase(
+    public Mono<StandardResponseEntity> getUsersByShippingAddressContainingIgnoreCase(
             @RequestParam String shippingAddress,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -380,7 +401,12 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByShippingAddressContainingIgnoreCase(shippingAddress, pageable)
-                .map(this::mapUserToUserDto);
+                .flatMap(this::prepareDto1)
+                .collectList()
+                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -394,12 +420,11 @@ public class UserController {
     public Mono<StandardResponseEntity> countUsersByShippingAddressContainingIgnoreCase(@RequestParam String shippingAddress) {
         return userService.countUsersByShippingAddressContainingIgnoreCase(shippingAddress)
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
     }
 
     // --- NEW: Controller Endpoints for all RoleRepository methods ---
-
     /**
      * Endpoint to find a role by its name.
      *
@@ -418,12 +443,13 @@ public class UserController {
         return userService.findRoleByName(eRole)
                 .map(role -> StandardResponseEntity.ok(role, ApiResponseMessages.ROLE_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ROLE_NOT_FOUND + roleName)))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ROLE + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ROLE + ": " + e.getMessage())));
     }
 
     /**
-     * Endpoint to find roles with names containing a specific string (case-insensitive), with pagination.
+     * Endpoint to find roles with names containing a specific string
+     * (case-insensitive), with pagination.
      *
      * @param name The string to search for in role names.
      * @param page The page number (0-indexed).
@@ -446,7 +472,8 @@ public class UserController {
     }
 
     /**
-     * Endpoint to count roles with names containing a specific string (case-insensitive).
+     * Endpoint to count roles with names containing a specific string
+     * (case-insensitive).
      *
      * @param name The string to count in role names.
      * @return A Mono emitting StandardResponseEntity with the count.
@@ -456,8 +483,8 @@ public class UserController {
     public Mono<StandardResponseEntity> countRolesByNameContainingIgnoreCase(@RequestParam String name) {
         return userService.countRolesByNameContainingIgnoreCase(name)
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ROLE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
     }
 
     /**
@@ -491,7 +518,7 @@ public class UserController {
     public Mono<StandardResponseEntity> countAllRoles() {
         return userService.countAllRoles()
                 .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ROLE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
+                .onErrorResume(Exception.class, e
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
     }
 }
