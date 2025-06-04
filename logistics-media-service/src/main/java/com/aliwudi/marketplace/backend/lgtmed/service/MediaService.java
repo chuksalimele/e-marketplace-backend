@@ -1,10 +1,9 @@
 package com.aliwudi.marketplace.backend.lgtmed.service;
 
+import com.aliwudi.marketplace.backend.common.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.dto.MediaUploadRequest;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidMediaDataException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.MediaAssetNotFoundException;
-import com.aliwudi.marketplace.backend.lgtmed.model.MediaAsset;
-import com.aliwudi.marketplace.backend.lgtmed.repository.MediaAssetRepository; // Corrected import
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j; // Import Slf4j for logging
 import org.springframework.stereotype.Service;
@@ -16,13 +15,14 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.lgtmed.repository.MediaRepository;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j // Add Slf4j for logging
 public class MediaService {
 
-    private final MediaAssetRepository mediaAssetRepository; // Corrected repository name
+    private final MediaRepository mediaRepository; // Corrected repository name
 
     // In a real application, you'd inject a cloud storage client (e.g., S3Client, GcsClient)
     // For demonstration, we'll simulate storage operations.
@@ -72,7 +72,7 @@ public class MediaService {
                             // .fileSize(fileSize) // If calculated
                             .build();
 
-                    return mediaAssetRepository.save(mediaAsset); // Corrected repository name
+                    return mediaRepository.save(mediaAsset); // Corrected repository name
                 })
                 .onErrorResume(e -> {
                     log.error("Error in uploadMedia service: {}", e.getMessage());
@@ -91,7 +91,7 @@ public class MediaService {
      * @throws MediaAssetNotFoundException if no media asset is found for the given unique file name.
      */
     public Mono<MediaAsset> getMediaAssetByUniqueFileName(String uniqueFileName) {
-        return mediaAssetRepository.findByUniqueFileName(uniqueFileName) // Corrected repository name
+        return mediaRepository.findByUniqueFileName(uniqueFileName) // Corrected repository name
                 .switchIfEmpty(Mono.error(new MediaAssetNotFoundException(ApiResponseMessages.MEDIA_NOT_FOUND + uniqueFileName)))
                 .onErrorResume(e -> {
                     log.error("Error in getMediaAssetByUniqueFileName service: {}", e.getMessage());
@@ -111,7 +111,7 @@ public class MediaService {
      * @return A Flux of MediaAsset records.
      */
     public Flux<MediaAsset> getMediaAssetsForEntity(String entityId, String entityType, Pageable pageable) {
-        return mediaAssetRepository.findByEntityIdAndEntityType(entityId, entityType, pageable) // Corrected repository name
+        return mediaRepository.findByEntityIdAndEntityType(entityId, entityType, pageable) // Corrected repository name
                 .onErrorResume(e -> {
                     log.error("Error in getMediaAssetsForEntity service for entity {} type {}: {}", entityId, entityType, e.getMessage());
                     return Flux.error(new RuntimeException(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage()));
@@ -126,7 +126,7 @@ public class MediaService {
      * @return A Mono emitting the count.
      */
     public Mono<Long> countMediaAssetsForEntity(String entityId, String entityType) {
-        return mediaAssetRepository.countByEntityIdAndEntityType(entityId, entityType) // Corrected repository name
+        return mediaRepository.countByEntityIdAndEntityType(entityId, entityType) // Corrected repository name
                 .onErrorResume(e -> {
                     log.error("Error in countMediaAssetsForEntity service for entity {} type {}: {}", entityId, entityType, e.getMessage());
                     return Mono.error(new RuntimeException(ApiResponseMessages.ERROR_COUNTING_ENTITY_MEDIA + ": " + e.getMessage()));
@@ -142,14 +142,14 @@ public class MediaService {
      */
     public Mono<Void> deleteMediaAsset(String uniqueFileName) {
         // In a real scenario, you would delete from cloud storage first, then from DB
-        return mediaAssetRepository.findByUniqueFileName(uniqueFileName) // Corrected repository name
+        return mediaRepository.findByUniqueFileName(uniqueFileName) // Corrected repository name
                 .switchIfEmpty(Mono.error(new MediaAssetNotFoundException(ApiResponseMessages.MEDIA_NOT_FOUND_FOR_DELETE + uniqueFileName)))
                 .flatMap(asset -> {
                     // Simulate deletion from cloud storage:
                     // return Mono.fromCallable(() -> s3Client.deleteObject(DeleteObjectRequest.builder()...))
                     //            .then(mediaAssetRepository.delete(asset)); // Corrected repository name
                     log.info("Simulating deletion of {} from cloud storage.", asset.getUrl());
-                    return mediaAssetRepository.delete(asset); // Corrected repository name
+                    return mediaRepository.delete(asset); // Corrected repository name
                 })
                 .then() // Ensure Mono<Void> is returned
                 .onErrorResume(e -> {
@@ -171,7 +171,7 @@ public class MediaService {
      */
     public Flux<MediaAsset> findAllMediaAssets(Pageable pageable) {
         log.info("Finding all media assets with pagination: {}", pageable);
-        return mediaAssetRepository.findAllBy(pageable); // Corrected repository name
+        return mediaRepository.findAllBy(pageable); // Corrected repository name
     }
 
     /**
@@ -183,7 +183,7 @@ public class MediaService {
      */
     public Flux<MediaAsset> findMediaAssetsByEntityType(String entityType, Pageable pageable) {
         log.info("Finding media assets by entity type: {} with pagination: {}", entityType, pageable);
-        return mediaAssetRepository.findByEntityType(entityType, pageable); // Corrected repository name
+        return mediaRepository.findByEntityType(entityType, pageable); // Corrected repository name
     }
 
     /**
@@ -195,7 +195,7 @@ public class MediaService {
      */
     public Flux<MediaAsset> findMediaAssetsByFileType(String fileType, Pageable pageable) {
         log.info("Finding media assets by file type: {} with pagination: {}", fileType, pageable);
-        return mediaAssetRepository.findByFileType(fileType, pageable); // Corrected repository name
+        return mediaRepository.findByFileType(fileType, pageable); // Corrected repository name
     }
 
     /**
@@ -207,7 +207,7 @@ public class MediaService {
      */
     public Flux<MediaAsset> findMediaAssetsByAssetNameContaining(String assetName, Pageable pageable) {
         log.info("Finding media assets by asset name containing '{}' with pagination: {}", assetName, pageable);
-        return mediaAssetRepository.findByAssetNameContainingIgnoreCase(assetName, pageable); // Corrected repository name
+        return mediaRepository.findByAssetNameContainingIgnoreCase(assetName, pageable); // Corrected repository name
     }
 
     /**
@@ -218,7 +218,7 @@ public class MediaService {
      */
     public Mono<Long> countMediaAssetsByEntityType(String entityType) {
         log.info("Counting media assets by entity type: {}", entityType);
-        return mediaAssetRepository.countByEntityType(entityType); // Corrected repository name
+        return mediaRepository.countByEntityType(entityType); // Corrected repository name
     }
 
     /**
@@ -229,7 +229,7 @@ public class MediaService {
      */
     public Mono<Long> countMediaAssetsByFileType(String fileType) {
         log.info("Counting media assets by file type: {}", fileType);
-        return mediaAssetRepository.countByFileType(fileType); // Corrected repository name
+        return mediaRepository.countByFileType(fileType); // Corrected repository name
     }
 
     /**
@@ -240,7 +240,7 @@ public class MediaService {
      */
     public Mono<Long> countMediaAssetsByAssetNameContaining(String assetName) {
         log.info("Counting media assets by asset name containing '{}'", assetName);
-        return mediaAssetRepository.countByAssetNameContainingIgnoreCase(assetName); // Corrected repository name
+        return mediaRepository.countByAssetNameContainingIgnoreCase(assetName); // Corrected repository name
     }
 
     /**
@@ -251,7 +251,7 @@ public class MediaService {
      */
     public Mono<Boolean> existsByUniqueFileName(String uniqueFileName) {
         log.info("Checking if media asset exists for unique file name: {}", uniqueFileName);
-        return mediaAssetRepository.existsByUniqueFileName(uniqueFileName); // Corrected repository name
+        return mediaRepository.existsByUniqueFileName(uniqueFileName); // Corrected repository name
     }
 
     // Helper for basic file type validation

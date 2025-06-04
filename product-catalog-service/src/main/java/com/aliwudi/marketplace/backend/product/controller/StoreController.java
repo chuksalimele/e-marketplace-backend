@@ -70,20 +70,20 @@ public class StoreController {
         // Basic input validation
         if (storeRequest.getName() == null || storeRequest.getName().isBlank()
                 || storeRequest.getSellerId() == null || storeRequest.getSellerId() <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_CREATION_REQUEST));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_CREATION_REQUEST));
         }
 
         return storeService.createStore(storeRequest)
                 .flatMap(this::prepareDto)
                 .map(store
-                        -> (StandardResponseEntity) StandardResponseEntity.created(store, ApiResponseMessages.STORE_CREATED_SUCCESS))
+                        -> StandardResponseEntity.created(store, ApiResponseMessages.STORE_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage()))) // Use e.getMessage() for more specific duplicate error
+                        -> Mono.just(StandardResponseEntity.badRequest(e.getMessage()))) // Use e.getMessage() for more specific duplicate error
                 .onErrorResume(InvalidStoreDataException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage()))) // User not found
+                        -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage()))) // User not found
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_STORE + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_STORE + ": " + e.getMessage())));
     }
 
     @GetMapping
@@ -92,40 +92,40 @@ public class StoreController {
             @RequestParam(defaultValue = "20") int size) { // Changed from Integer limit to int size
 
         if (page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return storeService.getAllStores(page, size) // Updated method call
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(storeList -> (StandardResponseEntity) StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .map(storeList -> StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
     }
 
     @GetMapping("/count")
     public Mono<StandardResponseEntity> countAllStores() {
         return storeService.countAllStores()
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/{id}")
     public Mono<StandardResponseEntity> getStoreById(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
         }
 
         return storeService.getStoreById(id)
                 .flatMap(this::prepareDto)
                 .map(store
-                        -> (StandardResponseEntity) StandardResponseEntity.ok(store, ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
+                        -> StandardResponseEntity.ok(store, ApiResponseMessages.STORE_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> // Catch specific exception
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE + ": " + e.getMessage())));
     }
 
     @GetMapping("/by-seller/{sellerId}")
@@ -135,66 +135,66 @@ public class StoreController {
             @RequestParam(defaultValue = "20") int size) { // Changed from Integer limit to int size
 
         if (sellerId == null || sellerId <= 0 || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return storeService.getStoresBySeller(sellerId, page, size) // Updated method call
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(storeList -> (StandardResponseEntity) StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage()))) // User not found
+                .map(storeList -> StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage()))) // User not found
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES_BY_SELLER + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES_BY_SELLER + ": " + e.getMessage())));
     }
 
     @GetMapping("/by-seller/{sellerId}/count")
     public Mono<StandardResponseEntity> countStoresBySeller(@PathVariable Long sellerId) {
         if (sellerId == null || sellerId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
         }
 
         return storeService.countStoresBySeller(sellerId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage()))) // User not found
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage()))) // User not found
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT_BY_SELLER + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT_BY_SELLER + ": " + e.getMessage())));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
     public Mono<StandardResponseEntity> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
         }
         // Additional validation for update request can be added here if needed, e.g., name cannot be blank
 
         return storeService.updateStore(id, storeRequest)
                 .flatMap(this::prepareDto)
-                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(store, ApiResponseMessages.STORE_UPDATED_SUCCESS))
+                .map(store -> StandardResponseEntity.ok(store, ApiResponseMessages.STORE_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(DuplicateResourceException.class, e
                         -> // Catch specific duplicate error for update
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(InvalidStoreDataException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_STORE + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_STORE + ": " + e.getMessage())));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
     public Mono<StandardResponseEntity> deleteStore(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_STORE_ID));
         }
 
         return storeService.deleteStore(id)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.STORE_DELETED_SUCCESS)))
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.STORE_DELETED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
+                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.STORE_NOT_FOUND + id)))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_STORE + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_STORE + ": " + e.getMessage())));
     }
 
     // --- New Endpoints based on StoreRepository methods ---
@@ -205,27 +205,27 @@ public class StoreController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (name == null || name.isBlank() || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
         return storeService.searchStoresByName(name, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(storeList -> (StandardResponseEntity) StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .map(storeList -> StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORES + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORES + ": " + e.getMessage())));
     }
 
     @GetMapping("/search/name/count")
     public Mono<StandardResponseEntity> countSearchStoresByName(@RequestParam String name) {
         if (name == null || name.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
         return storeService.countSearchStoresByName(name)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORE_COUNT + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORE_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/search/locationId")
@@ -235,27 +235,27 @@ public class StoreController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (locationId == null || locationId.isBlank() || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
         return storeService.searchStoresByLocationId(locationId, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(store -> (StandardResponseEntity) StandardResponseEntity.ok(store, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .map(store -> StandardResponseEntity.ok(store, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORES + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORES + ": " + e.getMessage())));
     }
 
     @GetMapping("/search/locationId/count")
     public Mono<StandardResponseEntity> countSearchStoresByLocationId(@RequestParam String locationId) {
         if (locationId == null || locationId.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
         return storeService.countSearchStoresByLocationId(locationId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORE_COUNT + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_STORE_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/min-rating/{minRating}")
@@ -265,33 +265,33 @@ public class StoreController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         if (minRating == null || minRating < 0.0 || minRating > 5.0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_RATING_RANGE));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_RATING_RANGE));
         }
 
         return storeService.getStoresByMinRating(minRating, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(storeList -> (StandardResponseEntity) StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidStoreDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(storeList -> StandardResponseEntity.ok(storeList, ApiResponseMessages.STORES_RETRIEVED_SUCCESS))
+                .onErrorResume(InvalidStoreDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORES + ": " + e.getMessage())));
     }
 
     @GetMapping("/min-rating/{minRating}/count")
     public Mono<StandardResponseEntity> countStoresByMinRating(@PathVariable Double minRating) {
         if (minRating == null || minRating < 0.0 || minRating > 5.0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
         }
 
         return storeService.countStoresByMinRating(minRating)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(InvalidStoreDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.STORE_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(InvalidStoreDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_STORE_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/exists/name-and-seller")
@@ -300,15 +300,15 @@ public class StoreController {
             @RequestParam Long sellerId) {
 
         if (name == null || name.isBlank() || sellerId == null || sellerId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
         }
 
         return storeService.existsStoreByNameAndSeller(name, sellerId)
                 .map(exists -> {
                     Map<String, Boolean> data = Map.of("exists", exists);
-                    return (StandardResponseEntity) StandardResponseEntity.ok(data, ApiResponseMessages.STORE_EXISTS_CHECK_SUCCESS);
+                    return StandardResponseEntity.ok(data, ApiResponseMessages.STORE_EXISTS_CHECK_SUCCESS);
                 })
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_STORE_EXISTENCE + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_STORE_EXISTENCE + ": " + e.getMessage())));
     }
 }

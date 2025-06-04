@@ -30,14 +30,14 @@ public class PaymentController {
     @PostMapping("/initiate")
     public Mono<StandardResponseEntity> initiatePayment(@RequestBody PaymentRequest request) {
         if (request.getOrderId() == null || request.getAmount() == null || request.getAmount().doubleValue() <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_INITIATION_REQUEST));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_INITIATION_REQUEST));
         }
 
         return paymentService.initiatePayment(
                 request.getOrderId(),
                 request.getAmount()
             )
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.created(Payment.builder()
+            .map(payment -> StandardResponseEntity.created(Payment.builder()
                     .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
@@ -47,10 +47,10 @@ public class PaymentController {
                 ApiResponseMessages.PAYMENT_INITIATED_SUCCESS
             ))
             .onErrorResume(ResourceNotFoundException.class, e ->
-                Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + request.getOrderId())))
-            .onErrorResume(InsufficientStockException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+                Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + request.getOrderId())))
+            .onErrorResume(InsufficientStockException.class, e -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
             .onErrorResume(Exception.class, e ->
-                Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_INITIATING_PAYMENT + ": " + e.getMessage())));
+                Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_INITIATING_PAYMENT + ": " + e.getMessage())));
     }
 
     @PostMapping("/webhook/{transactionRef}")
@@ -61,7 +61,7 @@ public class PaymentController {
                                                               @RequestParam(value = "quantity", required = false) Integer quantity) {
 
         if (status == null || status.trim().isEmpty() || orderId == null || orderId.trim().isEmpty()) {
-             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_WEBHOOK_CALLBACK_REQUEST));
+             return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_WEBHOOK_CALLBACK_REQUEST));
         }
 
         return Mono.just(status.toUpperCase())
@@ -69,21 +69,21 @@ public class PaymentController {
                 .flatMap(paymentStatus ->
                     // Pass orderId and quantity to processGatewayCallback
                     paymentService.processGatewayCallback(transactionRef, paymentStatus, "Webhook Callback Data", orderId, quantity != null ? quantity : 0)
-                        .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.PAYMENT_CALLBACK_PROCESSED_SUCCESS)))
+                        .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.PAYMENT_CALLBACK_PROCESSED_SUCCESS)))
                 )
-                .onErrorResume(IllegalArgumentException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_STATUS_VALUE + status)))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PAYMENT_NOT_FOUND + transactionRef)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_PROCESSING_CALLBACK + ": " + e.getMessage())));
+                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAYMENT_STATUS_VALUE + status)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PAYMENT_NOT_FOUND + transactionRef)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_PROCESSING_CALLBACK + ": " + e.getMessage())));
     }
 
     @GetMapping("/{orderId}")
     public Mono<StandardResponseEntity> getPaymentStatus(@PathVariable String orderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.MISSING_ORDER_ID_FOR_PAYMENT_STATUS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.MISSING_ORDER_ID_FOR_PAYMENT_STATUS));
         }
 
         return paymentService.getPaymentDetails(orderId)
-            .map(payment -> (StandardResponseEntity) StandardResponseEntity.ok(Payment.builder()
+            .map(payment -> StandardResponseEntity.ok(Payment.builder()
                     .order(payment.getOrderId())
                     .transactionRef(payment.getTransactionRef())
                     .amount(payment.getAmount())
@@ -93,11 +93,11 @@ public class PaymentController {
                 ApiResponseMessages.PAYMENT_STATUS_FETCHED_SUCCESS
             ))
             .onErrorResume(ResourceNotFoundException.class, e ->
-                Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                Mono.just(StandardResponseEntity.notFound(e.getMessage())))
             .onErrorResume(NumberFormatException.class, e ->
                     Mono.just(StandardResponseEntity.badRequest("Invalid Order ID format: " + orderId)))
             .onErrorResume(Exception.class, e ->
-                Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_FETCHING_PAYMENT_STATUS + ": " + e.getMessage())));
+                Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_FETCHING_PAYMENT_STATUS + ": " + e.getMessage())));
     }
 
     // --- NEW: PaymentRepository Controller Endpoints ---

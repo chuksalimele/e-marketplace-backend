@@ -3,6 +3,8 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
+    public String ERROR_RETRIEVING_DELIVERY = "Error retrieving delivery";
+
     public String DUPLICATE_STORE_NAME_FOR_SELLER = "Duplicate store name for seller.";
     public String ERROR_RETRIEVING_CART_ITEMS = "Error retrieving cart items.";
     public String CART_ITEMS_RETRIEVED_SUCCESS = "Cart items retrieved success";    

@@ -34,7 +34,7 @@ public class UserController {
     private final UserService userService;
 
     // Helper method to map User entity to User for public exposure
-    private Mono<User> prepareDto1(User user) {
+    private Mono<User> prepareDto(User user) {
         if (user == null) {
             return null;
         }
@@ -78,14 +78,14 @@ public class UserController {
     public Mono<StandardResponseEntity> getMyUserDetails() {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.getUserById(userId))
-                .flatMap(this::prepareDto1)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -96,12 +96,12 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')") // Only ADMINs can access this endpoint
     public Mono<StandardResponseEntity> getUserById(@PathVariable Long id) {
         return userService.getUserById(id)
-                .flatMap(this::prepareDto1)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -112,14 +112,14 @@ public class UserController {
     public Mono<StandardResponseEntity> updateMyUserDetails(@RequestBody UserUpdateRequest userUpdateRequest) {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.updateUser(userId, userUpdateRequest))
-                .flatMap(this::prepareDto1)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalArgumentException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .flatMap(this::prepareDto)
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_USER_DETAILS + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_USER_DETAILS + ": " + e.getMessage())));
     }
 
     /**
@@ -130,12 +130,12 @@ public class UserController {
     public Mono<StandardResponseEntity> deleteMyAccount() {
         return getAuthenticatedUserId()
                 .flatMap(userId -> userService.deleteUser(userId))
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.USER_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.USER_DELETED_SUCCESS)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
+                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_USER + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_USER + ": " + e.getMessage())));
     }
 
     /**
@@ -152,11 +152,11 @@ public class UserController {
         Pageable pageable = PageRequest.of(page, size);
 
         return userService.getAllUsers(pageable) // Modify your service to accept Pageable
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USERS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
     }
 
     // --- NEW: Controller Endpoints for all UserRepository methods ---
@@ -169,8 +169,8 @@ public class UserController {
     @GetMapping("/byUsername/{username}")
     public Mono<StandardResponseEntity> getUserByUsername(@PathVariable String username) {
         return userService.findByUsername(username)
-                .flatMap(this::prepareDto1)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with username: " + username)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -185,8 +185,8 @@ public class UserController {
     @GetMapping("/byEmail/{email}")
     public Mono<StandardResponseEntity> getUserByEmail(@PathVariable String email) {
         return userService.findByEmail(email)
-                .flatMap(this::prepareDto1)
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .flatMap(this::prepareDto)
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with email: " + email)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -213,9 +213,9 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByFirstNameContainingIgnoreCase(firstName, pageable)
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -257,9 +257,9 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByLastNameContainingIgnoreCase(lastName, pageable)
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -301,9 +301,9 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByUsernameOrEmailContainingIgnoreCase(searchTerm, pageable)
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -351,9 +351,9 @@ public class UserController {
             return Mono.error(new IllegalArgumentException("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
         }
         return userService.findUsersByCreatedAtAfter(dateTime, pageable)
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
@@ -401,9 +401,9 @@ public class UserController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return userService.findUsersByShippingAddressContainingIgnoreCase(shippingAddress, pageable)
-                .flatMap(this::prepareDto1)
+                .flatMap(this::prepareDto)
                 .collectList()
-                .map(user -> (StandardResponseEntity) StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
+                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));

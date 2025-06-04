@@ -93,13 +93,13 @@ public class CartController {
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.addItemToCart(userId, productId, quantity))
                 .flatMap(this::prepareDto)
-                .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_ADDED_SUCCESS))
+                .map(cartItem -> StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_ADDED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(InsufficientStockException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_ADDING_CART_ITEM + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_ADDING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -111,10 +111,10 @@ public class CartController {
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.getUserCart(userId))
                 .flatMap(this::prepareDto)
-                .map(cart -> (StandardResponseEntity) StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER)))
-                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
+                .map(cart -> StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER)))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
@@ -128,20 +128,20 @@ public class CartController {
         Integer quantity = payload.get("quantity") != null ? payload.get("quantity").intValue() : null;
 
         if (productId == null || quantity == null || quantity < 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CART_UPDATE_REQUEST));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CART_UPDATE_REQUEST));
         }
 
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.updateCartItemQuantity(userId, productId, quantity))
                 .flatMap(this::prepareDto)
-                .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
+                .map(cartItem -> StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
+                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
                 .onErrorResume(InsufficientStockException.class, e
-                        -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
+                        -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -153,15 +153,15 @@ public class CartController {
         Long productId = payload.get("productId");
 
         if (productId == null) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CART_REMOVE_REQUEST));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_CART_REMOVE_REQUEST));
         }
 
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.removeCartItem(userId, productId))
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART + productId)))
-                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART + productId)))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -172,9 +172,9 @@ public class CartController {
     public Mono<StandardResponseEntity> clearCart() {
         return getAuthenticatedUserId()
                 .flatMap(userId -> cartService.clearCart(userId))
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_CLEARED_SUCCESS)))
-                .onErrorResume(IllegalStateException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CLEARING_CART + ": " + e.getMessage())));
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_CLEARED_SUCCESS)))
+                .onErrorResume(IllegalStateException.class, e -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CLEARING_CART + ": " + e.getMessage())));
     }
 
     // --- CartItem Controller Endpoints (from previous update) ---
@@ -222,9 +222,9 @@ public class CartController {
         return cartService.findCartItemsByCartId(cartId, pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(cartItemList -> (StandardResponseEntity) StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
+                .map(cartItemList -> StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -250,9 +250,9 @@ public class CartController {
         return cartService.findCartItemsByProductId(productId, pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(cartItemList -> (StandardResponseEntity) StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
+                .map(cartItemList -> StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -268,9 +268,9 @@ public class CartController {
             @PathVariable Long productId) {
         return cartService.findSpecificCartItem(cartId, productId)
                 .flatMap(this::prepareDto)
-                .map(cartItem -> (StandardResponseEntity) StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART +": "+ productId)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEM + ": " + e.getMessage())));
+                .map(cartItem -> StandardResponseEntity.ok(cartItem, ApiResponseMessages.CART_ITEM_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND_IN_CART +": "+ productId)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -281,8 +281,8 @@ public class CartController {
     @GetMapping("/items/count/all")
     public Mono<StandardResponseEntity> countAllCartItems() {
         return cartService.countAllCartItems()
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -294,8 +294,8 @@ public class CartController {
     @GetMapping("/items/count/byCart/{cartId}")
     public Mono<StandardResponseEntity> countCartItemsByCartId(@PathVariable Long cartId) {
         return cartService.countCartItemsByCartId(cartId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -307,8 +307,8 @@ public class CartController {
     @GetMapping("/items/count/byProduct/{productId}")
     public Mono<StandardResponseEntity> countCartItemsByProductId(@PathVariable Long productId) {
         return cartService.countCartItemsByProductId(productId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.CART_ITEM_COUNT_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -323,8 +323,8 @@ public class CartController {
             @PathVariable Long cartId,
             @PathVariable Long productId) {
         return cartService.checkProductExistsInCart(cartId, productId)
-                .map(exists -> (StandardResponseEntity) StandardResponseEntity.ok(exists, ApiResponseMessages.CART_ITEM_EXISTS_CHECK_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_CART_ITEM_EXISTENCE + ": " + e.getMessage())));
+                .map(exists -> StandardResponseEntity.ok(exists, ApiResponseMessages.CART_ITEM_EXISTS_CHECK_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_CART_ITEM_EXISTENCE + ": " + e.getMessage())));
     }
 
     /**
@@ -338,8 +338,8 @@ public class CartController {
     @DeleteMapping("/items/admin/deleteByCart/{cartId}")
     public Mono<StandardResponseEntity> deleteAllCartItemsByCartId(@PathVariable Long cartId) {
         return cartService.deleteAllCartItemsByCartId(cartId)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEMS_DELETED_SUCCESS)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_CART_ITEMS + ": " + e.getMessage())));
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEMS_DELETED_SUCCESS)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
@@ -356,8 +356,8 @@ public class CartController {
             @PathVariable Long userId,
             @PathVariable Long productId) {
         return cartService.deleteCartItemByUserIdAndProductId(userId, productId)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_ITEM_REMOVED_SUCCESS)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_REMOVING_CART_ITEM + ": " + e.getMessage())));
     }
 
     /**
@@ -378,12 +378,12 @@ public class CartController {
         Long quantity = payload.get("quantity");
 
         if (quantity == null || quantity < 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_QUANTITY_PROVIDED));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_QUANTITY_PROVIDED));
         }
 
         return cartService.directUpdateCartItemQuantity(quantity, cartId, productId)
-                .map(rowsUpdatedCount -> (StandardResponseEntity) StandardResponseEntity.ok(rowsUpdatedCount, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS + " Rows updated: " + rowsUpdatedCount))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
+                .map(rowsUpdatedCount -> StandardResponseEntity.ok(rowsUpdatedCount, ApiResponseMessages.CART_ITEM_UPDATED_SUCCESS + " Rows updated: " + rowsUpdatedCount))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_CART_ITEM + ": " + e.getMessage())));
     }
 
     // --- NEW: Cart Repository Controller Endpoints ---
@@ -408,9 +408,9 @@ public class CartController {
         return cartService.findAllCarts(pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(cartList -> (StandardResponseEntity) StandardResponseEntity.ok(cartList, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
+                .map(cartList -> StandardResponseEntity.ok(cartList, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
@@ -423,9 +423,9 @@ public class CartController {
     public Mono<StandardResponseEntity> getCartByUserId(@PathVariable Long userId) {
         return cartService.findCartByUserId(userId)
                 .flatMap(this::prepareDto)
-                .map(cart -> (StandardResponseEntity) StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER + userId)))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
+                .map(cart -> StandardResponseEntity.ok(cart, ApiResponseMessages.CART_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_NOT_FOUND_FOR_USER + userId)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART + ": " + e.getMessage())));
     }
 
     /**
@@ -436,8 +436,8 @@ public class CartController {
     @GetMapping("/count")
     public Mono<StandardResponseEntity> countAllCarts() {
         return cartService.countAllCarts()
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.CART_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CARTS + ": " + e.getMessage())));
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.CART_COUNT_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_CARTS + ": " + e.getMessage())));
     }
 
     /**
@@ -449,8 +449,8 @@ public class CartController {
     @GetMapping("/exists/byUser/{userId}")
     public Mono<StandardResponseEntity> checkCartExistsByUserId(@PathVariable Long userId) {
         return cartService.checkCartExistsByUserId(userId)
-                .map(exists -> (StandardResponseEntity) StandardResponseEntity.ok(exists, ApiResponseMessages.CART_EXISTS_CHECK_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_CART_EXISTENCE + ": " + e.getMessage())));
+                .map(exists -> StandardResponseEntity.ok(exists, ApiResponseMessages.CART_EXISTS_CHECK_SUCCESS))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_CART_EXISTENCE + ": " + e.getMessage())));
     }
 
     /**
@@ -463,8 +463,8 @@ public class CartController {
     @DeleteMapping("/admin/deleteByUserId/{userId}")
     public Mono<StandardResponseEntity> deleteCartByUserId(@PathVariable Long userId) {
         return cartService.deleteCartByUserId(userId)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.CART_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_CART + ": " + e.getMessage())));
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.CART_DELETED_SUCCESS)))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_CART + ": " + e.getMessage())));
     }
 }

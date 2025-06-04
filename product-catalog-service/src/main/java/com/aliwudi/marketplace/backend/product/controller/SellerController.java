@@ -43,39 +43,39 @@ public class SellerController {
             @RequestParam(defaultValue = "10") Integer size) {
 
         if (page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return sellerService.getAllSellers(page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .map(sellerResponses -> StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLERS + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLERS + ": " + e.getMessage())));
     }
 
     @GetMapping("/count")
     public Mono<StandardResponseEntity> countAllSellers() {
         return sellerService.countAllSellers()
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER_COUNT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/{id}")
     public Mono<StandardResponseEntity> getSellerById(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
         }
 
         return sellerService.getSellerById(id)
                 .flatMap(this::prepareDto)
-                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
+                .map(seller -> StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER + ": " + e.getMessage())));
     }
 
     @PostMapping
@@ -84,54 +84,54 @@ public class SellerController {
         // Basic input validation
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank() ||
             sellerRequest.getEmail() == null || sellerRequest.getEmail().isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_CREATION_REQUEST));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_CREATION_REQUEST));
         }
 
         return sellerService.createSeller(sellerRequest)
                 .flatMap(this::prepareDto)
-                .map(seller -> (StandardResponseEntity) StandardResponseEntity.created(seller, ApiResponseMessages.SELLER_CREATED_SUCCESS))
+                .map(seller -> StandardResponseEntity.created(seller, ApiResponseMessages.SELLER_CREATED_SUCCESS))
                 .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
+                        Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_SELLER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_SELLER + ": " + e.getMessage())));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Mono<StandardResponseEntity> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
         }
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank()) {
-             return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_UPDATE_REQUEST));
+             return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_UPDATE_REQUEST));
         }
 
         return sellerService.updateSeller(id, sellerRequest)
                 .flatMap(this::prepareDto)
-                .map(seller -> (StandardResponseEntity) StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_UPDATED_SUCCESS))
+                .map(seller -> StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
+                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(InvalidSellerDataException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_SELLER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_SELLER + ": " + e.getMessage())));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Mono<StandardResponseEntity> deleteSeller(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
         }
 
         return sellerService.deleteSeller(id)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.SELLER_DELETED_SUCCESS)))
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.SELLER_DELETED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
+                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_SELLER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_SELLER + ": " + e.getMessage())));
     }
 
     @GetMapping("/search")
@@ -141,29 +141,29 @@ public class SellerController {
             @RequestParam(defaultValue = "10") Integer size) {
 
         if (query == null || query.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
         if (page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return sellerService.searchSellers(query, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(sellerResponses -> (StandardResponseEntity) StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
+                .map(sellerResponses -> StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLERS + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLERS + ": " + e.getMessage())));
     }
 
     @GetMapping("/search/count")
     public Mono<StandardResponseEntity> countSearchSellers(@RequestParam String query) {
         if (query == null || query.isBlank()) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
         }
 
         return sellerService.countSearchSellers(query)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLER_COUNT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLER_COUNT + ": " + e.getMessage())));
     }
 }

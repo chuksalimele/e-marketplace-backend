@@ -45,54 +45,54 @@ public class ReviewController {
         if (reviewRequest.getProductId() == null || reviewRequest.getProductId() <= 0 ||
             reviewRequest.getUserId() == null || reviewRequest.getUserId() <= 0 ||
             reviewRequest.getRating() == null || reviewRequest.getRating() < 1 || reviewRequest.getRating() > 5) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_SUBMISSION));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_SUBMISSION));
         }
 
         return reviewService.submitReview(reviewRequest)
                 .flatMap(this::prepareDto)
-                .map(review -> (StandardResponseEntity) StandardResponseEntity.created(review, ApiResponseMessages.REVIEW_SUBMITTED_SUCCESS))
+                .map(review -> StandardResponseEntity.created(review, ApiResponseMessages.REVIEW_SUBMITTED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage()))) // Catch specific ResourceNotFound
+                        Mono.just(StandardResponseEntity.notFound(e.getMessage()))) // Catch specific ResourceNotFound
                 .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION)))
+                        Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION)))
                 .onErrorResume(InvalidReviewDataException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SUBMITTING_REVIEW + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SUBMITTING_REVIEW + ": " + e.getMessage())));
     }
 
     @PutMapping("/{id}")
     public Mono<StandardResponseEntity> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewRequest updateRequest) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
         }
         if (updateRequest.getRating() != null && (updateRequest.getRating() < 1 || updateRequest.getRating() > 5)) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_RATING));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_RATING));
         }
 
         return reviewService.updateReview(id, updateRequest)
                 .flatMap(this::prepareDto)
-                .map(review -> (StandardResponseEntity) StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_UPDATED_SUCCESS))
+                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
+                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
                 .onErrorResume(InvalidReviewDataException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_REVIEW + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_REVIEW + ": " + e.getMessage())));
     }
 
     @DeleteMapping("/{id}")
     public Mono<StandardResponseEntity> deleteReview(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
         }
 
         return reviewService.deleteReview(id)
-                .then(Mono.just((StandardResponseEntity) StandardResponseEntity.ok(null, ApiResponseMessages.REVIEW_DELETED_SUCCESS)))
+                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.REVIEW_DELETED_SUCCESS)))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
+                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_REVIEW + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_REVIEW + ": " + e.getMessage())));
     }
 
     // --- New/Refactored Endpoints ---
@@ -100,15 +100,15 @@ public class ReviewController {
     @GetMapping("/{id}")
     public Mono<StandardResponseEntity> getReviewById(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
         }
         return reviewService.getReviewById(id)
                 .flatMap(this::prepareDto)
-                .map(review -> (StandardResponseEntity) StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
+                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
     }
 
     @GetMapping
@@ -117,23 +117,23 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return reviewService.getAllReviews(page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(reviewList -> (StandardResponseEntity) StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
     }
 
     @GetMapping("/count")
     public Mono<StandardResponseEntity> countAllReviews() {
         return reviewService.countAllReviews()
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}")
@@ -143,28 +143,28 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (productId == null || productId <= 0 || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return reviewService.getReviewsByProductId(productId, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(reviewList -> (StandardResponseEntity) StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_FOR_PRODUCT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_FOR_PRODUCT + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}/count")
     public Mono<StandardResponseEntity> countReviewsForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
         }
         return reviewService.countReviewsByProductId(productId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_FOR_PRODUCT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_FOR_PRODUCT + ": " + e.getMessage())));
     }
 
     @GetMapping("/user/{userId}")
@@ -174,28 +174,28 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (userId == null || userId <= 0 || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return reviewService.getReviewsByUserId(userId, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(reviewList -> (StandardResponseEntity) StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_BY_USER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_BY_USER + ": " + e.getMessage())));
     }
 
     @GetMapping("/user/{userId}/count")
     public Mono<StandardResponseEntity> countReviewsByUser(@PathVariable Long userId) {
         if (userId == null || userId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
         }
         return reviewService.countReviewsByUserId(userId)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_BY_USER + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_BY_USER + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}/min-rating/{minRating}")
@@ -206,17 +206,17 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (productId == null || productId <= 0 || minRating == null || minRating < 1 || minRating > 5 || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return reviewService.getReviewsByProductIdAndMinRating(productId, minRating, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(reviewList -> (StandardResponseEntity) StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}/min-rating/{minRating}/count")
@@ -225,14 +225,14 @@ public class ReviewController {
             @PathVariable Integer minRating) {
 
         if (productId == null || productId <= 0 || minRating == null || minRating < 1 || minRating > 5) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
         }
         return reviewService.countReviewsByProductIdAndMinRating(productId, minRating)
-                .map(count -> (StandardResponseEntity) StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(e.getMessage())))
+                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}/latest")
@@ -242,16 +242,16 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         if (productId == null || productId <= 0 || page < 0 || size <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
         }
 
         return reviewService.getLatestReviewsByProductId(productId, page, size)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(reviewList -> (StandardResponseEntity) StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
     }
 
     @GetMapping("/user/{userId}/product/{productId}")
@@ -260,32 +260,32 @@ public class ReviewController {
             @PathVariable Long productId) {
 
         if (userId == null || userId <= 0 || productId == null || productId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
         }
 
         return reviewService.getReviewByUserIdAndProductId(userId, productId)
                 .flatMap(this::prepareDto)
-                .map(review -> (StandardResponseEntity) StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
+                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
     }
 
     @GetMapping("/product/{productId}/average-rating")
     public Mono<StandardResponseEntity> getAverageRatingForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
         }
 
         return reviewService.getAverageRatingForProduct(productId)
                 .map(averageRating -> {
                     Map<String, Double> data = Map.of("averageRating", averageRating); // averageRating can be 0.0, not null
-                    return (StandardResponseEntity) StandardResponseEntity.ok(data, ApiResponseMessages.AVERAGE_RATING_RETRIEVED_SUCCESS);
+                    return StandardResponseEntity.ok(data, ApiResponseMessages.AVERAGE_RATING_RETRIEVED_SUCCESS);
                 })
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just((StandardResponseEntity) StandardResponseEntity.notFound(e.getMessage())))
+                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_AVERAGE_RATING + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_AVERAGE_RATING + ": " + e.getMessage())));
     }
 
     @GetMapping("/exists/user/{userId}/product/{productId}")
@@ -294,15 +294,15 @@ public class ReviewController {
             @PathVariable Long productId) {
 
         if (userId == null || userId <= 0 || productId == null || productId <= 0) {
-            return Mono.just((StandardResponseEntity) StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
         }
 
         return reviewService.existsReviewByUserIdAndProductId(userId, productId)
                 .map(exists -> {
                     Map<String, Boolean> data = Map.of("exists", exists);
-                    return (StandardResponseEntity) StandardResponseEntity.ok(data, ApiResponseMessages.REVIEW_EXISTS_CHECK_SUCCESS);
+                    return StandardResponseEntity.ok(data, ApiResponseMessages.REVIEW_EXISTS_CHECK_SUCCESS);
                 })
                 .onErrorResume(Exception.class, e ->
-                        Mono.just((StandardResponseEntity) StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_REVIEW_EXISTENCE + ": " + e.getMessage())));
+                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_REVIEW_EXISTENCE + ": " + e.getMessage())));
     }
 }

@@ -1,13 +1,16 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.user.model.Role;
+import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.user.dto.MessageResponse;
 import com.aliwudi.marketplace.backend.common.role.ERole;
-import com.aliwudi.marketplace.backend.user.model.User;
+import com.aliwudi.marketplace.backend.common.model.User;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.user.dto.SignupRequest;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,33 +40,33 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public Mono<ResponseEntity<MessageResponse>> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+    public Mono<StandardResponseEntity> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
         // Check if username already exists reactively
         return userRepository.existsByUsername(signUpRequest.getUsername())
                 .flatMap(usernameExists -> {
-                    if (usernameExists) {
-                        return Mono.just(new ResponseEntity<>(new MessageResponse("Error: Username is already taken!"), HttpStatus.BAD_REQUEST));
+                    if (usernameExists) {                        
+                        return Mono.just(StandardResponseEntity.badRequest("Error: Username is already taken!"));
                     }
                     // If username does not exist, then check email existence.
                     // This is the correct way to chain an asynchronous check.
                     return userRepository.existsByEmail(signUpRequest.getEmail())
                             .flatMap(emailExists -> { // <-- Correctly unwrap emailExists Mono<Boolean>
-                                if (emailExists) { // Now emailExists is a boolean
-                                    return Mono.just(new ResponseEntity<>(new MessageResponse("Error: Email is already in use!"), HttpStatus.BAD_REQUEST));
+                                if (emailExists) { // Now emailExists is a boolean                                    
+                                    return Mono.just(StandardResponseEntity.badRequest("Error: Email is already in use!"));
                                 }
 
                                 // Create new user's account
-                                User user = new User(signUpRequest.getUsername(),
-                                        signUpRequest.getEmail(),
-                                        encoder.encode(signUpRequest.getPassword())); // Hash the password!
+                                User user = User.builder()
+                                        .email(signUpRequest.getEmail())
+                                        .username(signUpRequest.getUsername())
+                                        .password(encoder.encode(signUpRequest.getPassword()))// Hash the password!
+                                        .createdAt(LocalDateTime.now())
+                                        .build();
 
                                 Set<String> strRoles = signUpRequest.getRole();
-                                Set<Role> roles = new HashSet<>();
-
                                 // Logic to assign roles.
                                 // We need to ensure that the roles are fetched reactively and
                                 // the `roles` Set is populated before `userRepository.save(user)` is called.
-
                                 // This will return a Mono<Set<Role>> or Mono<Role> depending on single/multiple
                                 Mono<Set<Role>> fetchedRolesMono;
 
@@ -81,16 +84,16 @@ public class AuthController {
                                     fetchedRolesMono = Flux.fromIterable(strRoles)
                                             .flatMap(roleName -> {
                                                 ERole eRole;
-                                                switch (roleName.toLowerCase()) {
-                                                    case "admin":
-                                                        eRole = ERole.ROLE_ADMIN;
-                                                        break;
-                                                    case "seller":
-                                                        eRole = ERole.ROLE_SELLER;
-                                                        break;
-                                                    default:
-                                                        eRole = ERole.ROLE_USER;
-                                                        break;
+                                                String lowerCaseRoleName = roleName.toLowerCase();
+
+                                                if (lowerCaseRoleName.equals("admin")
+                                                        || lowerCaseRoleName.equals(ERole.ROLE_ADMIN.name())) {
+                                                    eRole = ERole.ROLE_ADMIN;
+                                                } else if (lowerCaseRoleName.equals("seller")
+                                                        || lowerCaseRoleName.equals(ERole.ROLE_SELLER.name())) {
+                                                    eRole = ERole.ROLE_SELLER;
+                                                } else {
+                                                    eRole = ERole.ROLE_USER;
                                                 }
                                                 return roleRepository.findByName(eRole)
                                                         .switchIfEmpty(Mono.error(new RuntimeException("Error: Role '" + eRole.name() + "' is not found.")));
@@ -103,9 +106,9 @@ public class AuthController {
                                             user.setRoles(assignedRoles); // Set the roles for the new user
                                             return userRepository.save(user); // Save the new user to the database
                                         })
-                                        .thenReturn(new ResponseEntity<>(new MessageResponse("User registered successfully!"), HttpStatus.OK))
-                                        .onErrorResume(RuntimeException.class, e ->
-                                                Mono.just(new ResponseEntity<>(new MessageResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR)));
+                                        .thenReturn(StandardResponseEntity.ok(user, ApiResponseMessages.USER_REGISTERED_SUCCESS))
+                                        .onErrorResume(RuntimeException.class, e
+                                                -> Mono.just(StandardResponseEntity.internalServerError(e.getMessage())));
                             });
                 });
     }

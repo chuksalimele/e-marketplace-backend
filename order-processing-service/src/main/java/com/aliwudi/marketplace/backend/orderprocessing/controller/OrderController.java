@@ -60,7 +60,7 @@ public class OrderController {
                 checkoutRequest.getPaymentMethod()
         )
                 .flatMap(this::prepareDto)
-                .map(order -> (StandardResponseEntity) StandardResponseEntity.created(order, ApiResponseMessages.ORDER_CREATED_SUCCESS))
+                .map(order -> StandardResponseEntity.created(order, ApiResponseMessages.ORDER_CREATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + e.getMessage())))
                 .onErrorResume(InsufficientStockException.class, e
@@ -74,7 +74,7 @@ public class OrderController {
         return orderService.getAllOrders()
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(Exception.class, e
                         -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
     }
@@ -83,7 +83,7 @@ public class OrderController {
     public Mono<StandardResponseEntity> getOrderById(@PathVariable Long id) {
         return orderService.getOrderById(id)
                 .flatMap(this::prepareDto)
-                .map(order -> (StandardResponseEntity) StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_RETRIEVED_SUCCESS))
+                .map(order -> StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + id)))
                 .onErrorResume(Exception.class, e
@@ -95,7 +95,7 @@ public class OrderController {
         return orderService.getOrdersByUserId(userId)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + userId)))
                 .onErrorResume(Exception.class, e
@@ -118,7 +118,7 @@ public class OrderController {
 
         return orderService.updateOrderStatus(id, newStatus)
                 .flatMap(this::prepareDto)
-                .map(order -> (StandardResponseEntity) StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_STATUS_UPDATED_SUCCESS))
+                .map(order -> StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_STATUS_UPDATED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + ": " + id)))
                 .onErrorResume(Exception.class, e
@@ -189,7 +189,7 @@ public class OrderController {
         return orderService.findAllOrderItems(pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -219,7 +219,7 @@ public class OrderController {
         return orderService.findOrderItemsByOrderId(orderId, pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(orderItemList -> (StandardResponseEntity) StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
+                .map(orderItemList -> StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -248,7 +248,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findOrderItemsByProductId(productId, pageable)
                 .collectList()
-                .map(orderItemList -> (StandardResponseEntity) StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
+                .map(orderItemList -> StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -268,7 +268,7 @@ public class OrderController {
             @PathVariable Long productId) {
         return orderService.findSpecificOrderItem(orderId, productId)
                 .flatMap(this::prepareDto)
-                .map(orderItem -> (StandardResponseEntity) StandardResponseEntity.ok(orderItem, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
+                .map(orderItem -> StandardResponseEntity.ok(orderItem, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND + " for order " + orderId + " and product " + productId)))
                 .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDER_ITEM + ": " + e.getMessage())));
     }
@@ -347,7 +347,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findAllOrders(pageable)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -375,7 +375,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findOrdersByUserId(userId, pageable)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -410,7 +410,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findOrdersByStatus(orderStatus, pageable)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -453,7 +453,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findOrdersByTimeRange(start, end, pageable)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
@@ -489,7 +489,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size, sort);
         return orderService.findOrdersByUserIdAndStatus(userId, orderStatus, pageable)
                 .collectList()
-                .map(orderList -> (StandardResponseEntity) StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
+                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e

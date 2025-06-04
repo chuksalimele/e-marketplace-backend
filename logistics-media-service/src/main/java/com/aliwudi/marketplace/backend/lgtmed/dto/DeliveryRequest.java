@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class DeliveryRequest {
-    private String orderId;
+    private Long orderId;
     private String recipientName;
     private String recipientAddress;
     private String deliveryAgent; // Optional

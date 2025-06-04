@@ -1,9 +1,9 @@
 package com.aliwudi.marketplace.backend.lgtmed.service;
 
 import com.aliwudi.marketplace.backend.common.intersevice.OrderIntegrationService;
+import com.aliwudi.marketplace.backend.common.model.Delivery;
 import com.aliwudi.marketplace.backend.lgtmed.exception.DeliveryNotFoundException;
 import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidDeliveryDataException;
-import com.aliwudi.marketplace.backend.lgtmed.model.Delivery;
 import com.aliwudi.marketplace.backend.lgtmed.repository.DeliveryRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -38,23 +38,21 @@ public class DeliveryService {
      * @return A Mono emitting the created Delivery.
      * @throws InvalidDeliveryDataException if order not found, delivery already exists, or data is invalid.
      */
-    public Mono<Delivery> createDelivery(String orderIdStr, String recipientName, String recipientAddress, String deliveryAgent, LocalDateTime estimatedDeliveryDate) {
-        Long orderId;
+    public Mono<Delivery> createDelivery(Long orderId, String recipientName, String recipientAddress, String deliveryAgent, LocalDateTime estimatedDeliveryDate) {
         try {
-            orderId = Long.parseLong(orderIdStr);
         } catch (NumberFormatException e) {
-            return Mono.error(new InvalidDeliveryDataException("Invalid Order ID format: " + orderIdStr));
+            return Mono.error(new InvalidDeliveryDataException("Invalid Order ID format: " + orderId));
         }
 
         // 1. Validate if the order exists
         return orderIntegrationService.orderExistsById(orderId)
                 .flatMap(orderExists -> {
                     if (Boolean.FALSE.equals(orderExists)) {
-                        return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.ORDER_NOT_FOUND + orderIdStr));
+                        return Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.ORDER_NOT_FOUND +": "+ orderId));
                     }
                     // 2. Ensure only one delivery per order (if that's the business rule)
                     return deliveryRepository.findByOrderId(orderId)
-                            .flatMap(existingDelivery -> Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.DELIVERY_ALREADY_EXISTS_FOR_ORDER + orderIdStr)))
+                            .flatMap(existingDelivery -> Mono.error(new InvalidDeliveryDataException(ApiResponseMessages.DELIVERY_ALREADY_EXISTS_FOR_ORDER +": "+ orderId)))
                             .switchIfEmpty(Mono.defer(() -> {
                                 // 3. Create new Delivery
                                 String trackingNumber = UUID.randomUUID().toString();
@@ -75,7 +73,7 @@ public class DeliveryService {
                 })
                 .cast(Delivery.class)
                 .onErrorResume(e -> {
-                    log.error("Error creating delivery for order {}: {}", orderIdStr, e.getMessage());
+                    log.error("Error creating delivery for order {}: {}", orderId, e.getMessage());
                     if (e instanceof InvalidDeliveryDataException) {
                         return Mono.error(e);
                     }
