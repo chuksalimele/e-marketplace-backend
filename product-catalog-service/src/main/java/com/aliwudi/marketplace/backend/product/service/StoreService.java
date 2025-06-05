@@ -181,6 +181,18 @@ public class StoreService{
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
                 .flatMapMany(exists -> storeRepository.findBySellerId(sellerId, pageable));
     }
+    /**
+     * Finds all stores owned by a specific seller without pagination.
+     *
+     * @param sellerId The ID of the seller.
+     * @return A Flux emitting stores owned by the specified seller.
+     */
+    public Flux<Store> getStoresBySeller(Long sellerId) {
+        return sellerRepository.existsById(sellerId)
+                .filter(exists -> exists)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + sellerId)))
+                .flatMapMany(exists -> storeRepository.findBySellerId(sellerId));
+    }
 
     /**
      * Counts all stores owned by a specific seller.

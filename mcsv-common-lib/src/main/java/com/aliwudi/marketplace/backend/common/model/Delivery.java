@@ -1,26 +1,36 @@
 package com.aliwudi.marketplace.backend.common.model;
 
 import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import lombok.ToString;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
 
-
+@ToString
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class,
+        property = "id")
 @Table("deliveries")
 public class Delivery {
     @Id
     private Long id; // Using Long for auto-incrementing ID
     private Long orderId; // Links to the Order entity
+    
+    @ToString.Exclude
+    @Transient
+    private Order order;
     private String trackingNumber;
     private String recipientName;
     private String recipientAddress;

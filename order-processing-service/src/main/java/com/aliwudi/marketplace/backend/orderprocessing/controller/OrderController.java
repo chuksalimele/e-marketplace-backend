@@ -36,6 +36,7 @@ public class OrderController {
     private final OrderService orderService;
     private final UserIntegrationService userIntegrationService;
     private final ProductIntegrationService productIntegrationService;
+
     /**
      * Helper method to map Order entity to Order DTO for public exposure.
      */
@@ -44,24 +45,26 @@ public class OrderController {
             return Mono.empty();
         }
         Mono<User> userMono;
-        List<Mono<?>> listMonos=  List.of();
-        if(order.getUser() == null){
+        List<Mono<?>> listMonos = List.of();
+        if (order.getUser() == null) {
             userMono = userIntegrationService.getUserById(order.getUserId());
             listMonos.add(userMono);
         }
-        if(order.getItems() ==  null){
+        if (order.getItems() == null) {
             Flux orderItemFlux = orderService.findOrderItemsByOrderId(order.getId());
             Mono orderItemListMono = orderItemFlux.collectList();
             listMonos.add(orderItemListMono);
         }
-        
+
         return Mono.zip(listMonos, (Object[] array) -> {
             for (Object obj : array) {
-                if(obj instanceof User user){
+                if (obj instanceof User user) {
                     order.setUser(user);
                 }
-                if(obj instanceof List items){
-                    order.setItems(items);
+                if (obj instanceof List items && !items.isEmpty()) {
+                    if (items.get(0) instanceof OrderItem) {
+                        order.setItems(items);
+                    }
                 }
             }
             return order;
@@ -77,15 +80,15 @@ public class OrderController {
             return Mono.empty();
         }
         Mono<Product> productMono;
-        List<Mono<?>> listMonos=  List.of();
-        if(orderItem.getProduct() == null){
+        List<Mono<?>> listMonos = List.of();
+        if (orderItem.getProduct() == null) {
             productMono = productIntegrationService.getProductById(orderItem.getProductId());
             listMonos.add(productMono);
         }
-        
+
         return Mono.zip(listMonos, (Object[] array) -> {
             for (Object obj : array) {
-                if(obj instanceof Product product){
+                if (obj instanceof Product product) {
                     orderItem.setProduct(product);
                 }
             }
@@ -535,7 +538,7 @@ public class OrderController {
                 .onErrorResume(ResourceNotFoundException.class, e
                         -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
                 .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));                
+                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
     }
 
     /**

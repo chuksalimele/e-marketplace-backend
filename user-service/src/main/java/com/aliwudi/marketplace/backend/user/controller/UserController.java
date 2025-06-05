@@ -36,9 +36,26 @@ public class UserController {
     // Helper method to map User entity to User for public exposure
     private Mono<User> prepareDto(User user) {
         if (user == null) {
-            return null;
+            return Mono.empty();
         }
-        return user;
+        Mono<Role> roleMono;
+        List<Mono<?>> listMonos=  List.of();
+        
+        if(user.getRoles() == null){
+            Flux roleFlux = userService.findAllRoles(cart.getId());
+            Mono roleListMono = roleFlux.collectList();
+            listMonos.add(roleListMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof List roles && !roles.isEmpty()){
+                    if(roles.get(0) instanceof Role)
+                    user.setRoles(roles); 
+                }
+            }
+            return user;
+        });
     }
 
     /**

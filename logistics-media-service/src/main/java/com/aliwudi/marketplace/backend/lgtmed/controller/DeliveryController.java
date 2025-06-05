@@ -1,6 +1,8 @@
 package com.aliwudi.marketplace.backend.lgtmed.controller;
 
+import com.aliwudi.marketplace.backend.common.intersevice.OrderIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.Delivery;
+import com.aliwudi.marketplace.backend.common.model.Order;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryRequest;
 import com.aliwudi.marketplace.backend.lgtmed.dto.DeliveryUpdateRequest;
 import com.aliwudi.marketplace.backend.lgtmed.service.DeliveryService;
@@ -30,15 +32,30 @@ import com.aliwudi.marketplace.backend.common.status.DeliveryStatus;
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
+    private final OrderIntegrationService orderIntegrationService;
 
     /**
      * Helper method to map Delivery entity to Delivery DTO for public exposure.
      */
     private Mono<Delivery> prepareDto(Delivery delivery) {
         if (delivery == null) {
-            return null;
+            return Mono.empty();
         }
-        return Mono.just(delivery);// COME BACK
+        Mono<Order> orderMono;
+        List<Mono<?>> listMonos = List.of();
+        if (delivery.getOrder() == null) {
+            orderMono = orderIntegrationService.getOrderById(delivery.getOrderId());
+            listMonos.add(orderMono);
+        }
+
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if (obj instanceof Order order) {
+                    delivery.setOrder(order);
+                }
+            }
+            return delivery;
+        });
     }
 
     @PostMapping

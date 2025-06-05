@@ -21,6 +21,11 @@ public interface StoreRepository extends R2dbcRepository<Store, Long> {
     Flux<Store> findBySellerId(Long sellerId, Pageable pageable);
 
     /**
+     * Find all stores owned by a specific seller without pagination.
+     */
+    Flux<Store> findBySellerId(Long sellerId);
+    
+    /**
      * Search stores by name (case-insensitive, contains) with pagination.
      */
     Flux<Store> findByNameContainingIgnoreCase(String name, Pageable pageable);

@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.common.model;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor; // Will be adjusted for the new constructor
 import lombok.Builder;
@@ -14,6 +16,8 @@ import org.springframework.data.relational.core.mapping.Table;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class,
+        property = "id")
 @Table("cart_items")
 public class CartItem {
     @Id

@@ -1,6 +1,7 @@
 package com.aliwudi.marketplace.backend.product.controller; // Assuming 'seller' is part of 'product' for now
 
 import com.aliwudi.marketplace.backend.common.model.Seller;
+import com.aliwudi.marketplace.backend.common.model.Store;
 import com.aliwudi.marketplace.backend.product.dto.SellerRequest; // New DTO for incoming seller data
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException; // Re-using or creating
 import com.aliwudi.marketplace.backend.product.exception.InvalidSellerDataException; // New custom exception for seller-specific data issues
@@ -18,6 +19,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.product.service.StoreService;
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
@@ -26,15 +28,33 @@ import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 public class SellerController {
 
     private final SellerService sellerService;
+    private final StoreService storeService;
 
     /**
      * Helper method to map Seller entity to Seller DTO for public exposure.
      */
     private Mono<Seller> prepareDto(Seller seller) {
         if (seller == null) {
-            return null;
+            return Mono.empty();
         }
-        return seller;
+        List<Mono<?>> listMonos=  List.of();
+        
+        if(seller.getStores() ==  null){
+            Flux storesFlux = storeService.getStoresBySeller(seller.getId());
+            Mono storeListMono = storesFlux.collectList();
+            listMonos.add(storeListMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if (obj instanceof List stores && !stores.isEmpty()) {
+                    if (stores.get(0) instanceof Store) {
+                        seller.setStores(stores);
+                    }
+                }
+            }
+            return seller;
+        });
     }
 
     @GetMapping

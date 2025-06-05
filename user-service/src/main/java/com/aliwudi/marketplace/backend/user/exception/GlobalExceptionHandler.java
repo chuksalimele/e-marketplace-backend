@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.exception;
 
+import com.aliwudi.marketplace.backend.common.exception.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;

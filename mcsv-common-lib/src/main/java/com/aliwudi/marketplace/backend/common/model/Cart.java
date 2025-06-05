@@ -1,6 +1,8 @@
 package com.aliwudi.marketplace.backend.common.model;
 
 // Removed: import com.fasterxml.jackson.annotation.JsonBackReference; // No longer needed as User object is removed
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +20,8 @@ import org.springframework.data.relational.core.mapping.Table;
 @NoArgsConstructor 
 @AllArgsConstructor 
 @Builder
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class,
+        property = "id")
 @Table("carts")
 public class Cart {
 

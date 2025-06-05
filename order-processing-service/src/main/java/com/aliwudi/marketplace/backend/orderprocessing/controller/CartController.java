@@ -58,8 +58,10 @@ public class CartController {
                 if(obj instanceof User user){
                     cart.setUser(user);
                 }
-                if(obj instanceof List items){
-                    cart.setItems(items);
+                if(obj instanceof List items && !items.isEmpty()){
+                    if (items.get(0) instanceof CartItem) {
+                        cart.setItems(items);
+                    }
                 }
             }
             return cart;
