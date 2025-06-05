@@ -108,9 +108,9 @@ public class PaymentService {
      * @throws ResourceNotFoundException if payment for the order is not found.
      */
     @Transactional(readOnly = true)
-    public Mono<Payment> getPaymentDetails(String orderId) {
+    public Mono<Payment> getPaymentDetails(Long orderId) {
         log.info("Fetching payment details for orderId: {}", orderId);
-        return Mono.just(Long.parseLong(orderId)) // Convert String to Long
+        return Mono.just(orderId) // Convert String to Long
                 .flatMap(longOrderId -> paymentRepository.findByOrderId(longOrderId))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Payment not found for orderId: " + orderId)));
     }
@@ -138,9 +138,9 @@ public class PaymentService {
      * @return A Flux of Payment records for the specified user.
      */
     @Transactional(readOnly = true)
-    public Flux<Payment> findPaymentsByUserId(String userId, Pageable pageable) {
+    public Flux<Payment> findPaymentsByUserId(Long userId, Pageable pageable) {
         log.info("Finding payments for user: {} with pagination: {}", userId, pageable);
-        return Mono.just(Long.parseLong(userId)) // Convert String to Long
+        return Mono.just(userId) // Convert String to Long
                 .flatMapMany(longUserId -> paymentRepository.findByUserId(longUserId, pageable));
     }
 

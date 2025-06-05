@@ -21,6 +21,12 @@ public interface OrderItemRepository extends R2dbcRepository<OrderItem, Long> {
     Flux<OrderItem> findByOrderId(Long orderId, Pageable pageable);
 
     /**
+     * Find all order items belonging to a specific order without pagination.
+     * We already know there should be a maximum allowable order items for an order
+     */
+    Flux<OrderItem> findByOrderId(Long orderId);
+    
+    /**
      * Find all order items containing a specific product with pagination.
      */
     Flux<OrderItem> findByProductId(Long productId, Pageable pageable);

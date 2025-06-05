@@ -24,7 +24,7 @@ public interface CartItemRepository extends R2dbcRepository<CartItem, Long> {
 
     /**
      * Find all cart items belonging to a specific cart without pagination.
-     * We already expect a maximum allowable cart items in a cart
+     * We already know there should be a maximum allowable cart items in a cart
      */
     Flux<CartItem> findByCartId(Long cartId);//IMPORTANT
 

@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
+import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
+import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.Cart;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.service.OrderService;
@@ -8,6 +10,8 @@ import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientSto
 import com.aliwudi.marketplace.backend.orderprocessing.dto.CheckoutRequest;
 import com.aliwudi.marketplace.backend.common.model.Order; // Import Order model
 import com.aliwudi.marketplace.backend.common.model.OrderItem; // Import OrderItem model
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.User;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -29,7 +34,8 @@ import java.time.format.DateTimeParseException;
 public class OrderController {
 
     private final OrderService orderService;
-
+    private final UserIntegrationService userIntegrationService;
+    private final ProductIntegrationService productIntegrationService;
     /**
      * Helper method to map Order entity to Order DTO for public exposure.
      */
@@ -37,7 +43,29 @@ public class OrderController {
         if (order == null) {
             return Mono.empty();
         }
-        return order;
+        Mono<User> userMono;
+        List<Mono<?>> listMonos=  List.of();
+        if(order.getUser() == null){
+            userMono = userIntegrationService.getUserById(order.getUserId());
+            listMonos.add(userMono);
+        }
+        if(order.getItems() ==  null){
+            Flux orderItemFlux = orderService.findOrderItemsByOrderId(order.getId());
+            Mono orderItemListMono = orderItemFlux.collectList();
+            listMonos.add(orderItemListMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof User user){
+                    order.setUser(user);
+                }
+                if(obj instanceof List items){
+                    order.setItems(items);
+                }
+            }
+            return order;
+        });
     }
 
     /**
@@ -48,7 +76,21 @@ public class OrderController {
         if (orderItem == null) {
             return Mono.empty();
         }
-        return orderItem;
+        Mono<Product> productMono;
+        List<Mono<?>> listMonos=  List.of();
+        if(orderItem.getProduct() == null){
+            productMono = productIntegrationService.getProductById(orderItem.getProductId());
+            listMonos.add(productMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof Product product){
+                    orderItem.setProduct(product);
+                }
+            }
+            return orderItem;
+        });
     }
 
     @PostMapping("/checkout")

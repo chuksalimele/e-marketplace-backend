@@ -103,6 +103,7 @@ public class InventoryController {
 
     @PostMapping("/release")
     public Mono<StandardResponseEntity> releaseStock(@RequestBody StockOperationRequest request) {
+        
         return inventoryService.releaseStock(request.getProductId(), request.getQuantity())
                 .then(Mono.just(StandardResponseEntity.ok(null,
                         ApiResponseMessages.OPERATION_SUCCESSFUL
@@ -186,7 +187,7 @@ public class InventoryController {
         return inventoryService.findInventoryByAvailableQuantityGreaterThan(quantity, pageable)
                 .flatMap(this::prepareDto)
                 .collectList()
-                .map(inventoryList -> StandardResponseEntity.ok(inventoryList, ApiResponseMessages.INVENTORYS_RETRIEVED_SUCCESS))
+                .map(inventoryList -> StandardResponseEntity.ok(inventoryList, ApiResponseMessages.INVENTORY_RETRIEVED_SUCCESS))
                 .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.INVENTORY_NOT_FOUND)))
                 .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_INVENTORYS + ": " + e.getMessage())));                
     }

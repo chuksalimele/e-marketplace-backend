@@ -276,6 +276,16 @@ public class OrderService {
     }
 
     /**
+     * Retrieves all order items belonging to a specific order without pagination.
+     * We already know there should be a maximum allowable order items in for an order
+     * 
+     * @param orderId The ID of the order.
+     * @return A Flux of OrderItem.
+     */
+    public Flux<OrderItem> findOrderItemsByOrderId(Long orderId) {
+        return orderItemRepository.findByOrderId(orderId);
+    }
+    /**
      * Retrieves all order items containing a specific product with pagination.
      *
      * @param productId The ID of the product.

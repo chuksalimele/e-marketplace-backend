@@ -27,6 +27,11 @@ public class StandardResponseEntity<T> extends ResponseEntity<ApiResponse<T>> {
     // --- Convenience methods for common responses ---
 
     // Success response
+    public static <T> StandardResponseEntity ok(T data) {
+        return new StandardResponseEntity<>(ApiResponse.success(data, null, HttpStatus.OK), HttpStatus.OK);
+    }
+    
+    // Success response
     public static <T> StandardResponseEntity ok(T data, String message) {
         return new StandardResponseEntity<>(ApiResponse.success(data, message, HttpStatus.OK), HttpStatus.OK);
     }

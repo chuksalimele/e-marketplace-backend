@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
+import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.model.Review;
 import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.product.exception.InvalidReviewDataException;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.product.service.ProductService;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -25,6 +27,7 @@ import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final ProductService productService;
 
     /**
      * Helper method to convert Review entity to ReviewDto DTO.
@@ -34,9 +37,24 @@ public class ReviewController {
      */
     private Mono<Review> prepareDto(Review review) {
         if (review == null) {
-            return null;
+            return Mono.empty();
         }
-        return review;
+        Mono<Product> productMono;
+        List<Mono<?>> listMonos=  List.of();
+        
+        if(review.getProduct() == null){
+            productMono = productService.getProductById(review.getProductId());
+            listMonos.add(productMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof Product product){
+                    review.setProduct(product); 
+                }
+            }
+            return review;
+        });
     }
 
     @PostMapping

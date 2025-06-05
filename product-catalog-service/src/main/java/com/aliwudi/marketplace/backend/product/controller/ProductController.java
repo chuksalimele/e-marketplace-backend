@@ -1,6 +1,7 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
 import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.Store;
 import com.aliwudi.marketplace.backend.product.dto.ProductRequest;
 import com.aliwudi.marketplace.backend.product.service.ProductService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
@@ -18,6 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.product.service.StoreService;
 
 @RestController
 @RequestMapping("/api/products")
@@ -25,15 +27,31 @@ import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 public class ProductController {
 
     private final ProductService productService;
+    private final StoreService storeService;
 
     /**
      * Helper method to map Product entity to Product DTO for public exposure.
      */
     private Mono<Product> prepareDto(Product product) {
         if (product == null) {
-            return null;
+            return Mono.empty();
         }
-        return product;
+        Mono<Store> storeMono;
+        List<Mono<?>> listMonos=  List.of();
+        
+        if(product.getStore() == null){
+            storeMono = storeService.getStoreById(product.getStoreId());
+            listMonos.add(storeMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof Store store){
+                    product.setStore(store); 
+                }
+            }
+            return product;
+        });
     }
 
     @PostMapping
