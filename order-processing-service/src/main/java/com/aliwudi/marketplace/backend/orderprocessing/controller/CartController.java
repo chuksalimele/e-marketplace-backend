@@ -1,7 +1,11 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
+import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
+import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.Cart;
 import com.aliwudi.marketplace.backend.common.model.CartItem;
+import com.aliwudi.marketplace.backend.common.model.Product;
+import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.orderprocessing.service.CartService;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
 import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
@@ -19,6 +23,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.Map;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -26,6 +31,8 @@ import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 public class CartController {
 
     private final CartService cartService;
+    private final UserIntegrationService userIntegrationService;
+    private final ProductIntegrationService productIntegrationService;
 
     /**
      * Helper method to map Cart entity to Cart DTO for public exposure.
@@ -34,7 +41,29 @@ public class CartController {
         if (cart == null) {
             return Mono.empty();
         }
-        return cart;
+        Mono<User> userMono;
+        List<Mono<?>> listMonos=  List.of();
+        if(cart.getUser() == null){
+            userMono = userIntegrationService.getUserById(cart.getUserId());
+            listMonos.add(userMono);
+        }
+        if(cart.getItems() ==  null){
+            Flux cartItemFlux = cartService.findCartItemsByCartId(cart.getId());
+            Mono cartItemListMono = cartItemFlux.collectList();
+            listMonos.add(cartItemListMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof User user){
+                    cart.setUser(user);
+                }
+                if(obj instanceof List items){
+                    cart.setItems(items);
+                }
+            }
+            return cart;
+        });
     }
 
     /**
@@ -44,7 +73,21 @@ public class CartController {
         if (cartItem == null) {
             return Mono.empty();
         }
-        return cartItem;
+        Mono<Product> productMono;
+        List<Mono<?>> listMonos=  List.of();
+        if(cartItem.getProduct() == null){
+            productMono = productIntegrationService.getProductById(cartItem.getProductId());
+            listMonos.add(productMono);
+        }
+        
+        return Mono.zip(listMonos, (Object[] array) -> {
+            for (Object obj : array) {
+                if(obj instanceof Product product){
+                    cartItem.setProduct(product);
+                }
+            }
+            return cartItem;
+        });
     }
 
     /**
@@ -189,14 +232,19 @@ public class CartController {
      * @return A Flux of CartItem.
      */
     @GetMapping("/items/all")
-    public Flux<CartItem> getAllCartItems(
+    public Mono<StandardResponseEntity> getAllCartItems(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return cartService.findAllCartItems(pageable);
+        return cartService.findAllCartItems(pageable)    
+                .flatMap(this::prepareDto)
+                .collectList()
+                .map(cartItemList -> StandardResponseEntity.ok(cartItemList, ApiResponseMessages.CART_ITEMS_RETRIEVED_SUCCESS))
+                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.CART_ITEM_NOT_FOUND)))
+                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_CART_ITEMS + ": " + e.getMessage())));
     }
 
     /**
