@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.product.exception;
+package com.aliwudi.marketplace.backend.common.exception;
 
 public class InvalidSellerDataException extends RuntimeException {
     public InvalidSellerDataException(String message) {

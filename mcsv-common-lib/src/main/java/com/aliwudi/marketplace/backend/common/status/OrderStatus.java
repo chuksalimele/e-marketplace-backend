@@ -11,8 +11,11 @@ package com.aliwudi.marketplace.backend.common.status;
 public enum OrderStatus {
     PENDING,
     PROCESSING,
+    PAID,
+    PAYMENT_FAILED,    
     SHIPPED,
     DELIVERED,
     CANCELLED,
-    RETURNED
+    RETURNED, 
+
 }

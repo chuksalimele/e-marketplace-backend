@@ -3,22 +3,22 @@ package com.aliwudi.marketplace.backend.lgtmed.controller;
 import com.aliwudi.marketplace.backend.common.model.MediaAsset;
 import com.aliwudi.marketplace.backend.lgtmed.dto.MediaUploadRequest;
 import com.aliwudi.marketplace.backend.lgtmed.service.MediaService;
-import com.aliwudi.marketplace.backend.lgtmed.exception.MediaAssetNotFoundException;
-import com.aliwudi.marketplace.backend.lgtmed.exception.InvalidMediaDataException;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+import com.aliwudi.marketplace.backend.common.exception.MediaAssetNotFoundException;
+import com.aliwudi.marketplace.backend.common.exception.InvalidMediaDataException;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
-import org.springframework.data.domain.Pageable; // For pagination
-import org.springframework.data.domain.PageRequest; // For creating Pageable instances
-import org.springframework.data.domain.Sort; // For sorting
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 @RestController
 @RequestMapping("/api/media")
@@ -28,118 +28,118 @@ public class MediaController {
     private final MediaService mediaService;
 
     /**
-     * Helper method to map MediaAsset entity to MediaAsset DTO for public
-     * exposure.
+     * Endpoint to upload a new media asset.
+     *
+     * @param request The MediaUploadRequest containing asset details and content.
+     * @return A Mono emitting the created MediaAsset.
+     * @throws IllegalArgumentException if input validation fails.
+     * @throws InvalidMediaDataException if file type is unsupported, content is invalid, or duplicate unique file name.
      */
-    private Mono<MediaAsset> prepareDto(MediaAsset asset) {
-        if (asset == null) {
-            return null;
-        }
-        
-        MediaAsset media = MediaAsset.builder()
-                .id(asset.getId())
-                .assetName(asset.getAssetName())
-                .uniqueFileName(asset.getUniqueFileName())
-                .url(asset.getUrl())
-                .fileType(asset.getFileType())
-                .entityId(asset.getEntityId())
-                .entityType(asset.getEntityType())
-                .uploadTime(asset.getUploadTime())
-                .build();
-         
-        return Mono.just(media);
-    }
-
     @PostMapping("/upload")
+    @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER') or hasRole('USER')")
-    public Mono<StandardResponseEntity> uploadMedia(@Valid @RequestBody MediaUploadRequest request) {
+    public Mono<MediaAsset> uploadMedia(@Valid @RequestBody MediaUploadRequest request) {
+        // Basic input validation
         if (request.getAssetName() == null || request.getAssetName().isBlank()
                 || request.getFileContent() == null || request.getFileContent().isBlank()
                 || request.getFileType() == null || request.getFileType().isBlank()
                 || request.getEntityId() == null || request.getEntityId().isBlank()
                 || request.getEntityType() == null || request.getEntityType().isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_MEDIA_UPLOAD_REQUEST));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_MEDIA_UPLOAD_REQUEST);
         }
 
-        return mediaService.uploadMedia(request)
-                .flatMap(this::prepareDto)
-                .map(asset -> StandardResponseEntity.created(asset, ApiResponseMessages.MEDIA_UPLOAD_SUCCESS))
-                .onErrorResume(InvalidMediaDataException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPLOADING_MEDIA + ": " + e.getMessage())));
+        return mediaService.uploadMedia(request);
+        // Exceptions (InvalidMediaDataException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve a media asset by its unique file name.
+     *
+     * @param uniqueFileName The unique file name.
+     * @return A Mono emitting the MediaAsset.
+     * @throws IllegalArgumentException if unique file name is invalid.
+     * @throws MediaAssetNotFoundException if the media asset is not found.
+     */
     @GetMapping("/{uniqueFileName}")
-    public Mono<StandardResponseEntity> getMediaAsset(@PathVariable String uniqueFileName) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<MediaAsset> getMediaAsset(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME);
         }
-
-        return mediaService.getMediaAssetByUniqueFileName(uniqueFileName)
-                .flatMap(this::prepareDto)
-                .map(asset -> StandardResponseEntity.ok(asset, ApiResponseMessages.MEDIA_RETRIEVED_SUCCESS))
-                .onErrorResume(MediaAssetNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_MEDIA + ": " + e.getMessage())));
+        return mediaService.getMediaAssetByUniqueFileName(uniqueFileName);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve media assets for a specific entity with pagination.
+     *
+     * @param entityId The ID of the entity.
+     * @param entityType The type of the entity.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @param sortBy The field to sort by.
+     * @param sortDir The sort direction (asc/desc).
+     * @return A Flux of MediaAsset records.
+     * @throws IllegalArgumentException if entity identifiers or pagination parameters are invalid.
+     */
     @GetMapping("/entity/{entityId}/{entityType}")
-    public Mono<StandardResponseEntity> getMediaAssetsForEntity(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<MediaAsset> getMediaAssetsForEntity(
             @PathVariable String entityId,
             @PathVariable String entityType,
-            @RequestParam(defaultValue = "0") int page, // Changed to int for PageRequest
-            @RequestParam(defaultValue = "20") int size, // Changed to int for PageRequest
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
 
-        if (entityId == null || entityId.isBlank() || entityType == null || entityType.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS));
-        }
-        if (page < 0 || size <= 0) { // Check page and size
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        if (entityId == null || entityId.isBlank() || entityType == null || entityType.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
 
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(page, size, sort); // Create Pageable
+        Pageable pageable = PageRequest.of(page, size, sort);
 
-        return mediaService.getMediaAssetsForEntity(entityId, entityType, pageable) // Pass Pageable
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(mediaAssetList -> StandardResponseEntity.ok(mediaAssetList, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.getMediaAssetsForEntity(entityId, entityType, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count media assets for a specific entity.
+     *
+     * @param entityId The ID of the entity.
+     * @param entityType The type of the entity.
+     * @return A Mono emitting the count.
+     * @throws IllegalArgumentException if entity identifiers are invalid.
+     */
     @GetMapping("/entity/{entityId}/{entityType}/count")
-    public Mono<StandardResponseEntity> countMediaAssetsForEntity(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countMediaAssetsForEntity(
             @PathVariable String entityId,
             @PathVariable String entityType) {
-
         if (entityId == null || entityId.isBlank() || entityType == null || entityType.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS);
         }
-
-        return mediaService.countMediaAssetsForEntity(entityId, entityType)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.MEDIA_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.countMediaAssetsForEntity(entityId, entityType);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
-    @DeleteMapping("/{uniqueFileName}")
+    /**
+     * Endpoint to delete a media asset by its unique file name.
+     *
+     * @param uniqueFileName The unique file name of the media asset to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if unique file name is invalid.
+     * @throws MediaAssetNotFoundException if the media asset is not found.
+     */
+    @DeleteMapping("/admin/{uniqueFileName}") // Updated path for admin access
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
-    public Mono<StandardResponseEntity> deleteMediaAsset(@PathVariable String uniqueFileName) {
+    public Mono<Void> deleteMediaAsset(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME);
         }
-
-        return mediaService.deleteMediaAsset(uniqueFileName)
-                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.MEDIA_DELETED_SUCCESS)))
-                .onErrorResume(MediaAssetNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_MEDIA + ": " + e.getMessage())));
+        return mediaService.deleteMediaAsset(uniqueFileName);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     // --- NEW: Controller Endpoints for all MediaAssetRepository methods ---
@@ -151,25 +151,23 @@ public class MediaController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of MediaAsset records.
+     * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping("/admin/all-paginated") // Renamed to avoid conflict with existing /
+    @GetMapping("/admin/all") // Updated path for admin access
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getAllMediaAssetsPaginated(
+    public Flux<MediaAsset> getAllMediaAssetsPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         if (page < 0 || size <= 0) {
-            return Mono.error(new InvalidMediaDataException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return mediaService.findAllMediaAssets(pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(mediaAssetList -> StandardResponseEntity.ok(mediaAssetList, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.findAllMediaAssets(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -181,26 +179,24 @@ public class MediaController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of MediaAsset records.
+     * @throws IllegalArgumentException if entity type or pagination parameters are invalid.
      */
     @GetMapping("/admin/byEntityType/{entityType}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getMediaAssetsByEntityType(
+    public Flux<MediaAsset> getMediaAssetsByEntityType(
             @PathVariable String entityType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         if (entityType == null || entityType.isBlank() || page < 0 || size <= 0) {
-            return Mono.error(new InvalidMediaDataException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return mediaService.findMediaAssetsByEntityType(entityType, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(mediaAssetList -> StandardResponseEntity.ok(mediaAssetList, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.findMediaAssetsByEntityType(entityType, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -212,26 +208,24 @@ public class MediaController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of MediaAsset records.
+     * @throws IllegalArgumentException if file type or pagination parameters are invalid.
      */
     @GetMapping("/admin/byFileType/{fileType}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getMediaAssetsByFileType(
+    public Flux<MediaAsset> getMediaAssetsByFileType(
             @PathVariable String fileType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         if (fileType == null || fileType.isBlank() || page < 0 || size <= 0) {
-            return Mono.error(new InvalidMediaDataException(ApiResponseMessages.INVALID_FILE_TYPE + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_FILE_TYPE + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return mediaService.findMediaAssetsByFileType(fileType, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(mediaAssetList -> StandardResponseEntity.ok(mediaAssetList, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.findMediaAssetsByFileType(fileType, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -244,62 +238,60 @@ public class MediaController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of MediaAsset records.
+     * @throws IllegalArgumentException if asset name or pagination parameters are invalid.
      */
     @GetMapping("/admin/byAssetNameContaining")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getMediaAssetsByAssetNameContaining(
+    public Flux<MediaAsset> getMediaAssetsByAssetNameContaining(
             @RequestParam String assetName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         if (assetName == null || assetName.isBlank() || page < 0 || size <= 0) {
-            return Mono.error(new InvalidMediaDataException(ApiResponseMessages.INVALID_ASSET_NAME + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ASSET_NAME + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return mediaService.findMediaAssetsByAssetNameContaining(assetName, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(mediaAssetList -> StandardResponseEntity.ok(mediaAssetList, ApiResponseMessages.MEDIA_ASSETS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.findMediaAssetsByAssetNameContaining(assetName, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count media assets by their entity type.
      *
      * @param entityType The type of the entity.
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the count.
+     * @throws IllegalArgumentException if entity type is invalid.
      */
     @GetMapping("/count/byEntityType/{entityType}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countMediaAssetsByEntityType(@PathVariable String entityType) {
+    public Mono<Long> countMediaAssetsByEntityType(@PathVariable String entityType) {
         if (entityType == null || entityType.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS);
         }
-        return mediaService.countMediaAssetsByEntityType(entityType)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.MEDIA_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ENTITY_MEDIA + ": " + e.getMessage())));
+        return mediaService.countMediaAssetsByEntityType(entityType);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count media assets by their file type.
      *
      * @param fileType The type of the file.
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the count.
+     * @throws IllegalArgumentException if file type is invalid.
      */
     @GetMapping("/count/byFileType/{fileType}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countMediaAssetsByFileType(@PathVariable String fileType) {
+    public Mono<Long> countMediaAssetsByFileType(@PathVariable String fileType) {
         if (fileType == null || fileType.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_FILE_TYPE));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_FILE_TYPE);
         }
-        return mediaService.countMediaAssetsByFileType(fileType)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.MEDIA_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_MEDIA_BY_FILE_TYPE + ": " + e.getMessage())));
+        return mediaService.countMediaAssetsByFileType(fileType);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -307,35 +299,34 @@ public class MediaController {
      * string (case-insensitive).
      *
      * @param assetName The asset name string to search for.
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the count.
+     * @throws IllegalArgumentException if asset name is invalid.
      */
     @GetMapping("/count/byAssetNameContaining")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countMediaAssetsByAssetNameContaining(@RequestParam String assetName) {
+    public Mono<Long> countMediaAssetsByAssetNameContaining(@RequestParam String assetName) {
         if (assetName == null || assetName.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ASSET_NAME));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ASSET_NAME);
         }
-        return mediaService.countMediaAssetsByAssetNameContaining(assetName)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.MEDIA_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_MEDIA_BY_ASSET_NAME + ": " + e.getMessage())));
+        return mediaService.countMediaAssetsByAssetNameContaining(assetName);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to check if a media asset with a given unique file name exists.
      *
      * @param uniqueFileName The unique file name.
-     * @return A Mono emitting StandardResponseEntity with a boolean indicating
-     * existence.
+     * @return A Mono emitting true if it exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if unique file name is invalid.
      */
     @GetMapping("/exists/{uniqueFileName}")
-    public Mono<StandardResponseEntity> existsByUniqueFileName(@PathVariable String uniqueFileName) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsByUniqueFileName(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME);
         }
-        return mediaService.existsByUniqueFileName(uniqueFileName)
-                .map(exists -> StandardResponseEntity.ok(exists, ApiResponseMessages.MEDIA_EXISTS_CHECK_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_MEDIA_EXISTENCE + ": " + e.getMessage())));
+        return mediaService.existsByUniqueFileName(uniqueFileName);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }

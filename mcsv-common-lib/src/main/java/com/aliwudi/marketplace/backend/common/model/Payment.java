@@ -10,7 +10,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -31,7 +33,12 @@ public class Payment {
     private String transactionRef;
     private BigDecimal amount;
     private PaymentStatus status; // PENDING, SUCCESS, FAILED, REFUNDED
-    private LocalDateTime paymentTime;
+    
+    @CreatedDate // Automatically populated with creation timestamp
+    private LocalDateTime createdAt;
+    
+    @LastModifiedDate // Automatically populated with last modification timestamp
+    private LocalDateTime updatedAt;    
     private String gatewayResponse; // Raw response from payment gateway
  
 }

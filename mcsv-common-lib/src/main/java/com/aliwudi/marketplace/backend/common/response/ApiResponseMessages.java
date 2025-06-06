@@ -2,13 +2,15 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
+
     // --- General / Common Messages ---
     String OPERATION_SUCCESSFUL = "Operation successful."; // Generic success message
     String INVALID_PAGINATION_PARAMETERS = "Invalid pagination parameters: offset must be non-negative, limit must be positive.";
     String INVALID_SEARCH_TERM = "Invalid search term provided.";
     String INVALID_PARAMETERS = "Invalid parameters provided.";
     String GENERAL_SERVER_ERROR = "An unexpected server error occurred.";
-
+    String INVALID_DATE_FORMAT = "Invalid date format.";
+    String INVALID_LOCATION = "Invalid location.";
 
     // --- Authentication & Authorization Messages ---
     String UNAUTHENTICATED_USER = "User is not authenticated.";
@@ -279,6 +281,7 @@ public interface ApiResponseMessages {
     String INVALID_DELIVERY_STATUS_TRANSITION_FROM_CANCELED = "Cannot change status from CANCELED to any other status.";
     String INVALID_DELIVERY_STATUS_FOR_CANCELLATION = "Delivery cannot be canceled in current status";
     String INVALID_DELIVERY_AGENT = "Invalid delivery agent provided.";
+    String INVALID_DELIVERY_STATUS_TRANSITION_FROM_FAILED = "Invalid delivery status transition from failed.";    
     String ERROR_CREATING_DELIVERY = "An error occurred while creating the delivery.";
     String ERROR_RETRIEVING_DELIVERY_BY_ORDER = "An error occurred while retrieving delivery by order ID.";
     String ERROR_RETRIEVING_DELIVERY_BY_TRACKING = "An error occurred while retrieving delivery by tracking number.";
@@ -317,6 +320,7 @@ public interface ApiResponseMessages {
     String INVALID_BASE64_CONTENT = "Invalid Base64 file content provided.";
     String INVALID_ASSET_NAME = "Invalid asset name provided."; // General invalid asset name
     String INVALID_FILE_TYPE = "Invalid file type provided."; // General invalid file type
+    String DUPLICATE_MEDIA_UNIQUE_FILE_NAME = "Duplicate Media unique file name";
 
     String ERROR_UPLOADING_MEDIA = "An error occurred while uploading media.";
     String ERROR_RETRIEVING_MEDIA = "An error occurred while retrieving the media asset.";

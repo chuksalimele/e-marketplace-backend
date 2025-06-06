@@ -1,32 +1,26 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
-import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
-import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
-import com.aliwudi.marketplace.backend.common.model.Cart;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+import com.aliwudi.marketplace.backend.common.model.Order;
+import com.aliwudi.marketplace.backend.common.model.OrderItem;
 import com.aliwudi.marketplace.backend.orderprocessing.service.OrderService;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.CheckoutRequest;
-import com.aliwudi.marketplace.backend.common.model.Order; // Import Order model
-import com.aliwudi.marketplace.backend.common.model.OrderItem; // Import OrderItem model
-import com.aliwudi.marketplace.backend.common.model.Product;
-import com.aliwudi.marketplace.backend.common.model.User;
+import com.aliwudi.marketplace.backend.common.status.OrderStatus; // Import OrderStatus
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
+import com.aliwudi.marketplace.backend.orderprocessing.service.OrderService.OrderItemRequest; // Import inner DTO
 
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid; // For @Valid
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Flux; // Import Flux
-import java.util.Map;
-import lombok.RequiredArgsConstructor;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.common.status.OrderStatus;
+import reactor.core.publisher.Flux;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map; // Still used for status update payload
 
 @RestController
 @RequestMapping("/api/orders")
@@ -34,186 +28,172 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
-    private final UserIntegrationService userIntegrationService;
-    private final ProductIntegrationService productIntegrationService;
+    // Removed direct injection of integration services as they are used within the service layer.
 
     /**
-     * Helper method to map Order entity to Order DTO for public exposure.
+     * Endpoint to create a new order for a user based on checkout request.
+     *
+     * @param checkoutRequest The CheckoutRequest DTO containing user ID, items, shipping address, and payment method.
+     * @return A Mono emitting the created Order.
      */
-    private Mono<Order> prepareDto(Order order) {
-        if (order == null) {
-            return Mono.empty();
-        }
-        Mono<User> userMono;
-        List<Mono<?>> listMonos = List.of();
-        if (order.getUser() == null) {
-            userMono = userIntegrationService.getUserById(order.getUserId());
-            listMonos.add(userMono);
-        }
-        if (order.getItems() == null) {
-            Flux orderItemFlux = orderService.findOrderItemsByOrderId(order.getId());
-            Mono orderItemListMono = orderItemFlux.collectList();
-            listMonos.add(orderItemListMono);
-        }
-
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if (obj instanceof User user) {
-                    order.setUser(user);
-                }
-                if (obj instanceof List items && !items.isEmpty()) {
-                    if (items.get(0) instanceof OrderItem) {
-                        order.setItems(items);
-                    }
-                }
-            }
-            return order;
-        });
-    }
-
-    /**
-     * Helper method to map OrderItem entity to OrderItem DTO for public
-     * exposure.
-     */
-    private Mono<OrderItem> prepareDto(OrderItem orderItem) {
-        if (orderItem == null) {
-            return Mono.empty();
-        }
-        Mono<Product> productMono;
-        List<Mono<?>> listMonos = List.of();
-        if (orderItem.getProduct() == null) {
-            productMono = productIntegrationService.getProductById(orderItem.getProductId());
-            listMonos.add(productMono);
-        }
-
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if (obj instanceof Product product) {
-                    orderItem.setProduct(product);
-                }
-            }
-            return orderItem;
-        });
-    }
-
     @PostMapping("/checkout")
-    public Mono<StandardResponseEntity> createOrder(@RequestBody CheckoutRequest checkoutRequest) {
+    @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created for resource creation
+    public Mono<Order> createOrder(@Valid @RequestBody CheckoutRequest checkoutRequest) {
+        // userId should ideally come from authenticated principal in API Gateway
+        // For now, assuming it's part of the request payload or handled by API Gateway context.
         return orderService.createOrder(
                 checkoutRequest.getUserId(),
                 checkoutRequest.getItems(),
                 checkoutRequest.getShippingAddress(),
                 checkoutRequest.getPaymentMethod()
-        )
-                .flatMap(this::prepareDto)
-                .map(order -> StandardResponseEntity.created(order, ApiResponseMessages.ORDER_CREATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(InsufficientStockException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DURING_ORDER_CREATION + ": " + e.getMessage())));
+        );
+        // Exceptions (ResourceNotFoundException, InsufficientStockException, IllegalArgumentException)
+        // are now handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve all orders with pagination.
+     *
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @param sortBy The field to sort by.
+     * @param sortDir The sort direction (asc/desc).
+     * @return A Flux of Order.
+     */
     @GetMapping
-    public Mono<StandardResponseEntity> getAllOrders() {
-        return orderService.getAllOrders()
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getAllOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return orderService.findAllOrders(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve an order by its ID.
+     *
+     * @param id The ID of the order.
+     * @return A Mono emitting the Order.
+     */
     @GetMapping("/{id}")
-    public Mono<StandardResponseEntity> getOrderById(@PathVariable Long id) {
-        return orderService.getOrderById(id)
-                .flatMap(this::prepareDto)
-                .map(order -> StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + id)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Order> getOrderById(@PathVariable Long id) {
+        return orderService.getOrderById(id);
+        // Exceptions (ResourceNotFoundException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve orders by a specific user ID with pagination.
+     *
+     * @param userId The ID of the user.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @param sortBy The field to sort by.
+     * @param sortDir The sort direction (asc/desc).
+     * @return A Flux of Order.
+     */
     @GetMapping("/user/{userId}")
-    public Mono<StandardResponseEntity> getOrdersByUserId(@PathVariable Long userId) {
-        return orderService.getOrdersByUserId(userId)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + userId)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getOrdersByUserId(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return orderService.findOrdersByUserId(userId, pageable);
+        // Exceptions (ResourceNotFoundException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to update the status of an existing order.
+     *
+     * @param id The ID of the order to update.
+     * @param statusUpdate A map containing the "newStatus" string.
+     * @return A Mono emitting the updated Order.
+     * @throws IllegalArgumentException if the status string is invalid or missing.
+     */
     @PutMapping("/{id}/status")
-    public Mono<StandardResponseEntity> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> statusUpdate) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Order> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> statusUpdate) {
         String statusString = statusUpdate.get("newStatus");
         if (statusString == null || statusString.trim().isEmpty()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.MISSING_NEW_STATUS_BAD_REQUEST));
+            throw new IllegalArgumentException(ApiResponseMessages.MISSING_NEW_STATUS_BAD_REQUEST);
         }
 
         OrderStatus newStatus;
         try {
             newStatus = OrderStatus.valueOf(statusString.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + statusString));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + statusString);
         }
 
-        return orderService.updateOrderStatus(id, newStatus)
-                .flatMap(this::prepareDto)
-                .map(order -> StandardResponseEntity.ok(order, ApiResponseMessages.ORDER_STATUS_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + ": " + id)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_ORDER_STATUS + ": " + e.getMessage())));
+        return orderService.updateOrderStatus(id, newStatus);
+        // Exceptions (ResourceNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to delete an order by its ID.
+     *
+     * @param id The ID of the order to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     */
     @DeleteMapping("/{id}")
-    public Mono<StandardResponseEntity> deleteOrderById(@PathVariable Long id) {
-        return orderService.deleteOrderById(id)
-                .map(aVoid -> StandardResponseEntity.ok(null, ApiResponseMessages.ORDER_DELETED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND + id)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_ORDER + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful deletion
+    public Mono<Void> deleteOrderById(@PathVariable Long id) {
+        return orderService.deleteOrderById(id);
+        // Exceptions (ResourceNotFoundException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to delete all orders by a specific user ID.
+     *
+     * @param userId The ID of the user whose orders are to be deleted.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     */
     @DeleteMapping("/user/{userId}")
-    public Mono<StandardResponseEntity> deleteOrdersByUserId(@PathVariable Long userId) {
-        return orderService.deleteOrdersByUserId(userId)
-                .map(aVoid -> StandardResponseEntity.ok(null, ApiResponseMessages.ORDERS_DELETED_SUCCESS_FOR_USER)) // Specific message
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND_FOR_USER + ": " + userId)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_ORDER + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> deleteOrdersByUserId(@PathVariable Long userId) {
+        return orderService.deleteOrdersByUserId(userId);
+        // Exceptions (ResourceNotFoundException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to delete a specific order item from an order.
+     *
+     * @param orderId The ID of the order the item belongs to.
+     * @param orderItemId The ID of the order item to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     */
     @DeleteMapping("/order/{orderId}/item/{orderItemId}")
-    public Mono<StandardResponseEntity> deleteOrderItem(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> deleteOrderItem(
             @PathVariable Long orderId,
             @PathVariable Long orderItemId
     ) {
-        return orderService.deleteOrderItem(orderId, orderItemId)
-                .map(aVoid -> StandardResponseEntity.ok(null, ApiResponseMessages.ORDER_ITEMS_DELETED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND + orderItemId)))
-                .onErrorResume(IllegalArgumentException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest(e.getMessage()))) // For item not belonging to order
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_ORDER + ": " + e.getMessage())));
+        return orderService.deleteOrderItem(orderId, orderItemId);
+        // Exceptions (ResourceNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to clear all orders from the system. Use with extreme caution.
+     *
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     */
     @DeleteMapping("/clearAll")
-    public Mono<StandardResponseEntity> clearAllOrders() {
-        return orderService.clearAllOrders()
-                .map(aVoid -> StandardResponseEntity.ok(null, ApiResponseMessages.ALL_ORDERS_CLEARED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> clearAllOrders() {
+        return orderService.clearAllOrders();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
-    // --- NEW: OrderItem Controller Endpoints ---
+    // --- OrderItem Controller Endpoints ---
+
     /**
      * Endpoint to retrieve all order items with pagination.
      *
@@ -224,26 +204,20 @@ public class OrderController {
      * @return A Flux of OrderItem.
      */
     @GetMapping("/items/all")
-    public Mono<StandardResponseEntity> getAllOrderItems(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<OrderItem> getAllOrderItems(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findAllOrderItems(pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDER_ITEM + ": " + e.getMessage())));
+        return orderService.findAllOrderItems(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to retrieve all order items belonging to a specific order with
-     * pagination.
+     * Endpoint to retrieve all order items belonging to a specific order with pagination.
      *
      * @param orderId The ID of the order.
      * @param page The page number (0-indexed).
@@ -253,7 +227,8 @@ public class OrderController {
      * @return A Flux of OrderItem.
      */
     @GetMapping("/items/byOrder/{orderId}")
-    public Mono<StandardResponseEntity> getOrderItemsByOrderId(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<OrderItem> getOrderItemsByOrderId(
             @PathVariable Long orderId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -261,19 +236,12 @@ public class OrderController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrderItemsByOrderId(orderId, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(orderItemList -> StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDER_ITEM + ": " + e.getMessage())));
+        return orderService.findOrderItemsByOrderId(orderId, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to retrieve all order items containing a specific product with
-     * pagination.
+     * Endpoint to retrieve all order items containing a specific product with pagination.
      *
      * @param productId The ID of the product.
      * @param page The page number (0-indexed).
@@ -283,7 +251,8 @@ public class OrderController {
      * @return A Flux of OrderItem.
      */
     @GetMapping("/items/byProduct/{productId}")
-    public Mono<StandardResponseEntity> getOrderItemsByProductId(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<OrderItem> getOrderItemsByProductId(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -291,13 +260,8 @@ public class OrderController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrderItemsByProductId(productId, pageable)
-                .collectList()
-                .map(orderItemList -> StandardResponseEntity.ok(orderItemList, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDER_ITEM + ": " + e.getMessage())));
+        return orderService.findOrderItemsByProductId(productId, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -308,52 +272,50 @@ public class OrderController {
      * @return A Mono emitting the OrderItem.
      */
     @GetMapping("/items/find/{orderId}/{productId}")
-    public Mono<StandardResponseEntity> findSpecificOrderItem(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<OrderItem> findSpecificOrderItem(
             @PathVariable Long orderId,
             @PathVariable Long productId) {
-        return orderService.findSpecificOrderItem(orderId, productId)
-                .flatMap(this::prepareDto)
-                .map(orderItem -> StandardResponseEntity.ok(orderItem, ApiResponseMessages.ORDER_ITEM_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_ITEM_NOT_FOUND + " for order " + orderId + " and product " + productId)))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDER_ITEM + ": " + e.getMessage())));
+        return orderService.findSpecificOrderItem(orderId, productId);
+        // Exceptions (ResourceNotFoundException) are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count all order items.
      *
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/items/count/all")
-    public Mono<StandardResponseEntity> countAllOrderItems() {
-        return orderService.countAllOrderItems()
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDER_ITEMS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countAllOrderItems() {
+        return orderService.countAllOrderItems();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count all order items for a specific order.
      *
      * @param orderId The ID of the order.
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/items/count/byOrder/{orderId}")
-    public Mono<StandardResponseEntity> countOrderItemsByOrderId(@PathVariable Long orderId) {
-        return orderService.countOrderItemsByOrderId(orderId)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDER_ITEMS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrderItemsByOrderId(@PathVariable Long orderId) {
+        return orderService.countOrderItemsByOrderId(orderId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count all order items for a specific product.
      *
      * @param productId The ID of the product.
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/items/count/byProduct/{productId}")
-    public Mono<StandardResponseEntity> countOrderItemsByProductId(@PathVariable Long productId) {
-        return orderService.countOrderItemsByProductId(productId)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_ITEM_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDER_ITEMS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrderItemsByProductId(@PathVariable Long productId) {
+        return orderService.countOrderItemsByProductId(productId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -361,18 +323,19 @@ public class OrderController {
      *
      * @param orderId The ID of the order.
      * @param productId The ID of the product.
-     * @return A Mono emitting true if it exists, false otherwise.
+     * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
     @GetMapping("/items/exists/{orderId}/{productId}")
-    public Mono<StandardResponseEntity> checkOrderItemExists(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> checkOrderItemExists(
             @PathVariable Long orderId,
             @PathVariable Long productId) {
-        return orderService.checkOrderItemExists(orderId, productId)
-                .map(exists -> StandardResponseEntity.ok(exists, ApiResponseMessages.ORDER_ITEM_EXISTS_CHECK_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_ORDER_ITEM_EXISTENCE + ": " + e.getMessage())));
+        return orderService.checkOrderItemExists(orderId, productId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     // --- NEW: Order Repository Controller Endpoints ---
+
     /**
      * Endpoint to retrieve all orders with pagination.
      *
@@ -383,20 +346,16 @@ public class OrderController {
      * @return A Flux of Order.
      */
     @GetMapping("/admin/all")
-    public Mono<StandardResponseEntity> getAllOrdersPaginated(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getAllOrdersPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findAllOrders(pageable)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+        return orderService.findAllOrders(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -410,7 +369,8 @@ public class OrderController {
      * @return A Flux of Order.
      */
     @GetMapping("/admin/byUser/{userId}")
-    public Mono<StandardResponseEntity> getOrdersByUserIdPaginated(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getOrdersByUserIdPaginated(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -418,13 +378,8 @@ public class OrderController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrdersByUserId(userId, pageable)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+        return orderService.findOrdersByUserId(userId, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -438,7 +393,8 @@ public class OrderController {
      * @return A Flux of Order.
      */
     @GetMapping("/admin/byStatus/{status}")
-    public Mono<StandardResponseEntity> getOrdersByStatus(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getOrdersByStatus(
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -448,28 +404,19 @@ public class OrderController {
         try {
             orderStatus = OrderStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            // Handle invalid status input
-            return Mono.error(new IllegalArgumentException("Invalid order status: " + status));
+            throw new IllegalArgumentException("Invalid order status: " + status);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrdersByStatus(orderStatus, pageable)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+        return orderService.findOrdersByStatus(orderStatus, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find orders placed within a specific time range with
-     * pagination.
+     * Endpoint to find orders placed within a specific time range with pagination.
      *
-     * @param startTime The start time of the range (ISO 8601
-     * format:YYYY-MM-ddTHH:mm:ss).
-     * @param endTime The end time of the range (ISO 8601
-     * format:YYYY-MM-ddTHH:mm:ss).
+     * @param startTime The start time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
+     * @param endTime The end time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -477,7 +424,8 @@ public class OrderController {
      * @return A Flux of Order.
      */
     @GetMapping("/admin/byTimeRange")
-    public Mono<StandardResponseEntity> getOrdersByTimeRange(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getOrdersByTimeRange(
             @RequestParam String startTime,
             @RequestParam String endTime,
             @RequestParam(defaultValue = "0") int page,
@@ -489,20 +437,14 @@ public class OrderController {
         try {
             start = LocalDateTime.parse(startTime);
             end = LocalDateTime.parse(endTime);
-
         } catch (DateTimeParseException e) {
-            return Mono.error(new IllegalArgumentException("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss."));
+            throw new IllegalArgumentException("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss.");
         }
 
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrdersByTimeRange(start, end, pageable)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+        return orderService.findOrdersByTimeRange(start, end, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -517,7 +459,8 @@ public class OrderController {
      * @return A Flux of Order.
      */
     @GetMapping("/admin/byUserAndStatus/{userId}/{status}")
-    public Mono<StandardResponseEntity> getOrdersByUserIdAndStatus(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Order> getOrdersByUserIdAndStatus(
             @PathVariable Long userId,
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
@@ -528,85 +471,78 @@ public class OrderController {
         try {
             orderStatus = OrderStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Mono.error(new IllegalArgumentException("Invalid order status: " + status));
+            throw new IllegalArgumentException("Invalid order status: " + status);
         }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return orderService.findOrdersByUserIdAndStatus(userId, orderStatus, pageable)
-                .collectList()
-                .map(orderList -> StandardResponseEntity.ok(orderList, ApiResponseMessages.ORDERS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ORDER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ORDERS + ": " + e.getMessage())));
+        return orderService.findOrdersByUserIdAndStatus(userId, orderStatus, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count all orders.
      *
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/all")
-    public Mono<StandardResponseEntity> countAllOrders() {
-        return orderService.countAllOrders()
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDERS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countAllOrders() {
+        return orderService.countAllOrders();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count orders placed by a specific user.
      *
      * @param userId The ID of the user.
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/byUser/{userId}")
-    public Mono<StandardResponseEntity> countOrdersByUserId(@PathVariable Long userId) {
-        return orderService.countOrdersByUserId(userId)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDERS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrdersByUserId(@PathVariable Long userId) {
+        return orderService.countOrdersByUserId(userId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count orders by their current status.
      *
      * @param status The status of the order.
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/byStatus/{status}")
-    public Mono<StandardResponseEntity> countOrdersByStatus(@PathVariable String status) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrdersByStatus(@PathVariable String status) {
         OrderStatus orderStatus;
         try {
             orderStatus = OrderStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + status));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + status);
         }
-        return orderService.countOrdersByStatus(orderStatus)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDERS + ": " + e.getMessage())));
+        return orderService.countOrdersByStatus(orderStatus);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count orders placed within a specific time range.
      *
-     * @param startTime The start time of the range (ISO 8601
-     * format:YYYY-MM-ddTHH:mm:ss).
-     * @param endTime The end time of the range (ISO 8601
-     * format:YYYY-MM-ddTHH:mm:ss).
-     * @return A Mono emitting the count.
+     * @param startTime The start time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
+     * @param endTime The end time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/byTimeRange")
-    public Mono<StandardResponseEntity> countOrdersByTimeRange(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrdersByTimeRange(
             @RequestParam String startTime,
             @RequestParam String endTime) {
         try {
             LocalDateTime start = LocalDateTime.parse(startTime);
             LocalDateTime end = LocalDateTime.parse(endTime);
-            return orderService.countOrdersByTimeRange(start, end)
-                    .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_COUNT_SUCCESS))
-                    .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDERS + ": " + e.getMessage())));
+            return orderService.countOrdersByTimeRange(start, end);
         } catch (DateTimeParseException e) {
-            return Mono.just(StandardResponseEntity.badRequest("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss."));
+            throw new IllegalArgumentException("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss.");
         }
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -614,20 +550,20 @@ public class OrderController {
      *
      * @param userId The ID of the user.
      * @param status The status of the order.
-     * @return A Mono emitting the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/byUserAndStatus/{userId}/{status}")
-    public Mono<StandardResponseEntity> countOrdersByUserIdAndStatus(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countOrdersByUserIdAndStatus(
             @PathVariable Long userId,
             @PathVariable String status) {
         OrderStatus orderStatus;
         try {
             orderStatus = OrderStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + status));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_ORDER_STATUS_VALUE + status);
         }
-        return orderService.countOrdersByUserIdAndStatus(userId, orderStatus)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ORDER_COUNT_SUCCESS))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ORDERS + ": " + e.getMessage())));
+        return orderService.countOrdersByUserIdAndStatus(userId, orderStatus);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }

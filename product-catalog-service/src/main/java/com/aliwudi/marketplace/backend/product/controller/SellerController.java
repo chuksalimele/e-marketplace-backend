@@ -1,25 +1,23 @@
-package com.aliwudi.marketplace.backend.product.controller; // Assuming 'seller' is part of 'product' for now
+package com.aliwudi.marketplace.backend.product.controller;
 
 import com.aliwudi.marketplace.backend.common.model.Seller;
-import com.aliwudi.marketplace.backend.common.model.Store;
-import com.aliwudi.marketplace.backend.product.dto.SellerRequest; // New DTO for incoming seller data
-import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException; // Re-using or creating
-import com.aliwudi.marketplace.backend.product.exception.InvalidSellerDataException; // New custom exception for seller-specific data issues
-import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException; // Re-using or creating
+import com.aliwudi.marketplace.backend.product.dto.SellerRequest;
+import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException; // Corrected package
+import com.aliwudi.marketplace.backend.common.exception.InvalidSellerDataException; // Corrected package
+import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException; // Corrected package
 import com.aliwudi.marketplace.backend.product.service.SellerService;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-import java.util.stream.Collectors;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.product.service.StoreService;
+// Removed unused imports: java.util.List, java.util.stream.Collectors, com.aliwudi.marketplace.backend.common.model.Store, com.aliwudi.marketplace.backend.product.service.StoreService
+// as prepareDto logic moved to service
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
@@ -28,162 +26,159 @@ import com.aliwudi.marketplace.backend.product.service.StoreService;
 public class SellerController {
 
     private final SellerService sellerService;
-    private final StoreService storeService;
 
     /**
-     * Helper method to map Seller entity to Seller DTO for public exposure.
+     * Endpoint to retrieve all sellers with pagination.
+     *
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux of Seller entities.
+     * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    private Mono<Seller> prepareDto(Seller seller) {
-        if (seller == null) {
-            return Mono.empty();
-        }
-        List<Mono<?>> listMonos=  List.of();
-        
-        if(seller.getStores() ==  null){
-            Flux storesFlux = storeService.getStoresBySeller(seller.getId());
-            Mono storeListMono = storesFlux.collectList();
-            listMonos.add(storeListMono);
-        }
-        
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if (obj instanceof List stores && !stores.isEmpty()) {
-                    if (stores.get(0) instanceof Store) {
-                        seller.setStores(stores);
-                    }
-                }
-            }
-            return seller;
-        });
-    }
-
     @GetMapping
-    public Mono<StandardResponseEntity> getAllSellers(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Seller> getAllSellers(
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
-
-        if (page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+        if (page == null || page < 0 || size == null || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return sellerService.getAllSellers(page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(sellerResponses -> StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLERS + ": " + e.getMessage())));
+        return sellerService.getAllSellers(page, size);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count all sellers.
+     *
+     * @return A Mono emitting the total count of sellers.
+     */
     @GetMapping("/count")
-    public Mono<StandardResponseEntity> countAllSellers() {
-        return sellerService.countAllSellers()
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER_COUNT + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countAllSellers() {
+        return sellerService.countAllSellers();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve a seller by their ID.
+     *
+     * @param id The ID of the seller to retrieve.
+     * @return A Mono emitting the Seller.
+     * @throws IllegalArgumentException if seller ID is invalid.
+     * @throws ResourceNotFoundException if the seller is not found.
+     */
     @GetMapping("/{id}")
-    public Mono<StandardResponseEntity> getSellerById(@PathVariable Long id) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Seller> getSellerById(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
         }
-
-        return sellerService.getSellerById(id)
-                .flatMap(this::prepareDto)
-                .map(seller -> StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.SELLER_NOT_FOUND + id)))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_SELLER + ": " + e.getMessage())));
+        return sellerService.getSellerById(id);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to create a new seller.
+     *
+     * @param sellerRequest The DTO containing seller creation data.
+     * @return A Mono emitting the created Seller.
+     * @throws IllegalArgumentException if input validation fails.
+     * @throws DuplicateResourceException if a seller with the same email already exists.
+     * @throws InvalidSellerDataException if provided data is invalid.
+     */
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> createSeller(@Valid @RequestBody SellerRequest sellerRequest) {
+    public Mono<Seller> createSeller(@Valid @RequestBody SellerRequest sellerRequest) {
         // Basic input validation
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank() ||
             sellerRequest.getEmail() == null || sellerRequest.getEmail().isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_CREATION_REQUEST));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_CREATION_REQUEST);
         }
-
-        return sellerService.createSeller(sellerRequest)
-                .flatMap(this::prepareDto)
-                .map(seller -> StandardResponseEntity.created(seller, ApiResponseMessages.SELLER_CREATED_SUCCESS))
-                .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_SELLER_EMAIL)))
-                .onErrorResume(InvalidSellerDataException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CREATING_SELLER + ": " + e.getMessage())));
+        return sellerService.createSeller(sellerRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to update an existing seller.
+     *
+     * @param id The ID of the seller to update.
+     * @param sellerRequest The DTO containing seller update data.
+     * @return A Mono emitting the updated Seller.
+     * @throws IllegalArgumentException if seller ID or update data is invalid.
+     * @throws ResourceNotFoundException if the seller is not found.
+     * @throws InvalidSellerDataException if provided data is invalid.
+     * @throws DuplicateResourceException if the updated email causes a duplicate (if email update is allowed).
+     */
     @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
+    public Mono<Seller> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
         }
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank()) {
-             return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_UPDATE_REQUEST));
+             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_UPDATE_REQUEST);
         }
-
-        return sellerService.updateSeller(id, sellerRequest)
-                .flatMap(this::prepareDto)
-                .map(seller -> StandardResponseEntity.ok(seller, ApiResponseMessages.SELLER_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
-                .onErrorResume(InvalidSellerDataException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_SELLER + ": " + e.getMessage())));
+        return sellerService.updateSeller(id, sellerRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to delete a seller by their ID.
+     *
+     * @param id The ID of the seller to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if seller ID is invalid.
+     * @throws ResourceNotFoundException if the seller is not found.
+     */
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> deleteSeller(@PathVariable Long id) {
+    public Mono<Void> deleteSeller(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SELLER_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
         }
-
-        return sellerService.deleteSeller(id)
-                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.SELLER_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.SELLER_NOT_FOUND + id)))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_SELLER + ": " + e.getMessage())));
+        return sellerService.deleteSeller(id);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to search sellers by name (case-insensitive, contains) with pagination.
+     *
+     * @param query The search query for seller name.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting matching sellers.
+     * @throws IllegalArgumentException if search query or pagination parameters are invalid.
+     */
     @GetMapping("/search")
-    public Mono<StandardResponseEntity> searchSellers(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Seller> searchSellers(
             @RequestParam String query,
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
-
-        if (query == null || query.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+        if (query == null || query.isBlank() || page == null || page < 0 || size == null || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM);
         }
-        if (page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
-        }
-
-        return sellerService.searchSellers(query, page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(sellerResponses -> StandardResponseEntity.ok(sellerResponses, ApiResponseMessages.SELLERS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLERS + ": " + e.getMessage())));
+        return sellerService.searchSellers(query, page, size);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count sellers by name (case-insensitive, contains).
+     *
+     * @param query The search query for seller name.
+     * @return A Mono emitting the count of matching sellers.
+     * @throws IllegalArgumentException if search query is invalid.
+     */
     @GetMapping("/search/count")
-    public Mono<StandardResponseEntity> countSearchSellers(@RequestParam String query) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countSearchSellers(@RequestParam String query) {
         if (query == null || query.isBlank()) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_SEARCH_TERM));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM);
         }
-
-        return sellerService.countSearchSellers(query)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.SELLER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SEARCHING_SELLER_COUNT + ": " + e.getMessage())));
+        return sellerService.countSearchSellers(query);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }

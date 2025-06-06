@@ -1,26 +1,18 @@
 package com.aliwudi.marketplace.backend.orderprocessing.controller;
 
-import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.Inventory;
-import com.aliwudi.marketplace.backend.common.model.Product;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
-import com.aliwudi.marketplace.backend.orderprocessing.dto.InventoryUpdateRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.dto.StockOperationRequest;
-import com.aliwudi.marketplace.backend.orderprocessing.dto.StockResponse;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
+import com.aliwudi.marketplace.backend.orderprocessing.dto.InventoryUpdateRequest; // Assuming this DTO exists
+import com.aliwudi.marketplace.backend.orderprocessing.dto.StockOperationRequest; // Assuming this DTO exists
 import com.aliwudi.marketplace.backend.orderprocessing.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Flux; // Import Flux for methods returning multiple items
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.InventoryNotFoundException;
-import java.util.List;
+import reactor.core.publisher.Flux;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import jakarta.validation.Valid; // For @Valid annotation
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -28,117 +20,76 @@ import org.springframework.data.domain.Sort;
 public class InventoryController {
 
     private final InventoryService inventoryService;
-    private final ProductIntegrationService productIntegrationService;
+    // Removed ProductIntegrationService direct injection; it's now used within InventoryService for prepareDto.
 
     /**
-     * Helper method to map Inventory entity to Inventory DTO for public
-     * exposure.
+     * Endpoint to retrieve the available stock quantity for a given product ID.
+     *
+     * @param productId The ID of the product.
+     * @return A Mono emitting the available quantity (Integer).
      */
-    private Mono<Inventory> prepareDto(Inventory inventory) {
-        if (inventory == null) {
-            return Mono.empty();
-        }
-        Mono<Product> productMono;
-        List<Mono<?>> listMonos = List.of();
-        if (inventory.getProduct() == null) {
-            productMono = productIntegrationService.getProductById(inventory.getProductId());
-            listMonos.add(productMono);
-        }
-
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if (obj instanceof Product product) {
-                    inventory.setProduct(product);
-                }
-
-            }
-            return inventory;
-        });
+    @GetMapping("/{productId}/available-stock")
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Integer> getAvailableStock(@PathVariable Long productId) {
+        return inventoryService.getAvailableStock(productId);
+        // Errors (InventoryNotFoundException, IllegalArgumentException from service) are handled by GlobalExceptionHandler.
     }
 
-    @GetMapping("/{productId}")
-    public Mono<StandardResponseEntity> getAvailableStock(@PathVariable Long productId) {
-        return inventoryService.getAvailableStock(productId)
-                .map(availableQuantity -> StandardResponseEntity.ok(StockResponse.builder()
-                .productId(productId)
-                .availableQuantity(availableQuantity)
-                .build(),
-                ApiResponseMessages.OPERATION_SUCCESSFUL
-        ))
-                .onErrorResume(InventoryNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + productId)))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + productId)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
-    }
-
+    /**
+     * Endpoint to create a new inventory record or update an existing one for a given product ID.
+     *
+     * @param request The InventoryUpdateRequest containing productId and quantity.
+     * @return A Mono emitting the saved Inventory.
+     */
     @PostMapping("/add-or-update")
-    public Mono<StandardResponseEntity> createOrUpdateInventory(@RequestBody InventoryUpdateRequest request) {
-        return inventoryService.createOrUpdateInventory(request.getProductId(), request.getQuantity())
-                .then(Mono.just(StandardResponseEntity.created(null,
-                        ApiResponseMessages.OPERATION_SUCCESSFUL
-                )))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK) // Or HttpStatus.CREATED if always new
+    public Mono<Inventory> createOrUpdateInventory(@Valid @RequestBody InventoryUpdateRequest request) {
+        return inventoryService.createOrUpdateInventory(request.getProductId(), request.getQuantity());
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to reserve a specified quantity of stock for a product.
+     *
+     * @param request The StockOperationRequest containing productId and quantityToReserve.
+     * @return A Mono<Void> indicating completion (results in 204 No Content).
+     */
     @PostMapping("/reserve")
-    public Mono<StandardResponseEntity> reserveStock(@RequestBody StockOperationRequest request) {
-        return inventoryService.reserveStock(request.getProductId(), request.getQuantity())
-                .then(Mono.just(StandardResponseEntity.ok(null,
-                        ApiResponseMessages.OPERATION_SUCCESSFUL
-                )))
-                .onErrorResume(InventoryNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId())))
-                .onErrorResume(InsufficientStockException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> reserveStock(@Valid @RequestBody StockOperationRequest request) {
+        return inventoryService.reserveStock(request.getProductId(), request.getQuantity());
+        // Errors (InventoryNotFoundException, InsufficientStockException, IllegalArgumentException)
+        // are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to release a specified quantity of reserved stock for a product.
+     *
+     * @param request The StockOperationRequest containing productId and quantityToRelease.
+     * @return A Mono<Void> indicating completion (results in 204 No Content).
+     */
     @PostMapping("/release")
-    public Mono<StandardResponseEntity> releaseStock(@RequestBody StockOperationRequest request) {
-        
-        return inventoryService.releaseStock(request.getProductId(), request.getQuantity())
-                .then(Mono.just(StandardResponseEntity.ok(null,
-                        ApiResponseMessages.OPERATION_SUCCESSFUL
-                )))
-                .onErrorResume(InventoryNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId())))
-                .onErrorResume(IllegalArgumentException.class, e
-                        -> // For "Cannot release more than reserved"
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> releaseStock(@Valid @RequestBody StockOperationRequest request) {
+        return inventoryService.releaseStock(request.getProductId(), request.getQuantity());
+        // Errors (InventoryNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to confirm a reservation and permanently deduct stock from reserved quantity.
+     *
+     * @param request The StockOperationRequest containing productId and quantityConfirmed.
+     * @return A Mono<Void> indicating completion (results in 204 No Content).
+     */
     @PostMapping("/confirm-deduct")
-    public Mono<StandardResponseEntity> confirmReservationAndDeductStock(@RequestBody StockOperationRequest request) {
-        return inventoryService.confirmReservationAndDeductStock(request.getProductId(), request.getQuantity())
-                .then(Mono.just(StandardResponseEntity.ok(null,
-                        ApiResponseMessages.OPERATION_SUCCESSFUL
-                )))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.PRODUCT_NOT_FOUND + request.getProductId())))
-                .onErrorResume(InsufficientStockException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INSUFFICIENT_STOCK + e.getMessage())))
-                .onErrorResume(IllegalArgumentException.class, e
-                        -> // For "Cannot confirm more than reserved"
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> confirmReservationAndDeductStock(@Valid @RequestBody StockOperationRequest request) {
+        return inventoryService.confirmReservationAndDeductStock(request.getProductId(), request.getQuantity());
+        // Errors (InventoryNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
     }
 
-    // --- NEW: InventoryRepository Controller Endpoints ---
+    // --- Inventory Repository Controller Endpoints ---
+
     /**
      * Endpoint to retrieve all inventory records with pagination.
      *
@@ -149,19 +100,16 @@ public class InventoryController {
      * @return A Flux of Inventory records.
      */
     @GetMapping("/admin/all")
-    public Mono<StandardResponseEntity> getAllInventory(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Inventory> getAllInventory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return inventoryService.findAllInventory(pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(inventoryList -> StandardResponseEntity.ok(inventoryList, ApiResponseMessages.INVENTORY_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.INVENTORY_NOT_FOUND)))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_INVENTORYS + ": " + e.getMessage())));
+        return inventoryService.findAllInventory(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -176,7 +124,8 @@ public class InventoryController {
      * @return A Flux of Inventory records.
      */
     @GetMapping("/admin/availableGreaterThan/{quantity}")
-    public Mono<StandardResponseEntity> getInventoryByAvailableQuantityGreaterThan(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Inventory> getInventoryByAvailableQuantityGreaterThan(
             @PathVariable Integer quantity,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -184,85 +133,68 @@ public class InventoryController {
             @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return inventoryService.findInventoryByAvailableQuantityGreaterThan(quantity, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(inventoryList -> StandardResponseEntity.ok(inventoryList, ApiResponseMessages.INVENTORY_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.INVENTORY_NOT_FOUND)))
-                .onErrorResume(Exception.class, e -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_INVENTORYS + ": " + e.getMessage())));                
+        return inventoryService.findInventoryByAvailableQuantityGreaterThan(quantity, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to decrement the available quantity for a product directly.
      *
-     * @param request A StockOperationRequest containing productId (String) and
-     * quantity.
-     * @return A Mono emitting StandardResponseEntity.
+     * @param request A StockOperationRequest containing productId and quantity.
+     * @return A Mono emitting the number of rows updated (Integer).
      */
     @PostMapping("/admin/decrement")
-    public Mono<StandardResponseEntity> decrementAvailableQuantity(@RequestBody StockOperationRequest request) {
-        if (request.getProductId() == null || request.getQuantity() == null || request.getQuantity() <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest("Invalid request: productId and positive quantity are required."));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Integer> decrementAvailableQuantity(@Valid @RequestBody StockOperationRequest request) {
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive for decrement operation.");
         }
-        return inventoryService.decrementAvailableQuantity(request.getProductId(), request.getQuantity())
-                .map(rowsUpdated -> StandardResponseEntity.ok(rowsUpdated, "Available quantity decremented. Rows updated: " + rowsUpdated))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+        return inventoryService.decrementAvailableQuantity(request.getProductId(), request.getQuantity());
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to increment the available quantity for a product directly.
      *
-     * @param request A StockOperationRequest containing productId (String) and
-     * quantity.
-     * @return A Mono emitting StandardResponseEntity.
+     * @param request A StockOperationRequest containing productId and quantity.
+     * @return A Mono emitting the number of rows updated (Integer).
      */
     @PostMapping("/admin/increment")
-    public Mono<StandardResponseEntity> incrementAvailableQuantity(@RequestBody StockOperationRequest request) {
-        if (request.getProductId() == null || request.getQuantity() == null || request.getQuantity() <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest("Invalid request: productId and positive quantity are required."));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Integer> incrementAvailableQuantity(@Valid @RequestBody StockOperationRequest request) {
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive for increment operation.");
         }
-        return inventoryService.incrementAvailableQuantity(request.getProductId(), request.getQuantity())
-                .map(rowsUpdated -> StandardResponseEntity.ok(rowsUpdated, "Available quantity incremented. Rows updated: " + rowsUpdated))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+        return inventoryService.incrementAvailableQuantity(request.getProductId(), request.getQuantity());
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to update the reserved quantity for a product directly.
      *
-     * @param request A StockOperationRequest containing productId (String) and
-     * quantity (for reservedQuantity).
-     * @return A Mono emitting StandardResponseEntity.
+     * @param request A StockOperationRequest containing productId and quantity (for reservedQuantity).
+     * @return A Mono emitting the number of rows updated (Integer).
      */
     @PutMapping("/admin/updateReserved")
-    public Mono<StandardResponseEntity> updateReservedQuantity(@RequestBody StockOperationRequest request) {
-        if (request.getProductId() == null || request.getQuantity() == null || request.getQuantity() < 0) {
-            return Mono.just(StandardResponseEntity.badRequest("Invalid request: productId and non-negative quantity are required."));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Integer> updateReservedQuantity(@Valid @RequestBody StockOperationRequest request) {
+        if (request.getQuantity() == null || request.getQuantity() < 0) {
+            throw new IllegalArgumentException("Quantity must be non-negative for update reserved quantity operation.");
         }
-        return inventoryService.updateReservedQuantity(request.getProductId(), request.getQuantity())
-                .map(rowsUpdated -> StandardResponseEntity.ok(rowsUpdated, "Reserved quantity updated. Rows updated: " + rowsUpdated))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + request.getProductId())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+        return inventoryService.updateReservedQuantity(request.getProductId(), request.getQuantity());
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to count all inventory records.
      *
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the total count (Long).
      */
     @GetMapping("/count/all")
-    public Mono<StandardResponseEntity> countAllInventory() {
-        return inventoryService.countAllInventory()
-                .map(count -> StandardResponseEntity.ok(count, "Total inventory records counted."))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countAllInventory() {
+        return inventoryService.countAllInventory();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -270,30 +202,25 @@ public class InventoryController {
      * a threshold.
      *
      * @param quantity The minimum available quantity.
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the count (Long).
      */
     @GetMapping("/count/availableGreaterThan/{quantity}")
-    public Mono<StandardResponseEntity> countInventoryByAvailableQuantityGreaterThan(@PathVariable Integer quantity) {
-        return inventoryService.countInventoryByAvailableQuantityGreaterThan(quantity)
-                .map(count -> StandardResponseEntity.ok(count, "Inventory records with available quantity greater than " + quantity + " counted."))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countInventoryByAvailableQuantityGreaterThan(@PathVariable Integer quantity) {
+        return inventoryService.countInventoryByAvailableQuantityGreaterThan(quantity);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
      * Endpoint to check if an inventory record exists for a given product ID.
      *
-     * @param productId The ID of the product (as String).
-     * @return A Mono emitting StandardResponseEntity with a boolean indicating
-     * existence.
+     * @param productId The ID of the product.
+     * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
     @GetMapping("/exists/{productId}")
-    public Mono<StandardResponseEntity> existsInventoryByProductId(@PathVariable Long productId) {
-        return inventoryService.existsInventoryByProductId(productId)
-                .map(exists -> StandardResponseEntity.ok(exists, "Inventory existence check for product " + productId + " completed."))
-                .onErrorResume(NumberFormatException.class, e
-                        -> Mono.just(StandardResponseEntity.badRequest("Invalid Product ID format: " + productId)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.GENERAL_SERVER_ERROR + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsInventoryByProductId(@PathVariable Long productId) {
+        return inventoryService.existsInventoryByProductId(productId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }

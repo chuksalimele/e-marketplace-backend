@@ -11,7 +11,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.Set;
 import lombok.Builder;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -36,6 +38,9 @@ public class Cart {
     private List<CartItem> items; //skip for db but required for response
     
     private BigDecimal totalAmount;
+    @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
+    
+    @LastModifiedDate // Automatically populated with last modification timestamp
     private LocalDateTime updatedAt;    
 }

@@ -10,7 +10,9 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import lombok.ToString;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -40,7 +42,11 @@ public class Delivery {
     private LocalDateTime estimatedDeliveryDate;
     private LocalDateTime actualDeliveryDate; // Null until delivered
     private String notes; // Any additional notes or updates
+    
+    @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    
+    @LastModifiedDate // Automatically populated with last modification timestamp
+    private LocalDateTime updatedAt;    
 
 }

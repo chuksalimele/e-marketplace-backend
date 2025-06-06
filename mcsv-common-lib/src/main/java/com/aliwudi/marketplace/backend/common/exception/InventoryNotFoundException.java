@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.orderprocessing.exception;
+package com.aliwudi.marketplace.backend.common.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

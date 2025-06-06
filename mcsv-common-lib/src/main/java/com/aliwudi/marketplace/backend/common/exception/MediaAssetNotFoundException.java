@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.lgtmed.exception;
+package com.aliwudi.marketplace.backend.common.exception;
 
 public class MediaAssetNotFoundException extends RuntimeException {
     public MediaAssetNotFoundException(String message) {

@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Data
@@ -21,6 +22,8 @@ import org.springframework.data.relational.core.mapping.Table;
 public class Role {
     @Id    
     private Long id;
+    
+    @Column("name") // Maps to the 'name' column
     private ERole name; // Now of type ERole
 
     public Role(ERole name) {

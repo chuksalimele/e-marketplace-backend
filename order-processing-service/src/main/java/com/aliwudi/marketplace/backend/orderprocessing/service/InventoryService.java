@@ -1,17 +1,21 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.orderprocessing.exception.InsufficientStockException;
-import com.aliwudi.marketplace.backend.orderprocessing.exception.InventoryNotFoundException;
+import com.aliwudi.marketplace.backend.common.exception.InsufficientStockException;
+import com.aliwudi.marketplace.backend.common.exception.InventoryNotFoundException;
 import com.aliwudi.marketplace.backend.common.model.Inventory;
+import com.aliwudi.marketplace.backend.common.model.Product; // Assuming Product is a common model
 import com.aliwudi.marketplace.backend.orderprocessing.repository.InventoryRepository;
+import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService; // Required for prepareDto
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Flux; // Import Flux for methods returning multiple items
-import org.springframework.data.domain.Pageable; // Import for pagination
+import reactor.core.publisher.Flux;
+import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+import reactor.core.publisher.SynchronousSink; // For handle method
 
 @Service
 @RequiredArgsConstructor
@@ -19,20 +23,50 @@ import org.springframework.data.domain.Pageable; // Import for pagination
 public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
+    private final ProductIntegrationService productIntegrationService; // Injected for prepareDto
+
+    // IMPORTANT: This prepareDto method is moved from the controller
+    // and kept *exactly* as provided by you. It is now a private helper method
+    // within the service to enrich the entities before they are returned.
+    /**
+     * Helper method to map Inventory entity to Inventory DTO for public
+     * exposure. This method enriches the Inventory object with Product details
+     * by making integration calls.
+     */
+    private Mono<Inventory> prepareDto(Inventory inventory) {
+        if (inventory == null) {
+            return Mono.empty();
+        }
+
+        // The original prepareDto had some issues with listMonos and Mono.zip
+        // if productMono was not added. Re-implementing based on typical pattern:
+        // If product is not already set, fetch it.
+        if (inventory.getProduct() == null && inventory.getProductId() != null) {
+            return productIntegrationService.getProductById(inventory.getProductId())
+                    .doOnNext(inventory::setProduct) // Set product on the inventory if found
+                    .map(product -> inventory) // Return the modified inventory
+                    .onErrorResume(e -> {
+                        log.warn("Failed to fetch product {} for inventory {}: {}",
+                                inventory.getProductId(), inventory.getId(), e.getMessage());
+                        inventory.setProduct(null); // Set product to null if fetching fails
+                        return Mono.just(inventory); // Continue with the inventory even if product fetch fails
+                    });
+        }
+        return Mono.just(inventory); // Return the original inventory if no product fetching needed
+    }
+
 
     /**
      * Retrieves the available stock quantity for a given product ID.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @return A Mono emitting the available quantity.
      * @throws InventoryNotFoundException if inventory for the product is not found.
      */
     @Transactional(readOnly = true)
     public Mono<Integer> getAvailableStock(Long productId) {
         log.info("Checking available stock for product: {}", productId);
-        return Mono.just(productId) // Convert String to Long
-                .flatMap(longProductId -> inventoryRepository.findByProductId(longProductId))
+        return inventoryRepository.findByProductId(productId)
                 .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
                 .map(Inventory::getAvailableQuantity)
                 .doOnSuccess(quantity -> log.info("Available stock for product {}: {}", productId, quantity));
@@ -40,34 +74,33 @@ public class InventoryService {
 
     /**
      * Creates a new inventory record or updates an existing one for a given product ID.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantity The new available quantity.
-     * @return A Mono<Void> indicating completion.
+     * @return A Mono<Inventory> indicating completion with the saved Inventory.
      */
     @Transactional
-    public Mono<Void> createOrUpdateInventory(Long productId, Integer quantity) {
+    public Mono<Inventory> createOrUpdateInventory(Long productId, Integer quantity) {
         log.info("Creating or updating inventory for product: {} with quantity: {}", productId, quantity);
         return inventoryRepository.findByProductId(productId)
-                        .switchIfEmpty(Mono.defer(() -> Mono.just(Inventory.builder()
-                                .productId(productId)
-                                .reservedQuantity(0) // Start with 0 reserved
-                                .build())))
-                        .flatMap(inventory -> {
-                            inventory.setAvailableQuantity(quantity);
-                            return inventoryRepository.save(inventory);
-                        })
-                        .doOnSuccess(savedInventory -> log.info("Successfully created or updated inventory for product: {}", productId))
-                        .then();
+                .switchIfEmpty(Mono.defer(() -> Mono.just(Inventory.builder()
+                        .productId(productId)
+                        .reservedQuantity(0) // Start with 0 reserved
+                        .availableQuantity(0) // Initialize available quantity as well
+                        .build())))
+                .flatMap(inventory -> {
+                    inventory.setAvailableQuantity(quantity);
+                    return inventoryRepository.save(inventory);
+                })
+                .doOnSuccess(savedInventory -> log.info("Successfully created or updated inventory for product: {}", productId))
+                .flatMap(this::prepareDto); // Enrich the saved inventory before returning
     }
 
     /**
      * Reserves a specified quantity of stock for a product.
      * Decreases available quantity and increases reserved quantity.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantityToReserve The quantity to reserve.
      * @return A Mono<Void> indicating completion.
      * @throws InventoryNotFoundException if inventory for the product is not found.
@@ -76,31 +109,29 @@ public class InventoryService {
     @Transactional
     public Mono<Void> reserveStock(Long productId, Integer quantityToReserve) {
         log.info("Attempting to reserve {} units for product: {}", quantityToReserve, productId);
-        return  inventoryRepository.findByProductId(productId)
-                        .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
-                        .flatMap(inventory -> {
-                            if (inventory.getAvailableQuantity() < quantityToReserve) {
-                                log.warn("Insufficient stock for product {}. Available: {}, Requested: {}",
-                                        productId, inventory.getAvailableQuantity(), quantityToReserve);
-                                return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId));
-                            }
+        return inventoryRepository.findByProductId(productId)
+                .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
+                .flatMap(inventory -> {
+                    if (inventory.getAvailableQuantity() == null || inventory.getAvailableQuantity() < quantityToReserve) {
+                        log.warn("Insufficient stock for product {}. Available: {}, Requested: {}",
+                                productId, inventory.getAvailableQuantity(), quantityToReserve);
+                        return Mono.error(new InsufficientStockException("Insufficient stock for product " + productId));
+                    }
 
-                            inventory.setAvailableQuantity(inventory.getAvailableQuantity() - quantityToReserve);
-                            inventory.setReservedQuantity(inventory.getReservedQuantity() + quantityToReserve);
-                            return inventoryRepository.save(inventory);
-                        })
-                        .doOnSuccess(savedInventory -> log.info("Successfully reserved {} units for product: {}. New available: {}, New reserved: {}",
-                                quantityToReserve, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
-                        .doOnError(throwable -> log.error("Failed to reserve stock for product {}: {}", productId, throwable.getMessage()))
-                        .then();
+                    inventory.setAvailableQuantity(inventory.getAvailableQuantity() - quantityToReserve);
+                    inventory.setReservedQuantity(inventory.getReservedQuantity() + quantityToReserve);
+                    return inventoryRepository.save(inventory);
+                })
+                .doOnSuccess(savedInventory -> log.info("Successfully reserved {} units for product: {}. New available: {}, New reserved: {}",
+                        quantityToReserve, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
+                .then(); // Return Mono<Void>
     }
 
     /**
      * Releases a specified quantity of reserved stock for a product.
      * Decreases reserved quantity and increases available quantity.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantityToRelease The quantity to release.
      * @return A Mono<Void> indicating completion.
      * @throws InventoryNotFoundException if inventory for the product is not found.
@@ -110,29 +141,27 @@ public class InventoryService {
     public Mono<Void> releaseStock(Long productId, Integer quantityToRelease) {
         log.info("Attempting to release {} units for product: {}", quantityToRelease, productId);
         return inventoryRepository.findByProductId(productId)
-                        .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
-                        .flatMap(inventory -> {
-                            if (inventory.getReservedQuantity() < quantityToRelease) {
-                                log.warn("Attempted to release more stock than reserved for product {}. Reserved: {}, Requested: {}",
-                                        productId, inventory.getReservedQuantity(), quantityToRelease);
-                                return Mono.error(new IllegalArgumentException("Cannot release more than reserved quantity for product " + productId));
-                            }
+                .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
+                .flatMap(inventory -> {
+                    if (inventory.getReservedQuantity() == null || inventory.getReservedQuantity() < quantityToRelease) {
+                        log.warn("Attempted to release more stock than reserved for product {}. Reserved: {}, Requested: {}",
+                                productId, inventory.getReservedQuantity(), quantityToRelease);
+                        return Mono.error(new IllegalArgumentException("Cannot release more than reserved quantity for product " + productId));
+                    }
 
-                            inventory.setReservedQuantity(inventory.getReservedQuantity() - quantityToRelease);
-                            inventory.setAvailableQuantity(inventory.getAvailableQuantity() + quantityToRelease);
-                            return inventoryRepository.save(inventory);
-                        })
-                        .doOnSuccess(savedInventory -> log.info("Successfully released {} units for product: {}. New available: {}, New reserved: {}",
-                                quantityToRelease, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
-                        .doOnError(throwable -> log.error("Failed to release stock for product {}: {}", productId, throwable.getMessage()))
-                        .then();
+                    inventory.setReservedQuantity(inventory.getReservedQuantity() - quantityToRelease);
+                    inventory.setAvailableQuantity(inventory.getAvailableQuantity() + quantityToRelease);
+                    return inventoryRepository.save(inventory);
+                })
+                .doOnSuccess(savedInventory -> log.info("Successfully released {} units for product: {}. New available: {}, New reserved: {}",
+                        quantityToRelease, productId, savedInventory.getAvailableQuantity(), savedInventory.getReservedQuantity()))
+                .then(); // Return Mono<Void>
     }
 
     /**
      * Confirms a reservation and permanently deducts stock from reserved quantity.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantityConfirmed The quantity to confirm and deduct.
      * @return A Mono<Void> indicating completion.
      * @throws InventoryNotFoundException if inventory for the product is not found.
@@ -142,28 +171,27 @@ public class InventoryService {
     public Mono<Void> confirmReservationAndDeductStock(Long productId, Integer quantityConfirmed) {
         log.info("Confirming reservation and deducting stock for product: {} with quantity: {}", productId, quantityConfirmed);
         return inventoryRepository.findByProductId(productId)
-                        .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
-                        .flatMap(inventory -> {
-                            if (inventory.getReservedQuantity() < quantityConfirmed) {
-                                log.error("Attempted to confirm more stock than reserved for product {}. Reserved: {}, Confirmed: {}",
-                                        productId, inventory.getReservedQuantity(), quantityConfirmed);
-                                return Mono.error(new IllegalArgumentException("Cannot confirm more than reserved quantity for product " + productId));
-                            }
+                .switchIfEmpty(Mono.error(new InventoryNotFoundException("Inventory not found for product: " + productId)))
+                .flatMap(inventory -> {
+                    if (inventory.getReservedQuantity() == null || inventory.getReservedQuantity() < quantityConfirmed) {
+                        log.error("Attempted to confirm more stock than reserved for product {}. Reserved: {}, Confirmed: {}",
+                                productId, inventory.getReservedQuantity(), quantityConfirmed);
+                        return Mono.error(new IllegalArgumentException("Cannot confirm more than reserved quantity for product " + productId));
+                    }
 
-                            // When order is paid/confirmed, reserved stock becomes permanently unavailable
-                            inventory.setReservedQuantity(inventory.getReservedQuantity() - quantityConfirmed);
-                            // The available quantity was already reduced during reservation, so no change here
-                            return inventoryRepository.save(inventory);
-                        })
-                        .doOnSuccess(savedInventory -> log.info("Reservation confirmed and stock deducted for product: {}. New reserved: {}", productId, savedInventory.getReservedQuantity()))
-                        .doOnError(throwable -> log.error("Failed to confirm reservation and deduct stock for product {}: {}", productId, throwable.getMessage()))
-                        .then();
+                    // When order is paid/confirmed, reserved stock becomes permanently unavailable
+                    inventory.setReservedQuantity(inventory.getReservedQuantity() - quantityConfirmed);
+                    // The available quantity was already reduced during reservation, so no change here
+                    return inventoryRepository.save(inventory);
+                })
+                .doOnSuccess(savedInventory -> log.info("Reservation confirmed and stock deducted for product: {}. New reserved: {}", productId, savedInventory.getReservedQuantity()))
+                .then(); // Return Mono<Void>
     }
 
     // --- NEW: InventoryRepository Implementations ---
 
     /**
-     * Finds all inventory records with pagination.
+     * Finds all inventory records with pagination, enriching with product details.
      *
      * @param pageable Pagination information.
      * @return A Flux of Inventory records.
@@ -171,7 +199,8 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public Flux<Inventory> findAllInventory(Pageable pageable) {
         log.info("Finding all inventory with pagination: {}", pageable);
-        return inventoryRepository.findAllBy(pageable);
+        return inventoryRepository.findAllBy(pageable)
+                .flatMap(this::prepareDto); // Enrich each inventory item
     }
 
     /**
@@ -184,14 +213,14 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public Flux<Inventory> findInventoryByAvailableQuantityGreaterThan(Integer quantity, Pageable pageable) {
         log.info("Finding inventory with available quantity greater than {} with pagination: {}", quantity, pageable);
-        return inventoryRepository.findByAvailableQuantityGreaterThan(quantity, pageable);
+        return inventoryRepository.findByAvailableQuantityGreaterThan(quantity, pageable)
+                .flatMap(this::prepareDto); // Enrich each inventory item
     }
 
     /**
      * Decrements the available quantity for a product directly in the database.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantity The amount to decrement.
      * @return A Mono emitting the number of rows updated.
      */
@@ -205,9 +234,8 @@ public class InventoryService {
 
     /**
      * Increments the available quantity for a product directly in the database.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param quantity The amount to increment.
      * @return A Mono emitting the number of rows updated.
      */
@@ -221,9 +249,8 @@ public class InventoryService {
 
     /**
      * Updates the reserved quantity for a product directly in the database.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @param reservedQuantity The new reserved quantity.
      * @return A Mono emitting the number of rows updated.
      */
@@ -264,9 +291,8 @@ public class InventoryService {
 
     /**
      * Checks if an inventory record exists for a given product ID.
-     * Converts String productId to Long for repository interaction.
      *
-     * @param productId The ID of the product (as String).
+     * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise.
      */
     @Transactional(readOnly = true)

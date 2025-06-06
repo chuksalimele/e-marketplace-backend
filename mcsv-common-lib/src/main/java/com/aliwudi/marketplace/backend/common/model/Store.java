@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 
 import lombok.Builder;
 import lombok.ToString;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -47,8 +49,12 @@ public class Store {
     private String description;    
     private String profileImageUrl;
     private Double rating; // Store-specific rating
+    
+    @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;    
+    
+    @LastModifiedDate // Automatically populated with last modification timestamp
+    private LocalDateTime updatedAt;      
     
     public Store(String name, Long locationId, Long sellerId) {
         this.name = name;

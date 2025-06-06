@@ -10,7 +10,9 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Builder;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -31,9 +33,27 @@ public class User {
     private String lastName;
     private String phoneNumber;
     private String shippingAddress;
-    @Transient
-    private Set<Role> roles;
+    
+    @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;    
+
+    @LastModifiedDate // Automatically populated with last modification timestamp
+    private LocalDateTime updatedAt;
+
+    @Transient // This field is not persisted directly in the 'users' table.
+               // It's loaded via a join table or separate query by the repository.
+    private Set<Role> roles;
+    
+    
+    /**
+     * Helper method to add a role to the user.
+     * @param role The role to add.
+     */
+    public void addRole(Role role) {
+        if (this.roles == null) {
+            this.roles = new HashSet<>();
+        }
+        this.roles.add(role);
+    }
 
 }

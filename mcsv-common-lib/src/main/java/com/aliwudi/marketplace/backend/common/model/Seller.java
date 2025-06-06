@@ -10,7 +10,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.Builder;
 import lombok.ToString;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Table;
 // import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // If you use it for bidirectional relationships
@@ -30,8 +32,12 @@ public class Seller {
     private String name;
     private String email;    
     private String phnoneNumber;// personal phone number - this can be different from the Store phone number which is the office line
+    
+    @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;  
+    
+    @LastModifiedDate // Automatically populated with last modification timestamp
+    private LocalDateTime updatedAt;    
     
     @ToString.Exclude
     @Transient //skip for db but required for response dto    

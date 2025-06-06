@@ -1,25 +1,21 @@
 package com.aliwudi.marketplace.backend.product.controller;
 
-import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.model.Review;
-import com.aliwudi.marketplace.backend.product.exception.DuplicateResourceException;
-import com.aliwudi.marketplace.backend.product.exception.InvalidReviewDataException;
 import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
-import com.aliwudi.marketplace.backend.product.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.product.service.ReviewService;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException; // Corrected package
+import com.aliwudi.marketplace.backend.common.exception.InvalidReviewDataException; // Corrected package
+import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException; // Corrected package
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus; // For @ResponseStatus
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.product.service.ProductService;
+import java.util.Map; // Keep for Map.of
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -27,300 +23,332 @@ import com.aliwudi.marketplace.backend.product.service.ProductService;
 public class ReviewController {
 
     private final ReviewService reviewService;
-    private final ProductService productService;
 
     /**
-     * Helper method to convert Review entity to ReviewDto DTO.
-     * Note: Assumes 'product' field in Review entity might be null if not eagerly fetched.
-     * For a robust solution, consider fetching product name separately if always required,
-     * or ensuring 'product' is always loaded in the service layer where needed for the DTO.
+     * Endpoint to submit a new review for a product.
+     *
+     * @param reviewRequest The DTO containing review submission data.
+     * @return A Mono emitting the submitted Review.
+     * @throws IllegalArgumentException if input validation fails.
+     * @throws ResourceNotFoundException if a product or user is not found.
+     * @throws DuplicateResourceException if a review already exists for this user and product.
+     * @throws InvalidReviewDataException if the rating is invalid.
      */
-    private Mono<Review> prepareDto(Review review) {
-        if (review == null) {
-            return Mono.empty();
-        }
-        Mono<Product> productMono;
-        List<Mono<?>> listMonos=  List.of();
-        
-        if(review.getProduct() == null){
-            productMono = productService.getProductById(review.getProductId());
-            listMonos.add(productMono);
-        }
-        
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if(obj instanceof Product product){
-                    review.setProduct(product); 
-                }
-            }
-            return review;
-        });
-    }
-
     @PostMapping
-    public Mono<StandardResponseEntity> submitReview(@Valid @RequestBody ReviewRequest reviewRequest) {
+    @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
+    public Mono<Review> submitReview(@Valid @RequestBody ReviewRequest reviewRequest) {
         // Basic input validation at controller level
         if (reviewRequest.getProductId() == null || reviewRequest.getProductId() <= 0 ||
             reviewRequest.getUserId() == null || reviewRequest.getUserId() <= 0 ||
-            reviewRequest.getRating() == null || reviewRequest.getRating() < 1 || reviewRequest.getRating() > 5) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_SUBMISSION));
+            reviewRequest.getRating() == null) { // Rating range check is in service
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_REVIEW_SUBMISSION);
         }
-
-        return reviewService.submitReview(reviewRequest)
-                .flatMap(this::prepareDto)
-                .map(review -> StandardResponseEntity.created(review, ApiResponseMessages.REVIEW_SUBMITTED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(e.getMessage()))) // Catch specific ResourceNotFound
-                .onErrorResume(DuplicateResourceException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.DUPLICATE_REVIEW_SUBMISSION)))
-                .onErrorResume(InvalidReviewDataException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_SUBMITTING_REVIEW + ": " + e.getMessage())));
+        return reviewService.submitReview(reviewRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to update an existing review.
+     *
+     * @param id The ID of the review to update.
+     * @param updateRequest The DTO containing review update data.
+     * @return A Mono emitting the updated Review.
+     * @throws IllegalArgumentException if review ID is invalid or rating is out of range.
+     * @throws ResourceNotFoundException if the review is not found.
+     * @throws InvalidReviewDataException if updated review data is invalid.
+     */
     @PutMapping("/{id}")
-    public Mono<StandardResponseEntity> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewRequest updateRequest) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Review> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewRequest updateRequest) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_REVIEW_ID);
         }
+        // Rating range validation now primarily in service, but a quick check here too doesn't hurt.
         if (updateRequest.getRating() != null && (updateRequest.getRating() < 1 || updateRequest.getRating() > 5)) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_RATING));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_REVIEW_RATING);
         }
-
-        return reviewService.updateReview(id, updateRequest)
-                .flatMap(this::prepareDto)
-                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
-                .onErrorResume(InvalidReviewDataException.class, e ->
-                        Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_REVIEW + ": " + e.getMessage())));
+        return reviewService.updateReview(id, updateRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to delete a review by its ID.
+     *
+     * @param id The ID of the review to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if review ID is invalid.
+     * @throws ResourceNotFoundException if the review is not found.
+     */
     @DeleteMapping("/{id}")
-    public Mono<StandardResponseEntity> deleteReview(@PathVariable Long id) {
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
+    public Mono<Void> deleteReview(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_REVIEW_ID);
         }
-
-        return reviewService.deleteReview(id)
-                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.REVIEW_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.REVIEW_NOT_FOUND + id)))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_REVIEW + ": " + e.getMessage())));
+        return reviewService.deleteReview(id);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
-    // --- New/Refactored Endpoints ---
-
+    /**
+     * Endpoint to retrieve a single review by its ID.
+     *
+     * @param id The ID of the review to retrieve.
+     * @return A Mono emitting the Review.
+     * @throws IllegalArgumentException if review ID is invalid.
+     * @throws ResourceNotFoundException if the review is not found.
+     */
     @GetMapping("/{id}")
-    public Mono<StandardResponseEntity> getReviewById(@PathVariable Long id) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Review> getReviewById(@PathVariable Long id) {
         if (id == null || id <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_REVIEW_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_REVIEW_ID);
         }
-        return reviewService.getReviewById(id)
-                .flatMap(this::prepareDto)
-                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
+        return reviewService.getReviewById(id);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve all reviews with pagination.
+     *
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting all reviews.
+     * @throws IllegalArgumentException if pagination parameters are invalid.
+     */
     @GetMapping
-    public Mono<StandardResponseEntity> getAllReviews(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Review> getAllReviews(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
         if (page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return reviewService.getAllReviews(page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+        return reviewService.getAllReviews(page, size);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count all reviews.
+     *
+     * @return A Mono emitting the total count of reviews.
+     */
     @GetMapping("/count")
-    public Mono<StandardResponseEntity> countAllReviews() {
-        return reviewService.countAllReviews()
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countAllReviews() {
+        return reviewService.countAllReviews();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve all reviews for a specific product with pagination.
+     *
+     * @param productId The ID of the product.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting reviews for the specified product.
+     * @throws IllegalArgumentException if product ID or pagination parameters are invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     */
     @GetMapping("/product/{productId}")
-    public Mono<StandardResponseEntity> getReviewsForProduct(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Review> getReviewsForProduct(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
         if (productId == null || productId <= 0 || page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return reviewService.getReviewsByProductId(productId, page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_FOR_PRODUCT + ": " + e.getMessage())));
+        return reviewService.getReviewsByProductId(productId, page, size);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count all reviews for a specific product.
+     *
+     * @param productId The ID of the product.
+     * @return A Mono emitting the total count of reviews for the product.
+     * @throws IllegalArgumentException if product ID is invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     */
     @GetMapping("/product/{productId}/count")
-    public Mono<StandardResponseEntity> countReviewsForProduct(@PathVariable Long productId) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countReviewsForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);
         }
-        return reviewService.countReviewsByProductId(productId)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_FOR_PRODUCT + ": " + e.getMessage())));
+        return reviewService.countReviewsByProductId(productId);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to retrieve all reviews left by a specific user with pagination.
+     *
+     * @param userId The ID of the user.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting reviews by the specified user.
+     * @throws IllegalArgumentException if user ID or pagination parameters are invalid.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
     @GetMapping("/user/{userId}")
-    public Mono<StandardResponseEntity> getReviewsByUser(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Review> getReviewsByUser(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
         if (userId == null || userId <= 0 || page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return reviewService.getReviewsByUserId(userId, page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS_BY_USER + ": " + e.getMessage())));
+        return reviewService.getReviewsByUserId(userId, page, size);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count all reviews left by a specific user.
+     *
+     * @param userId The ID of the user.
+     * @return A Mono emitting the total count of reviews by the user.
+     * @throws IllegalArgumentException if user ID is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
     @GetMapping("/user/{userId}/count")
-    public Mono<StandardResponseEntity> countReviewsByUser(@PathVariable Long userId) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countReviewsByUser(@PathVariable Long userId) {
         if (userId == null || userId <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_USER_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
         }
-        return reviewService.countReviewsByUserId(userId)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT_BY_USER + ": " + e.getMessage())));
+        return reviewService.countReviewsByUserId(userId);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to find reviews for a product with a rating greater than or equal to a minimum value, with pagination.
+     *
+     * @param productId The ID of the product.
+     * @param minRating The minimum rating (inclusive).
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting filtered reviews.
+     * @throws IllegalArgumentException if product ID, minRating, or pagination parameters are invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     * @throws InvalidReviewDataException if the minRating is out of range.
+     */
     @GetMapping("/product/{productId}/min-rating/{minRating}")
-    public Mono<StandardResponseEntity> getReviewsByProductIdAndMinRating(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Review> getReviewsByProductIdAndMinRating(
             @PathVariable Long productId,
             @PathVariable Integer minRating,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
         if (productId == null || productId <= 0 || minRating == null || minRating < 1 || minRating > 5 || page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return reviewService.getReviewsByProductIdAndMinRating(productId, minRating, page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+        return reviewService.getReviewsByProductIdAndMinRating(productId, minRating, page, size);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to count reviews for a product with a rating greater than or equal to a minimum value.
+     *
+     * @param productId The ID of the product.
+     * @param minRating The minimum rating (inclusive).
+     * @return A Mono emitting the count of filtered reviews.
+     * @throws IllegalArgumentException if product ID or minRating are invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     * @throws InvalidReviewDataException if the minRating is out of range.
+     */
     @GetMapping("/product/{productId}/min-rating/{minRating}/count")
-    public Mono<StandardResponseEntity> countReviewsByProductIdAndMinRating(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Long> countReviewsByProductIdAndMinRating(
             @PathVariable Long productId,
             @PathVariable Integer minRating) {
-
         if (productId == null || productId <= 0 || minRating == null || minRating < 1 || minRating > 5) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PARAMETERS);
         }
-        return reviewService.countReviewsByProductIdAndMinRating(productId, minRating)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.REVIEW_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(InvalidReviewDataException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW_COUNT + ": " + e.getMessage())));
+        return reviewService.countReviewsByProductIdAndMinRating(productId, minRating);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to find the latest reviews for a product, ordered by review time descending, with pagination.
+     *
+     * @param productId The ID of the product.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @return A Flux emitting latest reviews for the product.
+     * @throws IllegalArgumentException if product ID or pagination parameters are invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     */
     @GetMapping("/product/{productId}/latest")
-    public Mono<StandardResponseEntity> getLatestReviewsByProductId(
+    @ResponseStatus(HttpStatus.OK)
+    public Flux<Review> getLatestReviewsByProductId(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
         if (productId == null || productId <= 0 || page < 0 || size <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-
-        return reviewService.getLatestReviewsByProductId(productId, page, size)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(reviewList -> StandardResponseEntity.ok(reviewList, ApiResponseMessages.REVIEWS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEWS + ": " + e.getMessage())));
+        return reviewService.getLatestReviewsByProductId(productId, page, size);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to find a review by a specific user for a specific product.
+     *
+     * @param userId The ID of the user.
+     * @param productId The ID of the product.
+     * @return A Mono emitting the Review.
+     * @throws IllegalArgumentException if user ID or product ID are invalid.
+     * @throws ResourceNotFoundException if the review is not found.
+     */
     @GetMapping("/user/{userId}/product/{productId}")
-    public Mono<StandardResponseEntity> getReviewByUserIdAndProductId(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Review> getReviewByUserIdAndProductId(
             @PathVariable Long userId,
             @PathVariable Long productId) {
-
         if (userId == null || userId <= 0 || productId == null || productId <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PARAMETERS);
         }
-
-        return reviewService.getReviewByUserIdAndProductId(userId, productId)
-                .flatMap(this::prepareDto)
-                .map(review -> StandardResponseEntity.ok(review, ApiResponseMessages.REVIEW_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e ->
-                        Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_REVIEW + ": " + e.getMessage())));
+        return reviewService.getReviewByUserIdAndProductId(userId, productId);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to get the average rating for a specific product.
+     *
+     * @param productId The ID of the product.
+     * @return A Mono emitting the average rating (Double).
+     * @throws IllegalArgumentException if product ID is invalid.
+     * @throws ResourceNotFoundException if the product is not found.
+     */
     @GetMapping("/product/{productId}/average-rating")
-    public Mono<StandardResponseEntity> getAverageRatingForProduct(@PathVariable Long productId) {
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Map<String, Double>> getAverageRatingForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PRODUCT_ID));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);
         }
-
         return reviewService.getAverageRatingForProduct(productId)
-                .map(averageRating -> {
-                    Map<String, Double> data = Map.of("averageRating", averageRating); // averageRating can be 0.0, not null
-                    return StandardResponseEntity.ok(data, ApiResponseMessages.AVERAGE_RATING_RETRIEVED_SUCCESS);
-                })
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_AVERAGE_RATING + ": " + e.getMessage())));
+                .map(averageRating -> Map.of("averageRating", averageRating));
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
+    /**
+     * Endpoint to check if a user has already reviewed a specific product.
+     *
+     * @param userId The ID of the user.
+     * @param productId The ID of the product.
+     * @return A Mono emitting true if a review exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if user ID or product ID are invalid.
+     */
     @GetMapping("/exists/user/{userId}/product/{productId}")
-    public Mono<StandardResponseEntity> checkReviewExists(
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> checkReviewExists(
             @PathVariable Long userId,
             @PathVariable Long productId) {
-
         if (userId == null || userId <= 0 || productId == null || productId <= 0) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_PARAMETERS));
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PARAMETERS);
         }
-
-        return reviewService.existsReviewByUserIdAndProductId(userId, productId)
-                .map(exists -> {
-                    Map<String, Boolean> data = Map.of("exists", exists);
-                    return StandardResponseEntity.ok(data, ApiResponseMessages.REVIEW_EXISTS_CHECK_SUCCESS);
-                })
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_CHECKING_REVIEW_EXISTENCE + ": " + e.getMessage())));
+        return reviewService.existsReviewByUserIdAndProductId(userId, productId);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }
