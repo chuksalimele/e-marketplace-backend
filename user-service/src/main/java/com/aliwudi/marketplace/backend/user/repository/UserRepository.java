@@ -56,4 +56,28 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     Mono<Boolean> existsByUsername(String username);
 
+    // Custom query to find a user by ID and fetch their roles
+    // This query is a common pattern for loading relationships in R2DBC
+    @Query("SELECT u.*, r.id AS role_id, r.name AS role_name " +
+           "FROM users u " +
+           "LEFT JOIN user_roles ur ON u.id = ur.user_id " +
+           "LEFT JOIN roles r ON ur.role_id = r.id " +
+           "WHERE u.id = :id")
+    Flux<User> findUserWithRolesById(Long id);
+
+    // Custom query to find a user by username and fetch their roles
+    @Query("SELECT u.*, r.id AS role_id, r.name AS role_name " +
+           "FROM users u " +
+           "LEFT JOIN user_roles ur ON u.id = ur.user_id " +
+           "LEFT JOIN roles r ON ur.role_id = r.id " +
+           "WHERE u.username = :username")
+    Flux<User> findUserWithRolesByUsername(String username);
+
+    // Custom query to find a user by email and fetch their roles
+    @Query("SELECT u.*, r.id AS role_id, r.name AS role_name " +
+           "FROM users u " +
+           "LEFT JOIN user_roles ur ON u.id = ur.user_id " +
+           "LEFT JOIN roles r ON ur.role_id = r.id " +
+           "WHERE u.email = :email")
+    Flux<User> findUserWithRolesByEmail(String email);    
 }

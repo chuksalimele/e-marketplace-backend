@@ -2,6 +2,21 @@ package com.aliwudi.marketplace.backend.common.response;
 
 public interface ApiResponseMessages {
 
+    public static String INVALID_SHIPPING_ADDRESS = "Invalid shipping address.";
+    public static String INVALID_USERNAME = "Invalid username.";
+    public static String INVALID_FIRST_NAME = "Invalid first name.";
+    public static String INVALID_LAST_NAME = "Invalid last name.";
+    public static String INVALID_EMAIL = "Invalid email.";
+
+    String INVALID_USER_CREATION_REQUEST = "Invalid user creation request";
+
+    String USER_NOT_FOUND_EMAIL ="User not found with email - ";
+
+    String USER_NOT_FOUND_USERNAME ="User not found with username - ";
+
+    String ROLE_NOT_FOUND_MSG = "Role not found.";
+    String OLD_PASSWORD_MISMATCH = "Old password mismatch.";
+
 
     // --- General / Common Messages ---
     String OPERATION_SUCCESSFUL = "Operation successful."; // Generic success message

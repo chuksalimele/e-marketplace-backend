@@ -1,8 +1,8 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
+import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.user.dto.MessageResponse;
-import com.aliwudi.marketplace.backend.common.role.ERole;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;

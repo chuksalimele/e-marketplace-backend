@@ -1,541 +1,536 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.common.model.Role;
-import com.aliwudi.marketplace.backend.common.model.User;
+import com.aliwudi.marketplace.backend.user.dto.PasswordUpdateRequest;
 import com.aliwudi.marketplace.backend.user.service.UserService;
-import com.aliwudi.marketplace.backend.common.response.StandardResponseEntity;
-import com.aliwudi.marketplace.backend.user.exception.ResourceNotFoundException;
-import com.aliwudi.marketplace.backend.user.dto.UserUpdateRequest; // Import for update requests
+import com.aliwudi.marketplace.backend.common.model.User;
+import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
+import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
+import com.aliwudi.marketplace.backend.common.exception.InvalidPasswordException;
+import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
+import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
+import com.aliwudi.marketplace.backend.user.dto.UserRequest;
+import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Flux; // Import Flux
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize; // For role-based authorization
-import org.springframework.data.domain.Pageable; // For pagination
-import org.springframework.data.domain.PageRequest; // For creating Pageable instances
-import org.springframework.data.domain.Sort; // For sorting
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime; // For date queries
-import java.time.format.DateTimeParseException; // For parsing dates
-import java.util.List;
-import java.util.stream.Collectors;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.common.role.ERole;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException; // For date parsing from request params
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
+@RequiredArgsConstructor // Generates a constructor for final fields
 public class UserController {
 
     private final UserService userService;
 
-    // Helper method to map User entity to User for public exposure
-    private Mono<User> prepareDto(User user) {
-        if (user == null) {
-            return Mono.empty();
-        }
-        Mono<Role> roleMono;
-        List<Mono<?>> listMonos=  List.of();
-        
-        if(user.getRoles() == null){
-            Flux roleFlux = userService.findAllRoles(cart.getId());
-            Mono roleListMono = roleFlux.collectList();
-            listMonos.add(roleListMono);
-        }
-        
-        return Mono.zip(listMonos, (Object[] array) -> {
-            for (Object obj : array) {
-                if(obj instanceof List roles && !roles.isEmpty()){
-                    if(roles.get(0) instanceof Role)
-                    user.setRoles(roles); 
-                }
-            }
-            return user;
-        });
-    }
-
     /**
-     * Helper method to get the authenticated user's ID from the reactive
-     * SecurityContextHolder. This ID is propagated by the API Gateway.
+     * Endpoint to create a new user.
+     * Accessible by 'ADMIN' or can be exposed for public registration.
      *
-     * @return A Mono emitting the authenticated user's ID.
-     * @throws IllegalStateException if the user is not authenticated or ID
-     * cannot be retrieved.
+     * @param userRequest The DTO containing user creation data.
+     * @return A Mono emitting the created User.
+     * @throws IllegalArgumentException if input validation fails.
+     * @throws DuplicateResourceException if username or email already exist.
+     * @throws RoleNotFoundException if any specified role does not exist.
      */
-    private Mono<Long> getAuthenticatedUserId() {
-        return ReactiveSecurityContextHolder.getContext()
-                .map(securityContext -> securityContext.getAuthentication())
-                .flatMap(authentication -> {
-                    if (authentication == null || !authentication.isAuthenticated()) {
-                        return Mono.error(new IllegalStateException(ApiResponseMessages.UNAUTHENTICATED_USER));
-                    }
-                    if (authentication.getPrincipal() instanceof Long) {
-                        return Mono.just((Long) authentication.getPrincipal());
-                    } else if (authentication.getPrincipal() instanceof String) {
-                        try {
-                            return Mono.just(Long.parseLong((String) authentication.getPrincipal()));
-                        } catch (NumberFormatException e) {
-                            return Mono.error(new IllegalStateException(ApiResponseMessages.INVALID_USER_ID_FORMAT, e));
-                        }
-                    }
-                    return Mono.error(new IllegalStateException(ApiResponseMessages.INVALID_USER_ID));
-                })
-                .switchIfEmpty(Mono.error(new IllegalStateException(ApiResponseMessages.SECURITY_CONTEXT_NOT_FOUND)));
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
+    // This will activate the @Size constraint on the 'password' field that belongs to this group.
+    public Mono<User> createUser(@Validated(CreateUserValidation.class) @RequestBody UserRequest userRequest) {
+        // Basic validation at controller level for required fields
+        // Note: With @Validated(CreateUserValidation.class) and @NotBlank on username/email
+        // this manual check for username/email.isBlank() might become redundant,
+        // but it's kept for explicit demonstration of controller-level checks for critical fields.
+        if (userRequest.getUsername() == null || userRequest.getUsername().isBlank() ||
+            userRequest.getEmail() == null || userRequest.getEmail().isBlank()) { // Password check might be removed if @Validated covers it
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST);
+        }
+        // If the password was valid for the CreateUserValidation group, it means it's not blank
+        // and meets the size requirement, so the manual userRequest.getPassword().isBlank() check
+        // for password might become less necessary or could be simplified.
+
+        return userService.createUser(userRequest);
+        // Exceptions (DuplicateResourceException, RoleNotFoundException, IllegalArgumentException,
+        // WebExchangeBindException from validation failures) are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Get details of the currently authenticated user. Accessible by the user
-     * themselves.
+     * Endpoint to update an existing user's information.
+     * Accessible by 'ADMIN' or the 'USER' themselves.
+     *
+     * @param id The ID of the user to update.
+     * @param userRequest The DTO containing updated user data.
+     * @return A Mono emitting the updated User.
+     * @throws IllegalArgumentException if user ID is invalid or update data is insufficient.
+     * @throws ResourceNotFoundException if the user is not found.
+     * @throws DuplicateResourceException if updated username or email already exist.
+     * @throws RoleNotFoundException if any specified role does not exist during role update.
      */
-    @GetMapping("/me")
-    public Mono<StandardResponseEntity> getMyUserDetails() {
-        return getAuthenticatedUserId()
-                .flatMap(userId -> userService.getUserById(userId))
-                .flatMap(this::prepareDto)
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)")
+    // Here, we use just @Valid (or @Validated without a group).
+    // This means only default validation constraints (those without a 'groups' attribute, or with 'groups=Default.class')
+    // will be applied. The @Size constraint on 'password' in UserRequest will NOT be active here,
+    // allowing you to update other user fields without providing a password.
+    public Mono<User> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        // Basic check for at least one field to update
+        if (userRequest.getFirstName() == null && userRequest.getLastName() == null &&
+            userRequest.getEmail() == null && userRequest.getUsername() == null &&
+            userRequest.getShippingAddress() == null && userRequest.getRoleNames() == null) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_UPDATE_REQUEST);
+        }
+        return userService.updateUser(id, userRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+    
+    /**
+     * Endpoint to update a user's password.
+     * Accessible by 'USER' (for their own password) or 'ADMIN' (for any user's password).
+     *
+     * @param id The ID of the user whose password to update.
+     * @param passwordUpdateRequest DTO containing old and new passwords.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if input validation fails.
+     * @throws ResourceNotFoundException if the user is not found.
+     * @throws InvalidPasswordException if the old password does not match or new password is too short/weak.
+     */
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful update
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)") // Example authorization
+    public Mono<Void> updateUserPassword(@PathVariable Long id, @Valid @RequestBody PasswordUpdateRequest passwordUpdateRequest) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        return userService.updateUserPassword(id, passwordUpdateRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Get user details by ID (e.g., for admin users). This method requires
-     * role-based authorization (e.g., hasRole('ADMIN')).
+     * Endpoint to delete a user by their ID.
+     * Accessible only by 'ADMIN'.
+     *
+     * @param id The ID of the user to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if user ID is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
+    @DeleteMapping("/admin/{id}") // Admin endpoint
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
+    @PreAuthorize("hasRole('ADMIN')")
+    public Mono<Void> deleteUser(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        return userService.deleteUser(id);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+
+    /**
+     * Endpoint to retrieve a user by their ID.
+     * Accessible by 'ADMIN' or the 'USER' themselves.
+     *
+     * @param id The ID of the user to retrieve.
+     * @return A Mono emitting the User.
+     * @throws IllegalArgumentException if user ID is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')") // Only ADMINs can access this endpoint
-    public Mono<StandardResponseEntity> getUserById(@PathVariable Long id) {
-        return userService.getUserById(id)
-                .flatMap(this::prepareDto)
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e
-                        -> Mono.just(StandardResponseEntity.notFound(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)") // Example authorization
+    public Mono<User> getUserById(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        return userService.getUserById(id);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Update details of the currently authenticated user. Allows user to update
-     * their own profile (e.g., email, non-password fields).
-     */
-    @PutMapping("/me")
-    public Mono<StandardResponseEntity> updateMyUserDetails(@RequestBody UserUpdateRequest userUpdateRequest) {
-        return getAuthenticatedUserId()
-                .flatMap(userId -> userService.updateUser(userId, userUpdateRequest))
-                .flatMap(this::prepareDto)
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_UPDATED_SUCCESS))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(StandardResponseEntity.badRequest(e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_UPDATING_USER_DETAILS + ": " + e.getMessage())));
-    }
-
-    /**
-     * Delete the currently authenticated user's account. This should be a
-     * highly protected endpoint.
-     */
-    @DeleteMapping("/me")
-    public Mono<StandardResponseEntity> deleteMyAccount() {
-        return getAuthenticatedUserId()
-                .flatMap(userId -> userService.deleteUser(userId))
-                .then(Mono.just(StandardResponseEntity.ok(null, ApiResponseMessages.USER_DELETED_SUCCESS)))
-                .onErrorResume(ResourceNotFoundException.class, e -> Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + e.getMessage())))
-                .onErrorResume(IllegalStateException.class, e
-                        -> Mono.just(StandardResponseEntity.unauthorized(e.getMessage())))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_DELETING_USER + ": " + e.getMessage())));
-    }
-
-    /**
-     * Admin method to get users. This method requires role-based authorization
-     * (e.g., hasRole('ADMIN')).
-     */
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN')") // Only ADMINs can access this endpoint
-    public Mono<StandardResponseEntity> getAllUsers(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        // Create a Pageable object
-        Pageable pageable = PageRequest.of(page, size);
-
-        return userService.getAllUsers(pageable) // Modify your service to accept Pageable
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USERS_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ALL_USERS + ": " + e.getMessage())));
-    }
-
-    // --- NEW: Controller Endpoints for all UserRepository methods ---
-    /**
-     * Endpoint to find a user by their username.
+     * Endpoint to retrieve a user by their username.
+     * Accessible by 'ADMIN' or for specific public lookups (e.g., username availability check).
      *
-     * @param username The username to search for.
-     * @return A Mono emitting StandardResponseEntity with the User if found.
+     * @param username The username of the user.
+     * @return A Mono emitting the User.
+     * @throws IllegalArgumentException if username is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
      */
     @GetMapping("/byUsername/{username}")
-    public Mono<StandardResponseEntity> getUserByUsername(@PathVariable String username) {
-        return userService.findByUsername(username)
-                .flatMap(this::prepareDto)
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with username: " + username)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')") // Typically admin only, or if public profile viewing is allowed
+    public Mono<User> getUserByUsername(@PathVariable String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USERNAME);
+        }
+        return userService.getUserByUsername(username);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find a user by their email.
+     * Endpoint to retrieve a user by their email.
+     * Accessible by 'ADMIN' only due to privacy concerns.
      *
-     * @param email The email to search for.
-     * @return A Mono emitting StandardResponseEntity with the User if found.
+     * @param email The email of the user.
+     * @return A Mono emitting the User.
+     * @throws IllegalArgumentException if email is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
      */
     @GetMapping("/byEmail/{email}")
-    public Mono<StandardResponseEntity> getUserByEmail(@PathVariable String email) {
-        return userService.findByEmail(email)
-                .flatMap(this::prepareDto)
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND + " with email: " + email)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public Mono<User> getUserByEmail(@PathVariable String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
+        }
+        return userService.getUserByEmail(email);
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find users by first name, with pagination.
+     * Endpoint to retrieve all users with pagination.
+     * Accessible by 'ADMIN' only.
      *
-     * @param firstName The first name to search for (case-insensitive).
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of User records.
+     * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping("/byFirstName/{firstName}")
+    @GetMapping("/admin/all")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getUsersByFirstNameContainingIgnoreCase(
-            @PathVariable String firstName,
+    public Flux<User> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
+        if (page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
+        }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findUsersByFirstNameContainingIgnoreCase(firstName, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+        return userService.getAllUsers(pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count users by first name.
+     * Endpoint to count all users.
+     * Accessible by 'ADMIN' only.
      *
-     * @param firstName The first name to count (case-insensitive).
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @return A Mono emitting the total count of users.
      */
-    @GetMapping("/count/byFirstName/{firstName}")
+    @GetMapping("/admin/count")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countUsersByFirstNameContainingIgnoreCase(@PathVariable String firstName) {
-        return userService.countUsersByFirstNameContainingIgnoreCase(firstName)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+    public Mono<Long> countAllUsers() {
+        return userService.countAllUsers();
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find users by last name, with pagination.
+     * Finds users by first name (case-insensitive, contains) with pagination.
+     * Accessible by 'ADMIN'.
      *
-     * @param lastName The last name to search for (case-insensitive).
+     * @param firstName The first name to search for.
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of User records.
+     * @return A Flux emitting matching users.
+     * @throws IllegalArgumentException if first name or pagination parameters are invalid.
      */
-    @GetMapping("/byLastName/{lastName}")
+    @GetMapping("/admin/byFirstName")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getUsersByLastNameContainingIgnoreCase(
-            @PathVariable String lastName,
+    public Flux<User> getUsersByFirstName(
+            @RequestParam String firstName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
+        if (firstName == null || firstName.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_FIRST_NAME + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
+        }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findUsersByLastNameContainingIgnoreCase(lastName, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+        return userService.getUsersByFirstName(firstName, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count users by last name.
+     * Counts users by first name (case-insensitive, contains).
+     * Accessible by 'ADMIN'.
      *
-     * @param lastName The last name to count (case-insensitive).
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @param firstName The first name to search for.
+     * @return A Mono emitting the count of matching users.
+     * @throws IllegalArgumentException if first name is invalid.
      */
-    @GetMapping("/count/byLastName/{lastName}")
+    @GetMapping("/admin/countByFirstName")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countUsersByLastNameContainingIgnoreCase(@PathVariable String lastName) {
-        return userService.countUsersByLastNameContainingIgnoreCase(lastName)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+    public Mono<Long> countUsersByFirstName(@RequestParam String firstName) {
+        if (firstName == null || firstName.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_FIRST_NAME);
+        }
+        return userService.countUsersByFirstName(firstName);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find users by username or email, with pagination.
+     * Finds users by last name (case-insensitive, contains) with pagination.
+     * Accessible by 'ADMIN'.
      *
-     * @param searchTerm The search term (username or email, case-insensitive).
+     * @param lastName The last name to search for.
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of User records.
+     * @return A Flux emitting matching users.
+     * @throws IllegalArgumentException if last name or pagination parameters are invalid.
      */
-    @GetMapping("/search")
+    @GetMapping("/admin/byLastName")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getUsersByUsernameOrEmailContainingIgnoreCase(
+    public Flux<User> getUsersByLastName(
+            @RequestParam String lastName,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        if (lastName == null || lastName.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_LAST_NAME + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
+        }
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return userService.getUsersByLastName(lastName, pageable);
+        // Errors are handled by GlobalExceptionHandler.
+    }
+
+    /**
+     * Counts users by last name (case-insensitive, contains).
+     * Accessible by 'ADMIN'.
+     *
+     * @param lastName The last name to search for.
+     * @return A Mono emitting the count of matching users.
+     * @throws IllegalArgumentException if last name is invalid.
+     */
+    @GetMapping("/admin/countByLastName")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public Mono<Long> countUsersByLastName(@RequestParam String lastName) {
+        if (lastName == null || lastName.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_LAST_NAME);
+        }
+        return userService.countUsersByLastName(lastName);
+        // Errors are handled by GlobalExceptionHandler.
+    }
+
+    /**
+     * Finds users by username or email (case-insensitive, contains) with pagination.
+     * Accessible by 'ADMIN'.
+     *
+     * @param searchTerm The search term for username or email.
+     * @param page The page number (0-indexed).
+     * @param size The number of items per page.
+     * @param sortBy The field to sort by.
+     * @param sortDir The sort direction (asc/desc).
+     * @return A Flux emitting matching users.
+     * @throws IllegalArgumentException if search term or pagination parameters are invalid.
+     */
+    @GetMapping("/admin/byUsernameOrEmail")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public Flux<User> getUsersByUsernameOrEmail(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
+        if (searchTerm == null || searchTerm.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
+        }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findUsersByUsernameOrEmailContainingIgnoreCase(searchTerm, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+        return userService.getUsersByUsernameOrEmail(searchTerm, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count users by username or email.
+     * Counts users by username or email (case-insensitive, contains).
+     * Accessible by 'ADMIN'.
      *
-     * @param searchTerm The search term (username or email, case-insensitive).
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @param searchTerm The search term for username or email.
+     * @return A Mono emitting the count of matching users.
+     * @throws IllegalArgumentException if search term is invalid.
      */
-    @GetMapping("/count/search")
+    @GetMapping("/admin/countByUsernameOrEmail")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countUsersByUsernameOrEmailContainingIgnoreCase(@RequestParam String searchTerm) {
-        return userService.countUsersByUsernameOrEmailContainingIgnoreCase(searchTerm)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+    public Mono<Long> countUsersByUsernameOrEmail(@RequestParam String searchTerm) {
+        if (searchTerm == null || searchTerm.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM);
+        }
+        return userService.countUsersByUsernameOrEmail(searchTerm);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find users created after a certain date, with pagination.
+     * Finds users created after a certain date with pagination.
+     * Accessible by 'ADMIN'.
      *
-     * @param date The cutoff date (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
+     * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of User records.
+     * @return A Flux emitting matching users.
+     * @throws IllegalArgumentException if date format or pagination parameters are invalid.
      */
-    @GetMapping("/createdAtAfter")
+    @GetMapping("/admin/byCreatedAtAfter")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getUsersByCreatedAtAfter(
+    public Flux<User> getUsersByCreatedAtAfter(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(page, size, sort);
+        if (date == null || date.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_DATE_FORMAT + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
+        }
         LocalDateTime dateTime;
         try {
             dateTime = LocalDateTime.parse(date);
         } catch (DateTimeParseException e) {
-            return Mono.error(new IllegalArgumentException("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
+            throw new IllegalArgumentException("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss.");
         }
-        return userService.findUsersByCreatedAtAfter(dateTime, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return userService.getUsersByCreatedAtAfter(dateTime, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count users created after a certain date.
+     * Counts users created after a certain date.
+     * Accessible by 'ADMIN'.
      *
-     * @param date The cutoff date (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
+     * @return A Mono emitting the count of matching users.
+     * @throws IllegalArgumentException if date format is invalid.
      */
-    @GetMapping("/count/createdAtAfter")
+    @GetMapping("/admin/countByCreatedAtAfter")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countUsersByCreatedAtAfter(@RequestParam String date) {
+    public Mono<Long> countUsersByCreatedAtAfter(@RequestParam String date) {
+        if (date == null || date.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_DATE_FORMAT);
+        }
         try {
             LocalDateTime dateTime = LocalDateTime.parse(date);
-            return userService.countUsersByCreatedAtAfter(dateTime)
-                    .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                    .onErrorResume(Exception.class, e
-                            -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
+            return userService.countUsersByCreatedAtAfter(dateTime);
         } catch (DateTimeParseException e) {
-            return Mono.just(StandardResponseEntity.badRequest("Invalid date format. Please use ISO 8601 format: YYYY-MM-ddTHH:mm:ss."));
+            throw new IllegalArgumentException("Invalid date format. Please use ISO 8601 format:YYYY-MM-ddTHH:mm:ss.");
         }
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find users with a specific shipping address, with pagination.
+     * Finds users with a specific shipping address (case-insensitive, contains) with pagination.
+     * Accessible by 'ADMIN'.
      *
-     * @param shippingAddress The shipping address to search for
-     * (case-insensitive).
+     * @param shippingAddress The shipping address to search for.
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of User records.
+     * @return A Flux emitting matching users.
+     * @throws IllegalArgumentException if shipping address or pagination parameters are invalid.
      */
-    @GetMapping("/byShippingAddress")
+    @GetMapping("/admin/byShippingAddress")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getUsersByShippingAddressContainingIgnoreCase(
+    public Flux<User> getUsersByShippingAddress(
             @RequestParam String shippingAddress,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findUsersByShippingAddressContainingIgnoreCase(shippingAddress, pageable)
-                .flatMap(this::prepareDto)
-                .collectList()
-                .map(user -> StandardResponseEntity.ok(user, ApiResponseMessages.USER_DETAILS_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.USER_NOT_FOUND)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_USER_DETAILS + ": " + e.getMessage())));
-    }
-
-    /**
-     * Endpoint to count users with a specific shipping address.
-     *
-     * @param shippingAddress The shipping address to count (case-insensitive).
-     * @return A Mono emitting StandardResponseEntity with the count.
-     */
-    @GetMapping("/count/byShippingAddress")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countUsersByShippingAddressContainingIgnoreCase(@RequestParam String shippingAddress) {
-        return userService.countUsersByShippingAddressContainingIgnoreCase(shippingAddress)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.USER_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_USERS + ": " + e.getMessage())));
-    }
-
-    // --- NEW: Controller Endpoints for all RoleRepository methods ---
-    /**
-     * Endpoint to find a role by its name.
-     *
-     * @param roleName The name of the role (e.g., "ROLE_USER", "ROLE_ADMIN").
-     * @return A Mono emitting StandardResponseEntity with the Role.
-     */
-    @GetMapping("/roles/byName/{roleName}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> getRoleByName(@PathVariable String roleName) {
-        ERole eRole;
-        try {
-            eRole = ERole.valueOf(roleName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return Mono.just(StandardResponseEntity.badRequest(ApiResponseMessages.INVALID_ROLE_PROVIDED + roleName));
+        if (shippingAddress == null || shippingAddress.isBlank() || page < 0 || size <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SHIPPING_ADDRESS + " or " + ApiResponseMessages.INVALID_PAGINATION_PARAMETERS);
         }
-        return userService.findRoleByName(eRole)
-                .map(role -> StandardResponseEntity.ok(role, ApiResponseMessages.ROLE_RETRIEVED_SUCCESS))
-                .switchIfEmpty(Mono.just(StandardResponseEntity.notFound(ApiResponseMessages.ROLE_NOT_FOUND + roleName)))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_RETRIEVING_ROLE + ": " + e.getMessage())));
-    }
-
-    /**
-     * Endpoint to find roles with names containing a specific string
-     * (case-insensitive), with pagination.
-     *
-     * @param name The string to search for in role names.
-     * @param page The page number (0-indexed).
-     * @param size The number of items per page.
-     * @param sortBy The field to sort by.
-     * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of Role records.
-     */
-    @GetMapping("/roles/search")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Flux<Role> searchRolesByNameContainingIgnoreCase(
-            @RequestParam String name,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findRolesByNameContainingIgnoreCase(name, pageable);
+        return userService.getUsersByShippingAddress(shippingAddress, pageable);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count roles with names containing a specific string
-     * (case-insensitive).
+     * Counts users with a specific shipping address (case-insensitive, contains).
+     * Accessible by 'ADMIN'.
      *
-     * @param name The string to count in role names.
-     * @return A Mono emitting StandardResponseEntity with the count.
+     * @param shippingAddress The shipping address to search for.
+     * @return A Mono emitting the count of matching users.
+     * @throws IllegalArgumentException if shipping address is invalid.
      */
-    @GetMapping("/roles/count/search")
+    @GetMapping("/admin/countByShippingAddress")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countRolesByNameContainingIgnoreCase(@RequestParam String name) {
-        return userService.countRolesByNameContainingIgnoreCase(name)
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ROLE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
+    public Mono<Long> countUsersByShippingAddress(@RequestParam String shippingAddress) {
+        if (shippingAddress == null || shippingAddress.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_SHIPPING_ADDRESS);
+        }
+        return userService.countUsersByShippingAddress(shippingAddress);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to find all roles with pagination.
+     * Checks if a user with the given email exists.
+     * Can be used for registration forms to check email availability.
      *
-     * @param page The page number (0-indexed).
-     * @param size The number of items per page.
-     * @param sortBy The field to sort by.
-     * @param sortDir The sort direction (asc/desc).
-     * @return A Flux of Role records.
+     * @param email The email to check.
+     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if email is invalid.
      */
-    @GetMapping("/roles/all")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Flux<Role> getAllRoles(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        return userService.findAllRoles(pageable);
+    @GetMapping("/existsByEmail")
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsByEmail(@RequestParam String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
+        }
+        return userService.existsByEmail(email);
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to count all roles.
+     * Checks if a user with the given username exists.
+     * Can be used for registration forms to check username availability.
      *
-     * @return A Mono emitting StandardResponseEntity with the total count.
+     * @param username The username to check.
+     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if username is invalid.
      */
-    @GetMapping("/roles/count/all")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Mono<StandardResponseEntity> countAllRoles() {
-        return userService.countAllRoles()
-                .map(count -> StandardResponseEntity.ok(count, ApiResponseMessages.ROLE_COUNT_RETRIEVED_SUCCESS))
-                .onErrorResume(Exception.class, e
-                        -> Mono.just(StandardResponseEntity.internalServerError(ApiResponseMessages.ERROR_COUNTING_ROLES + ": " + e.getMessage())));
+    @GetMapping("/existsByUsername")
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsByUsername(@RequestParam String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USERNAME);
+        }
+        return userService.existsByUsername(username);
+        // Errors are handled by GlobalExceptionHandler.
     }
 }
