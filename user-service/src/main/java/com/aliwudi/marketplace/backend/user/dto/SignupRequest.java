@@ -1,29 +1,37 @@
-// SignupRequest.java
 package com.aliwudi.marketplace.backend.user.dto;
 
-import jakarta.validation.constraints.Email;   // For email format validation
-import jakarta.validation.constraints.NotBlank; // For non-empty fields
-import jakarta.validation.constraints.Size;   // For string length validation
-import lombok.Data; // Lombok for getters/setters
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
-import java.util.Set; // For roles
+import java.util.Set;
 
-@Data // From Lombok
+/**
+ * DTO for user registration (sign-up).
+ * Contains only necessary fields for initial registration.
+ */
+@Data // Generates getters, setters, toString, equals, hashCode
+@NoArgsConstructor // Generates a no-argument constructor
+@AllArgsConstructor // Generates a constructor with all fields
 public class SignupRequest {
-    @NotBlank
-    @Size(min = 3, max = 20) // Username must be between 3 and 20 characters
+
+    @NotBlank(message = "Username cannot be empty")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
 
-    @NotBlank
-    @Size(max = 50)
-    @Email // Ensures the email is in a valid format
+    @NotBlank(message = "Email cannot be empty")
+    @Email(message = "Email should be a valid email format")
+    @Size(max = 100, message = "Email cannot exceed 100 characters")
     private String email;
 
-    // Roles are sent as a Set of Strings (e.g., ["seller", "admin"])
-    // These will be mapped to our ERole enum and Role entity later.
-    private Set<String> role;
-
-    @NotBlank
-    @Size(min = 6, max = 40) // Password must be between 6 and 40 characters
+    @NotBlank(message = "Password cannot be empty")
+    @Size(min = 6, max = 100, message = "Password must be at least 6 characters long")
     private String password;
+
+    // Optional: Roles to assign during signup. If not provided,
+    // UserService will default to ROLE_USER.
+    private Set<String> role;
 }
