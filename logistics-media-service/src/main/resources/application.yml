@@ -21,10 +21,6 @@ spring:
           issuer-uri: http://localhost:8080 # Replace with your Auth Server's issuer URI
           # No jwk-set-uri needed here, as the Gateway handles primary validation.
           # We just need to tell Spring Security how to configure the JWT decoder context.    
-  autoconfigure:
-    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we dono need it
-    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-
 eureka:
   client:
     service-url:

@@ -2,7 +2,7 @@
 ---
 # src/main/resources/application.yml for Product Service
 server:
-  port: 5004 # A unique port for this microservice
+  port: 5005 # A unique port for this microservice
  
 # Set logging level to debug BUT REMOVE IN PRODUCTION      
 logging:
@@ -11,7 +11,7 @@ logging:
 
 spring:
   application:
-    name: logistics-media-service # The unique name of this service, used by Eureka
+    name: notification-service # The unique name of this service, used by Eureka
   security:
     oauth2:
       resourceserver:
@@ -22,7 +22,7 @@ spring:
           # No jwk-set-uri needed here, as the Gateway handles primary validation.
           # We just need to tell Spring Security how to configure the JWT decoder context.    
   autoconfigure:
-    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we dono need it
+    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we do not need it
     exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
 
 eureka:
