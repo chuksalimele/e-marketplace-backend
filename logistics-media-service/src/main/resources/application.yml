@@ -16,11 +16,14 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # This issuer-uri should match the 'issuer' defined in your Authorization Server
-          # It's used by Spring Security to configure the JWT decoder.
-          issuer-uri: http://localhost:8080 # Replace with your Auth Server's issuer URI
-          # No jwk-set-uri needed here, as the Gateway handles primary validation.
-          # We just need to tell Spring Security how to configure the JWT decoder context.    
+          # This issuer-uri is good for matching the 'iss' claim in the JWT.
+          # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.
+          issuer-uri: http://localhost:8080 # Replace with your Auth Server's actual issuer URI
+
+          # THIS IS CRUCIAL FOR SIGNATURE VERIFICATION.
+          # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
+          # This should point to the JWK Set endpoint of your Authorization Server.
+          jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 eureka:
   client:
     service-url:
