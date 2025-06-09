@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.common.intersevice;
+package com.aliwudi.marketplace.backend.common.interservice;
 
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;

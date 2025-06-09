@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.lgtmed.service;
 
-import com.aliwudi.marketplace.backend.common.intersevice.OrderIntegrationService;
+import com.aliwudi.marketplace.backend.common.interservice.OrderIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.Delivery;
 import com.aliwudi.marketplace.backend.common.model.Order; // Import Order model for prepareDto
 import com.aliwudi.marketplace.backend.common.exception.DeliveryNotFoundException;

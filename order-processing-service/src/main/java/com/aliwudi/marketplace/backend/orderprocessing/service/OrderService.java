@@ -1,7 +1,7 @@
 package com.aliwudi.marketplace.backend.orderprocessing.service;
 
-import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService;
-import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
+import com.aliwudi.marketplace.backend.common.interservice.ProductIntegrationService;
+import com.aliwudi.marketplace.backend.common.interservice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.common.exception.InsufficientStockException;
 import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.common.model.Order;

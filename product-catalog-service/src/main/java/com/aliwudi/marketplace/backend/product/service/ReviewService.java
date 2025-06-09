@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.product.service;
 
-import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService;
+import com.aliwudi.marketplace.backend.common.interservice.UserIntegrationService;
 import com.aliwudi.marketplace.backend.common.model.User; // Import User model for prepareDto
 import com.aliwudi.marketplace.backend.product.dto.ReviewRequest;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException; // Corrected package

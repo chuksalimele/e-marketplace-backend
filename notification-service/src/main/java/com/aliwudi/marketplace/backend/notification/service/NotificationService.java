@@ -7,15 +7,7 @@ import com.aliwudi.marketplace.backend.common.exception.NotificationNotFoundExce
 import com.aliwudi.marketplace.backend.common.enumeration.NotificationType;
 import com.aliwudi.marketplace.backend.common.status.NotificationStatus;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.common.intersevice.UserIntegrationService; // To fetch user details (email, phone)
-
-// Placeholder for actual email/SMS sending services
-// You would implement these as separate Spring @Service classes
-// that interact with your chosen email/SMS API providers.
-// For example:
-// import com.aliwudi.marketplace.backend.notifications.channels.EmailService;
-// import com.aliwudi.marketplace.backend.notifications.channels.SmsService;
-
+import com.aliwudi.marketplace.backend.common.interservice.UserIntegrationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers; // For offloading blocking operations
+import reactor.core.scheduler.Schedulers;
+
+// NEW: Spring Security Imports for Reactive Context
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails; // Common interface for principal
 
 import java.time.LocalDateTime;
 
@@ -41,7 +38,7 @@ import java.time.LocalDateTime;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final UserIntegrationService userIntegrationService; // To get user's email/phone for external notifications
+    private final UserIntegrationService usertegrationService; // To get user's email/phone for external notifications
     // private final EmailService emailService; // Uncomment and inject once implemented
     // private final SmsService smsService;     // Uncomment and inject once implemented
 
@@ -82,7 +79,7 @@ public class NotificationService {
 
                     // Trigger external notifications (Email/SMS) asynchronously
                     // We fetch the user details (email, phone) to send these notifications.
-                    userIntegrationService.getUserById(savedNotification.getUserId())
+                    usertegrationService.getUserById(savedNotification.getUserId())
                             .doOnNext(user -> {
                                 switch (savedNotification.getType()) {
                                     case ORDER_UPDATE:
@@ -98,7 +95,7 @@ public class NotificationService {
                                         }
                                         // Example: Send SMS for critical order updates (e.g., "delivered")
                                         // This requires a 'phone_number' field in your User model
-                                        // if (savedNotification.getMessage().contains("delivered") && user.getPhoneNumber() != null) {
+                                        // if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) { // Assuming user has getPhoneNumber()
                                         //     sendSmsNotification(user.getPhoneNumber(), savedNotification.getMessage())
                                         //             .subscribeOn(Schedulers.boundedElastic())
                                         //             .subscribe(
@@ -126,7 +123,7 @@ public class NotificationService {
                             })
                             .subscribe(
                                     user -> log.debug("User details fetched for external notifications: {}", user.getId()),
-                                    error -> log.warn("Could not fetch user details for external notifications: {}", error.getMessage())
+                                    error -> log.warn("Could not fetch user details for external notifications (ID: {}): {}", savedNotification.getUserId(), error.getMessage())
                             );
                 })
                 .doOnError(e -> log.error("Error creating notification for userId {}: {}", request.getUserId(), e.getMessage(), e));
@@ -142,10 +139,9 @@ public class NotificationService {
             log.info("Simulating sending email to: {} with subject: {}", to, subject);
             // Implement actual call to your EmailService here
             // e.g., emailService.sendEmail(to, subject, body);
-            // This would be a blocking call, hence the subscribeOn(Schedulers.boundedElastic())
             try {
                 // Simulate network delay or external API call
-                Thread.sleep(500);
+                Thread.sleep(500); // Simulate blocking I/O
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Email sending simulation interrupted: {}", e.getMessage());
@@ -164,10 +160,9 @@ public class NotificationService {
             log.info("Simulating sending SMS to: {} with message: {}", toPhoneNumber, message);
             // Implement actual call to your SmsService here
             // e.g., smsService.sendSms(toPhoneNumber, message);
-            // This would be a blocking call, hence the subscribeOn(Schedulers.boundedElastic())
             try {
                 // Simulate network delay or external API call
-                Thread.sleep(300);
+                Thread.sleep(300); // Simulate blocking I/O
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("SMS sending simulation interrupted: {}", e.getMessage());
@@ -191,7 +186,7 @@ public class NotificationService {
     public Mono<Notification> markNotificationAsRead(Long notificationId, Long userId) {
         log.info("Attempting to mark notification ID: {} for user ID: {} as READ", notificationId, userId);
         return notificationRepository.findById(notificationId)
-                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND+": " + notificationId)))
+                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND + notificationId)))
                 .filter(notification -> notification.getUserId().equals(userId)) // Ensure user owns the notification
                 .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND_FOR_USER + notificationId + " and user " + userId)))
                 .flatMap(notification -> {
@@ -220,7 +215,7 @@ public class NotificationService {
     public Mono<Void> deleteNotification(Long notificationId, Long userId) {
         log.info("Attempting to delete notification ID: {} for user ID: {}", notificationId, userId);
         return notificationRepository.findById(notificationId)
-                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND+": " + notificationId)))
+                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND + notificationId)))
                 .filter(notification -> notification.getUserId().equals(userId)) // Ensure user owns the notification
                 .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND_FOR_USER + notificationId + " and user " + userId)))
                 .flatMap(notificationRepository::delete)
@@ -239,7 +234,7 @@ public class NotificationService {
     public Mono<Notification> getNotificationByIdAndUserId(Long notificationId, Long userId) {
         log.info("Retrieving notification ID: {} for user ID: {}", notificationId, userId);
         return notificationRepository.findById(notificationId)
-                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND+": " + notificationId)))
+                .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND + notificationId)))
                 .filter(notification -> notification.getUserId().equals(userId)) // Ensure user owns the notification
                 .switchIfEmpty(Mono.error(new NotificationNotFoundException(ApiResponseMessages.NOTIFICATION_NOT_FOUND_FOR_USER + notificationId + " and user " + userId)))
                 .doOnSuccess(notification -> log.info("Notification ID: {} retrieved successfully.", notificationId))
@@ -337,28 +332,45 @@ public class NotificationService {
     }
 
     /**
-     * Helper method to get the current authenticated user's ID.
-     * In a real application, this would retrieve the user ID from the Spring Security context
-     * which is populated by the API Gateway after JWT authentication.
+     * Helper method to get the current authenticated user's ID from Spring Security context.
+     * This is the real-world implementation assuming a Spring Security WebFlux setup.
+     * The principal is typically a UserDetails object or a custom UserPrincipal containing the ID.
      *
-     * @return A Mono emitting the current user's ID, or an error if not authenticated.
+     * @return A Mono emitting the current user's ID (Long).
+     * @throws RuntimeException if the user is not authenticated or user ID cannot be determined.
      */
     public Mono<Long> getCurrentAuthenticatedUserId() {
-        // This is a placeholder. In a real Spring Security setup with WebFlux,
-        // you would typically get the user ID from ReactiveSecurityContextHolder.
-        // Example:
-        // return ReactiveSecurityContextHolder.getContext()
-        //         .map(SecurityContext::getAuthentication)
-        //         .filter(Authentication::isAuthenticated)
-        //         .map(Authentication::getPrincipal)
-        //         .cast(UserDetails.class) // Or your custom UserPrincipal class
-        //         .map(UserDetails::getUsername) // Assuming username is the user ID or can be mapped to it
-        //         .map(Long::parseLong) // Convert to Long ID
-        //         .switchIfEmpty(Mono.error(new RuntimeException(ApiResponseMessages.UNAUTHENTICATED_USER)));
-
-        // For now, returning a hardcoded ID for demonstration or testing.
-        // Replace with actual security context retrieval.
-        return Mono.just(1L) // Example: Replace with actual authenticated user ID retrieval
+        return ReactiveSecurityContextHolder.getContext()
+                .switchIfEmpty(Mono.error(new RuntimeException(ApiResponseMessages.SECURITY_CONTEXT_NOT_FOUND)))
+                .map(context -> context.getAuthentication())
+                .filter(Authentication::isAuthenticated)
+                .switchIfEmpty(Mono.error(new RuntimeException(ApiResponseMessages.UNAUTHENTICATED_USER)))
+                .map(Authentication::getPrincipal)
+                .flatMap(principal -> {
+                    // Try to cast to Long directly (if principal is just the ID)
+                    if (principal instanceof Long) {
+                        return Mono.just((Long) principal);
+                    }
+                    // Try to cast to UserDetails (common for Spring Security)
+                    else if (principal instanceof UserDetails) {
+                        try {
+                            // Assuming username is the user ID, or there's an getId() method
+                            String username = ((UserDetails) principal).getUsername(); // Often the ID string
+                            return Mono.just(Long.parseLong(username)); // Attempt to parse
+                        } catch (NumberFormatException e) {
+                            log.error("Principal username is not a valid Long ID: {}", ((UserDetails) principal).getUsername(), e);
+                            return Mono.error(new RuntimeException(ApiResponseMessages.INVALID_USER_ID_FORMAT));
+                        }
+                    }
+                    // If you have a custom UserPrincipal class with a getId() method:
+                    // else if (principal instanceof YourCustomUserPrincipal) {
+                    //     return Mono.just(((YourCustomUserPrincipal) principal).getId());
+                    // }
+                    else {
+                        log.error("Unsupported principal type in security context: {}", principal.getClass().getName());
+                        return Mono.error(new RuntimeException(ApiResponseMessages.INVALID_USER_ID_FORMAT));
+                    }
+                })
                 .doOnSuccess(id -> log.debug("Retrieved authenticated user ID: {}", id))
                 .doOnError(e -> log.error("Failed to retrieve authenticated user ID: {}", e.getMessage()));
     }

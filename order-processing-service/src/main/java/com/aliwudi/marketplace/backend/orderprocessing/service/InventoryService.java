@@ -5,7 +5,7 @@ import com.aliwudi.marketplace.backend.common.exception.InventoryNotFoundExcepti
 import com.aliwudi.marketplace.backend.common.model.Inventory;
 import com.aliwudi.marketplace.backend.common.model.Product; // Assuming Product is a common model
 import com.aliwudi.marketplace.backend.orderprocessing.repository.InventoryRepository;
-import com.aliwudi.marketplace.backend.common.intersevice.ProductIntegrationService; // Required for prepareDto
+import com.aliwudi.marketplace.backend.common.interservice.ProductIntegrationService; // Required for prepareDto
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
