@@ -26,7 +26,12 @@ public class Location {
     @Id
     Long id;
     String country;
+    //String countryAbbr; // Will be implemented in client side - e.g ng for Nigeria, gh for Ghana
     String state;
+    //String stateAbbr; // Will be implemented in client side -
     String city;
     LocationCategory locationCategory;
+    // Potentially add: private String postalCode;
+    // Potentially add: private Double latitude;
+    // Potentially add: private Double longitude;    
 }

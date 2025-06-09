@@ -6,5 +6,6 @@ include ':user-service'
 include ':product-catalog-service'
 include ':order-processing-service'
 include ':logistics-media-service'
+include ':notification-service'
 include ':mcsv-common-lib'
 

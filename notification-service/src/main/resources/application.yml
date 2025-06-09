@@ -1,0 +1,34 @@
+## YAML Template.
+---
+# src/main/resources/application.yml for Product Service
+server:
+  port: 5004 # A unique port for this microservice
+ 
+# Set logging level to debug BUT REMOVE IN PRODUCTION      
+logging:
+ level:
+  org.springframework.security: DEBUG
+
+spring:
+  application:
+    name: logistics-media-service # The unique name of this service, used by Eureka
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # This issuer-uri should match the 'issuer' defined in your Authorization Server
+          # It's used by Spring Security to configure the JWT decoder.
+          issuer-uri: http://localhost:8080 # Replace with your Auth Server's issuer URI
+          # No jwk-set-uri needed here, as the Gateway handles primary validation.
+          # We just need to tell Spring Security how to configure the JWT decoder context.    
+  autoconfigure:
+    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we dono need it
+    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # Pointing to your Eureka Server
+  instance:
+    hostname: localhost # For local development, use localhost
+    prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)
