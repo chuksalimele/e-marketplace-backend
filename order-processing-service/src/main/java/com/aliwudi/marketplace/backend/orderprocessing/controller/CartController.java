@@ -3,7 +3,7 @@ package com.aliwudi.marketplace.backend.orderprocessing.controller;
 import com.aliwudi.marketplace.backend.common.model.Cart;
 import com.aliwudi.marketplace.backend.common.model.CartItem;
 import com.aliwudi.marketplace.backend.orderprocessing.service.CartService;
-import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // Still useful for constructing specific error messages
+import com.aliwudi.marketplace.backend.common.util.AuthUtil;
 import com.aliwudi.marketplace.backend.orderprocessing.dto.AddItemRequest; // New request DTO
 import com.aliwudi.marketplace.backend.orderprocessing.dto.UpdateItemQuantityRequest; // New request DTO
 
@@ -14,13 +14,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import java.util.Map; // Used for generic payload for remove/directUpdate, but replaced with DTOs for add/update quantity
+import org.springframework.web.server.ServerWebExchange;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -29,57 +28,24 @@ import java.util.Map; // Used for generic payload for remove/directUpdate, but r
 public class CartController {
 
     private final CartService cartService;
+    private final AuthUtil authUtil;
     // Removed direct injection of integration services, as their usage is now confined to CartService.
-
-    /**
-     * Helper method to get the authenticated user's ID from the reactive
-     * SecurityContextHolder. This ID is propagated by the API Gateway.
-     *
-     * @return A Mono emitting the authenticated user's ID.
-     * @throws IllegalStateException if the user is not authenticated or ID
-     * cannot be retrieved.
-     */
-    private Mono<Long> getAuthenticatedUserId() {
-        return ReactiveSecurityContextHolder.getContext()
-                .map(securityContext -> securityContext.getAuthentication())
-                .flatMap(authentication -> {
-                    if (authentication == null || !authentication.isAuthenticated()) {
-                        log.warn("Unauthenticated user access attempt.");
-                        // This exception will be caught by GlobalExceptionHandler
-                        return Mono.error(new IllegalStateException(ApiResponseMessages.UNAUTHENTICATED_USER));
-                    }
-                    Object principal = authentication.getPrincipal();
-                    if (principal instanceof Long id) { // Direct cast if already Long
-                        return Mono.just(id);
-                    } else if (principal instanceof String idString) { // Parse if String
-                        try {
-                            return Mono.just(Long.parseLong(idString));
-                        } catch (NumberFormatException e) {
-                            log.error("Invalid user ID format in principal: {}. Error: {}", idString, e.getMessage());
-                            // This exception will be caught by GlobalExceptionHandler
-                            return Mono.error(new IllegalStateException(ApiResponseMessages.INVALID_USER_ID_FORMAT, e));
-                        }
-                    }
-                    log.error("Invalid principal type for authenticated user: {}", principal.getClass().getName());
-                    // This exception will be caught by GlobalExceptionHandler
-                    return Mono.error(new IllegalStateException(ApiResponseMessages.INVALID_USER_ID));
-                })
-                .switchIfEmpty(Mono.error(new IllegalStateException(ApiResponseMessages.SECURITY_CONTEXT_NOT_FOUND)))
-                .doOnError(e -> log.error("Failed to retrieve authenticated user ID: {}", e.getMessage()));
-    }
 
     /**
      * Endpoint to add a product to the authenticated user's cart. If the
      * product is already in the cart, its quantity will be updated. Requires
      * the user to be authenticated.
      *
+     * @param exchange
      * @param request The AddItemRequest containing productId and quantity.
      * @return A Mono emitting the updated Cart.
      */
     @PostMapping("/add")
     @ResponseStatus(HttpStatus.OK) // Common for updates; can be HttpStatus.CREATED if always new carts
-    public Mono<Cart> addProductToCart(@Valid @RequestBody AddItemRequest request) {
-        return getAuthenticatedUserId()
+    public Mono<Cart> addProductToCart(
+            ServerWebExchange exchange,
+            @Valid @RequestBody AddItemRequest request) {
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> cartService.addItemToCart(userId, request.getProductId(), request.getQuantity()));
                 // Errors are handled by GlobalExceptionHandler.
     }
@@ -88,12 +54,13 @@ public class CartController {
      * Endpoint to retrieve the authenticated user's entire cart, enriched with
      * details. Requires the user to be authenticated.
      *
+     * @param exchange
      * @return A Mono emitting the Cart.
      */
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Cart> getUserCart() {
-        return getAuthenticatedUserId()
+    public Mono<Cart> getUserCart(ServerWebExchange exchange) {
+        return  authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> cartService.getUserCart(userId));
                 // Errors are handled by GlobalExceptionHandler.
     }
@@ -103,13 +70,16 @@ public class CartController {
      * cart. If the new quantity is 0, the item will be removed. Requires the
      * user to be authenticated.
      *
+     * @param exchange
      * @param request The UpdateItemQuantityRequest containing productId and newQuantity.
      * @return A Mono emitting the updated Cart, or Mono.empty() if the item was removed (results in 204).
      */
     @PutMapping("/update")
     @ResponseStatus(HttpStatus.OK) // 200 OK for update, 204 No Content for removal if Mono.empty() is returned
-    public Mono<Cart> updateCartItem(@Valid @RequestBody UpdateItemQuantityRequest request) {
-        return getAuthenticatedUserId()
+    public Mono<Cart> updateCartItem(
+            ServerWebExchange exchange,
+            @Valid @RequestBody UpdateItemQuantityRequest request) {
+        return  authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> cartService.updateCartItemQuantity(userId, request.getProductId(), request.getQuantity()))
                 .switchIfEmpty(Mono.empty()); // If updateQuantity returns empty, it means item was removed, so return 204
                 // Errors are handled by GlobalExceptionHandler.
@@ -119,18 +89,21 @@ public class CartController {
      * Endpoint to remove a product from the authenticated user's cart. Requires
      * the user to be authenticated.
      *
+     * @param exchange
      * @param payload A map containing the "productId" to remove.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
     @DeleteMapping("/remove")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> removeProductFromCart(@RequestBody Map<String, Long> payload) {
+    public Mono<Void> removeProductFromCart(
+            ServerWebExchange exchange,
+            @RequestBody Map<String, Long> payload) {
         Long productId = payload.get("productId");
         if (productId == null) {
             // This exception will be caught by GlobalExceptionHandler
             return Mono.error(new IllegalArgumentException("Product ID is required for removal."));
         }
-        return getAuthenticatedUserId()
+        return  authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> cartService.removeCartItem(userId, productId));
                 // Errors are handled by GlobalExceptionHandler.
     }
@@ -139,12 +112,13 @@ public class CartController {
      * Endpoint to clear the authenticated user's entire cart. Requires the user
      * to be authenticated.
      *
+     * @param exchange
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
     @DeleteMapping("/clear")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> clearCart() {
-        return getAuthenticatedUserId()
+    public Mono<Void> clearCart(ServerWebExchange exchange) {
+        return  authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> cartService.clearCart(userId));
                 // Errors are handled by GlobalExceptionHandler.
     }

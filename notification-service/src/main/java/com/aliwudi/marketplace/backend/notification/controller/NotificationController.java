@@ -7,6 +7,7 @@ import com.aliwudi.marketplace.backend.common.exception.NotificationNotFoundExce
 import com.aliwudi.marketplace.backend.common.enumeration.NotificationType;
 import com.aliwudi.marketplace.backend.common.status.NotificationStatus;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.common.util.AuthUtil;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType; // For MediaType.TEXT_EVENT_STREAM
 import org.springframework.security.access.prepost.PreAuthorize; // For role-based authorization
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,6 +28,7 @@ import reactor.core.publisher.Mono;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final AuthUtil authUtil;
 
     /**
      * Endpoint for creating a new notification.
@@ -56,14 +59,15 @@ public class NotificationController {
      * SSE endpoint to stream real-time notifications for the authenticated user.
      * Clients will subscribe to this endpoint to receive immediate updates.
      *
+     * @param exchange
      * @return A Flux emitting Notification objects as server-sent events.
      * @throws IllegalArgumentException if authenticated user ID cannot be determined.
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
-    public Flux<Notification> getRealTimeNotifications() {
-        return notificationService.getCurrentAuthenticatedUserId()
+    public Flux<Notification> getRealTimeNotifications(ServerWebExchange exchange) {
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(notificationService::getRealTimeNotificationsStream)
                 .switchIfEmpty(Flux.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Error handling for authentication failure handled by GlobalExceptionHandler.
@@ -73,6 +77,7 @@ public class NotificationController {
     /**
      * Endpoint to retrieve all notifications for the authenticated user with pagination.
      *
+     * @param exchange
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -84,6 +89,7 @@ public class NotificationController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
     public Flux<Notification> getAllMyNotifications(
+            ServerWebExchange exchange,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -94,7 +100,7 @@ public class NotificationController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(userId -> notificationService.getAllNotificationsForUser(userId, pageable))
                 .switchIfEmpty(Flux.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Errors are handled by GlobalExceptionHandler.
@@ -103,6 +109,7 @@ public class NotificationController {
     /**
      * Endpoint to retrieve notifications for the authenticated user by status with pagination.
      *
+     * @param exchange
      * @param status The notification status (e.g., "READ", "UNREAD").
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -115,6 +122,7 @@ public class NotificationController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
     public Flux<Notification> getMyNotificationsByStatus(
+            ServerWebExchange exchange,
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -132,7 +140,7 @@ public class NotificationController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(userId -> notificationService.getNotificationsForUserByStatus(userId, notificationStatus, pageable))
                 .switchIfEmpty(Flux.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Errors are handled by GlobalExceptionHandler.
@@ -141,6 +149,7 @@ public class NotificationController {
     /**
      * Endpoint to retrieve notifications for the authenticated user by type with pagination.
      *
+     * @param exchange
      * @param type The notification type (e.g., "ORDER_UPDATE", "PROMOTION").
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -153,6 +162,7 @@ public class NotificationController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
     public Flux<Notification> getMyNotificationsByType(
+            ServerWebExchange exchange,
             @PathVariable String type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -170,7 +180,7 @@ public class NotificationController {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(userId -> notificationService.getNotificationsForUserByType(userId, notificationType, pageable))
                 .switchIfEmpty(Flux.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Errors are handled by GlobalExceptionHandler.
@@ -187,11 +197,13 @@ public class NotificationController {
     @PutMapping("/me/{id}/read")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
-    public Mono<Notification> markNotificationAsRead(@PathVariable Long id) {
+    public Mono<Notification> markNotificationAsRead(
+            ServerWebExchange exchange, 
+            @PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_NOTIFICATION_ID);
         }
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> notificationService.markNotificationAsRead(id, userId))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Exceptions (NotificationNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
@@ -200,6 +212,7 @@ public class NotificationController {
     /**
      * Endpoint to delete a specific notification for the authenticated user.
      *
+     * @param exchange
      * @param id The ID of the notification to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      * @throws IllegalArgumentException if notification ID is invalid or user not authenticated.
@@ -208,11 +221,14 @@ public class NotificationController {
     @DeleteMapping("/me/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
-    public Mono<Void> deleteMyNotification(@PathVariable Long id) {
+    public Mono<Void> deleteMyNotification(
+            ServerWebExchange exchange,
+            @PathVariable Long id) {
+        
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_NOTIFICATION_ID);
         }
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> notificationService.deleteNotification(id, userId))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Exceptions (NotificationNotFoundException, IllegalArgumentException) are handled by GlobalExceptionHandler.
@@ -221,14 +237,15 @@ public class NotificationController {
     /**
      * Endpoint to count all notifications for the authenticated user.
      *
+     * @param exchange
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if user not authenticated.
      */
     @GetMapping("/me/count")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
-    public Mono<Long> countMyNotifications() {
-        return notificationService.getCurrentAuthenticatedUserId()
+    public Mono<Long> countMyNotifications(ServerWebExchange exchange) {
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(notificationService::countNotificationsForUser)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Errors are handled by GlobalExceptionHandler.
@@ -237,6 +254,7 @@ public class NotificationController {
     /**
      * Endpoint to count notifications for the authenticated user by status.
      *
+     * @param exchange
      * @param status The notification status (e.g., "READ", "UNREAD").
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if status is invalid or user not authenticated.
@@ -244,7 +262,9 @@ public class NotificationController {
     @GetMapping("/me/count/status/{status}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
-    public Mono<Long> countMyNotificationsByStatus(@PathVariable String status) {
+    public Mono<Long> countMyNotificationsByStatus(
+            ServerWebExchange exchange,
+            @PathVariable String status) {
         if (status == null || status.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_NOTIFICATION_STATUS);
         }
@@ -255,7 +275,7 @@ public class NotificationController {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_NOTIFICATION_STATUS + status);
         }
 
-        return notificationService.getCurrentAuthenticatedUserId()
+        return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(userId -> notificationService.countNotificationsForUserByStatus(userId, notificationStatus))
                 .switchIfEmpty(Mono.error(new IllegalArgumentException(ApiResponseMessages.UNAUTHENTICATED_USER)));
         // Errors are handled by GlobalExceptionHandler.

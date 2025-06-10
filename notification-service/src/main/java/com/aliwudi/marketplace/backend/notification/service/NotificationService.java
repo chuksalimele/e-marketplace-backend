@@ -27,10 +27,10 @@ import org.springframework.security.core.userdetails.UserDetails; // Common inte
 import java.time.LocalDateTime;
 
 /**
- * Service class for managing Notifications.
- * Handles creation, retrieval, updates (marking as read), deletion,
- * and broadcasting of notifications for real-time delivery via SSE.
- * Now also orchestrates sending notifications via Email and SMS.
+ * Service class for managing Notifications. Handles creation, retrieval,
+ * updates (marking as read), deletion, and broadcasting of notifications for
+ * real-time delivery via SSE. Now also orchestrates sending notifications via
+ * Email and SMS.
  */
 @Service
 @RequiredArgsConstructor // Generates constructor for final fields
@@ -46,10 +46,10 @@ public class NotificationService {
     private final Sinks.Many<Notification> notificationsSink = Sinks.many().multicast().onBackpressureBuffer();
 
     /**
-     * Creates and stores a new notification, then broadcasts it for real-time delivery.
-     * This operation is transactional.
-     * Additionally, it determines if an email or SMS notification should be sent
-     * based on the notification type and user preferences (if implemented).
+     * Creates and stores a new notification, then broadcasts it for real-time
+     * delivery. This operation is transactional. Additionally, it determines if
+     * an email or SMS notification should be sent based on the notification
+     * type and user preferences (if implemented).
      *
      * @param request The DTO containing data for the new notification.
      * @return A Mono emitting the created Notification.
@@ -130,9 +130,9 @@ public class NotificationService {
     }
 
     /**
-     * Placeholder method for sending an email notification.
-     * In a real application, this would call your EmailService.
-     * Offloaded to Schedulers.boundedElastic() to prevent blocking.
+     * Placeholder method for sending an email notification. In a real
+     * application, this would call your EmailService. Offloaded to
+     * Schedulers.boundedElastic() to prevent blocking.
      */
     private Mono<Void> sendEmailNotification(String to, String subject, String body) {
         return Mono.fromRunnable(() -> {
@@ -151,9 +151,9 @@ public class NotificationService {
     }
 
     /**
-     * Placeholder method for sending an SMS notification.
-     * In a real application, this would call your SmsService.
-     * Offloaded to Schedulers.boundedElastic() to prevent blocking.
+     * Placeholder method for sending an SMS notification. In a real
+     * application, this would call your SmsService. Offloaded to
+     * Schedulers.boundedElastic() to prevent blocking.
      */
     private Mono<Void> sendSmsNotification(String toPhoneNumber, String message) {
         return Mono.fromRunnable(() -> {
@@ -172,15 +172,15 @@ public class NotificationService {
     }
 
     // ... (rest of the NotificationService methods remain the same) ...
-
     /**
-     * Marks a specific notification as 'READ'.
-     * This operation is transactional.
+     * Marks a specific notification as 'READ'. This operation is transactional.
      *
      * @param notificationId The ID of the notification to mark as read.
-     * @param userId The ID of the user who owns the notification (for authorization).
+     * @param userId The ID of the user who owns the notification (for
+     * authorization).
      * @return A Mono emitting the updated Notification.
-     * @throws NotificationNotFoundException if the notification is not found for the given user.
+     * @throws NotificationNotFoundException if the notification is not found
+     * for the given user.
      */
     @Transactional
     public Mono<Notification> markNotificationAsRead(Long notificationId, Long userId) {
@@ -203,13 +203,14 @@ public class NotificationService {
     }
 
     /**
-     * Deletes a specific notification.
-     * This operation is transactional.
+     * Deletes a specific notification. This operation is transactional.
      *
      * @param notificationId The ID of the notification to delete.
-     * @param userId The ID of the user who owns the notification (for authorization).
+     * @param userId The ID of the user who owns the notification (for
+     * authorization).
      * @return A Mono<Void> indicating completion.
-     * @throws NotificationNotFoundException if the notification is not found for the given user.
+     * @throws NotificationNotFoundException if the notification is not found
+     * for the given user.
      */
     @Transactional
     public Mono<Void> deleteNotification(Long notificationId, Long userId) {
@@ -227,9 +228,11 @@ public class NotificationService {
      * Retrieves a specific notification by its ID and associated user ID.
      *
      * @param notificationId The ID of the notification.
-     * @param userId The ID of the user who owns the notification (for authorization).
+     * @param userId The ID of the user who owns the notification (for
+     * authorization).
      * @return A Mono emitting the Notification.
-     * @throws NotificationNotFoundException if the notification is not found for the given user.
+     * @throws NotificationNotFoundException if the notification is not found
+     * for the given user.
      */
     public Mono<Notification> getNotificationByIdAndUserId(Long notificationId, Long userId) {
         log.info("Retrieving notification ID: {} for user ID: {}", notificationId, userId);
@@ -242,8 +245,8 @@ public class NotificationService {
     }
 
     /**
-     * Retrieves all notifications for a specific user with pagination.
-     * Sorted by creation date descending.
+     * Retrieves all notifications for a specific user with pagination. Sorted
+     * by creation date descending.
      *
      * @param userId The ID of the user.
      * @param pageable Pagination information.
@@ -257,7 +260,8 @@ public class NotificationService {
     }
 
     /**
-     * Retrieves notifications for a specific user filtered by status with pagination.
+     * Retrieves notifications for a specific user filtered by status with
+     * pagination.
      *
      * @param userId The ID of the user.
      * @param status The read status (READ, UNREAD).
@@ -272,7 +276,8 @@ public class NotificationService {
     }
 
     /**
-     * Retrieves notifications for a specific user filtered by type with pagination.
+     * Retrieves notifications for a specific user filtered by type with
+     * pagination.
      *
      * @param userId The ID of the user.
      * @param type The notification type.
@@ -329,49 +334,5 @@ public class NotificationService {
                 .doOnCancel(() -> log.info("SSE subscription cancelled for user ID: {}", userId))
                 .doOnError(e -> log.error("Error in SSE stream for user ID {}: {}", userId, e.getMessage(), e))
                 .publishOn(Schedulers.boundedElastic()); // Ensure operations on elements are not on event loop
-    }
-
-    /**
-     * Helper method to get the current authenticated user's ID from Spring Security context.
-     * This is the real-world implementation assuming a Spring Security WebFlux setup.
-     * The principal is typically a UserDetails object or a custom UserPrincipal containing the ID.
-     *
-     * @return A Mono emitting the current user's ID (Long).
-     * @throws RuntimeException if the user is not authenticated or user ID cannot be determined.
-     */
-    public Mono<Long> getCurrentAuthenticatedUserId() {
-        return ReactiveSecurityContextHolder.getContext()
-                .switchIfEmpty(Mono.error(new RuntimeException(ApiResponseMessages.SECURITY_CONTEXT_NOT_FOUND)))
-                .map(context -> context.getAuthentication())
-                .filter(Authentication::isAuthenticated)
-                .switchIfEmpty(Mono.error(new RuntimeException(ApiResponseMessages.UNAUTHENTICATED_USER)))
-                .map(Authentication::getPrincipal)
-                .flatMap(principal -> {
-                    // Try to cast to Long directly (if principal is just the ID)
-                    if (principal instanceof Long) {
-                        return Mono.just((Long) principal);
-                    }
-                    // Try to cast to UserDetails (common for Spring Security)
-                    else if (principal instanceof UserDetails) {
-                        try {
-                            // Assuming username is the user ID, or there's an getId() method
-                            String username = ((UserDetails) principal).getUsername(); // Often the ID string
-                            return Mono.just(Long.parseLong(username)); // Attempt to parse
-                        } catch (NumberFormatException e) {
-                            log.error("Principal username is not a valid Long ID: {}", ((UserDetails) principal).getUsername(), e);
-                            return Mono.error(new RuntimeException(ApiResponseMessages.INVALID_USER_ID_FORMAT));
-                        }
-                    }
-                    // If you have a custom UserPrincipal class with a getId() method:
-                    // else if (principal instanceof YourCustomUserPrincipal) {
-                    //     return Mono.just(((YourCustomUserPrincipal) principal).getId());
-                    // }
-                    else {
-                        log.error("Unsupported principal type in security context: {}", principal.getClass().getName());
-                        return Mono.error(new RuntimeException(ApiResponseMessages.INVALID_USER_ID_FORMAT));
-                    }
-                })
-                .doOnSuccess(id -> log.debug("Retrieved authenticated user ID: {}", id))
-                .doOnError(e -> log.error("Failed to retrieve authenticated user ID: {}", e.getMessage()));
     }
 }
