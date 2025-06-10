@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.common.interservice;
 
 import com.aliwudi.marketplace.backend.common.model.Order;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
+import com.aliwudi.marketplace.backend.common.filter.JwtPropagationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,15 +14,23 @@ import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.UnknownHostException;
 import java.util.concurrent.TimeoutException;
-import org.reactivestreams.Publisher; // Import Publisher
+import org.slf4j.Logger; // Import Logger
+import org.slf4j.LoggerFactory; // Import LoggerFactory
 
 @Service
 public class OrderIntegrationService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderIntegrationService.class); // Add Logger
+
     private final WebClient webClient;
 
-    public OrderIntegrationService(@Value("${order.service.url}") String orderServiceBaseUrl) {
-        this.webClient = WebClient.builder().baseUrl(orderServiceBaseUrl).build();
+    // Inject the JwtPropagationFilter
+    public OrderIntegrationService(@Value("${order.service.url}") String orderServiceBaseUrl,
+                                   JwtPropagationFilter jwtPropagationFilter) { // INJECT THE FILTER
+        this.webClient = WebClient.builder()
+                .baseUrl(orderServiceBaseUrl)
+                .filter(jwtPropagationFilter) // APPLY THE FILTER HERE!
+                .build();
     }
 
     /**
@@ -38,30 +47,30 @@ public class OrderIntegrationService {
         return mono
                 .onErrorResume(WebClientResponseException.class, e -> {
                     if (isNotFoundHandledSeparately && e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        System.out.println("Order " + resourceIdentifier + " not found in Order Service (404) during " + contextMessage + ".");
+                        log.info("Order {} not found in Order Service (404) during {}.", resourceIdentifier, contextMessage);
                         return Mono.empty(); // Signal not found by returning empty
                     }
-                    System.err.println("WebClient response error during " + contextMessage + " for order " + resourceIdentifier + ": " + e.getMessage() + " (Status: " + e.getStatusCode() + ")");
+                    log.error("WebClient response error during {} for order {}: {} (Status: {})", contextMessage, resourceIdentifier, e.getMessage(), e.getStatusCode(), e);
                     return Mono.error(new ServiceUnavailableException("Order Service communication error during " + contextMessage + " for order ID " + resourceIdentifier + ": " + e.getMessage(), e));
                 })
                 .onErrorResume(ConnectException.class, e -> {
-                    System.err.println("Connection error to Order Service during " + contextMessage + " for order " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Connection error to Order Service during {} for order {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Failed to connect to Order Service (connection refused/host unreachable) during " + contextMessage + " for order ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(NoRouteToHostException.class, e -> {
-                    System.err.println("No route to host for Order Service during " + contextMessage + " for order " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("No route to host for Order Service during {} for order {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("No route to host for Order Service during " + contextMessage + " for order ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(UnknownHostException.class, e -> {
-                    System.err.println("Unknown host for Order Service during " + contextMessage + " for order " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Unknown host for Order Service during {} for order {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Unknown host for Order Service during " + contextMessage + " for order ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(TimeoutException.class, e -> {
-                    System.err.println("Timeout connecting to Order Service during " + contextMessage + " for order " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Timeout connecting to Order Service during {} for order {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Order Service communication timeout during " + contextMessage + " for order ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(Exception.class, e -> {
-                    System.err.println("Failed during " + contextMessage + " for order " + resourceIdentifier + " from Order Service due to unexpected error: " + e.getMessage());
+                    log.error("Failed during {} for order {} from Order Service due to unexpected error: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Failed to connect to Order Service during " + contextMessage + " for order ID " + resourceIdentifier, e));
                 });
     }
@@ -80,30 +89,30 @@ public class OrderIntegrationService {
         return flux
                 .onErrorResume(WebClientResponseException.class, e -> {
                     if (isNotFoundHandledSeparately && e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        System.out.println("Orders for " + resourceIdentifier + " not found in Order Service (404) during " + contextMessage + ".");
+                        log.info("Orders for {} not found in Order Service (404) during {}.", resourceIdentifier, contextMessage);
                         return Flux.empty(); // Signal not found by returning empty Flux
                     }
-                    System.err.println("WebClient response error during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage() + " (Status: " + e.getStatusCode() + ")");
+                    log.error("WebClient response error during {} for {}: {} (Status: {})", contextMessage, resourceIdentifier, e.getMessage(), e.getStatusCode(), e);
                     return Flux.error(new ServiceUnavailableException("Order Service communication error during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage(), e));
                 })
                 .onErrorResume(ConnectException.class, e -> {
-                    System.err.println("Connection error to Order Service during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Connection error to Order Service during {} for {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Flux.error(new ServiceUnavailableException("Failed to connect to Order Service (connection refused/host unreachable) during " + contextMessage + " for " + resourceIdentifier, e));
                 })
                 .onErrorResume(NoRouteToHostException.class, e -> {
-                    System.err.println("No route to host for Order Service during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("No route to host for Order Service during {} for {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Flux.error(new ServiceUnavailableException("No route to host for Order Service during " + contextMessage + " for " + resourceIdentifier, e));
                 })
                 .onErrorResume(UnknownHostException.class, e -> {
-                    System.err.println("Unknown host for Order Service during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Unknown host for Order Service during {} for {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Flux.error(new ServiceUnavailableException("Unknown host for Order Service during " + contextMessage + " for " + resourceIdentifier, e));
                 })
                 .onErrorResume(TimeoutException.class, e -> {
-                    System.err.println("Timeout connecting to Order Service during " + contextMessage + " for " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Timeout connecting to Order Service during {} for {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Flux.error(new ServiceUnavailableException("Order Service communication timeout during " + contextMessage + " for " + resourceIdentifier, e));
                 })
                 .onErrorResume(Exception.class, e -> {
-                    System.err.println("Failed during " + contextMessage + " for " + resourceIdentifier + " from Order Service due to unexpected error: " + e.getMessage());
+                    log.error("Failed during {} for {} from Order Service due to unexpected error: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Flux.error(new ServiceUnavailableException("Failed to connect to Order Service during " + contextMessage + " for " + resourceIdentifier, e));
                 });
     }
@@ -119,7 +128,6 @@ public class OrderIntegrationService {
         Mono<Boolean> responseMono = webClient.head() // Use HEAD request for efficiency
                 .uri("/api/orders/{orderId}", orderId) // Adjust URI based on your Order Service API
                 .retrieve()
-                // Removed onStatus calls as WebClientResponseException will handle them
                 .toBodilessEntity() // Discard the response body, get only headers/status
                 .map(response -> response.getStatusCode() == HttpStatus.OK); // If 200 OK, order exists
 
@@ -127,7 +135,7 @@ public class OrderIntegrationService {
         return responseMono
                 .onErrorResume(WebClientResponseException.class, e -> {
                     if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        System.out.println("Order " + orderId + " not found in Order Service (404 for HEAD).");
+                        log.info("Order {} not found in Order Service (404 for HEAD).", orderId);
                         return Mono.just(false); // Order does not exist
                     }
                     // For other WebClientResponseExceptions, let the generic handler take over
@@ -148,7 +156,6 @@ public class OrderIntegrationService {
         Mono<Order> responseMono = webClient.get()
                 .uri("/api/orders/{orderId}", orderId) // Adjust URI based on your Order Service API
                 .retrieve()
-                // Removed onStatus calls as WebClientResponseException will handle them
                 .bodyToMono(Order.class);
 
         return handleOrderServiceErrors(responseMono, "fetching order", orderId, true);
@@ -165,7 +172,6 @@ public class OrderIntegrationService {
         Flux<Order> responseFlux = webClient.get()
                 .uri("/api/orders/user/{userId}", userId) // Adjust URI based on your Order Service API
                 .retrieve()
-                // Removed onStatus calls as WebClientResponseException will handle them
                 .bodyToFlux(Order.class); // Expecting a Flux of Order
 
         return handleOrderServiceErrors(responseFlux, "fetching user's orders", userId, true);

@@ -2,24 +2,34 @@ package com.aliwudi.marketplace.backend.common.interservice;
 
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
+import com.aliwudi.marketplace.backend.common.filter.JwtPropagationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException; // Corrected: Import WebClientResponseException
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
-import java.net.ConnectException; // For connection errors
-import java.net.NoRouteToHostException; // For network routing issues
-import java.net.UnknownHostException; // For DNS resolution issues
-import java.util.concurrent.TimeoutException; // For timeouts that might not be WebClient specific
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.UnknownHostException;
+import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger; // For logging
+import org.slf4j.LoggerFactory; // For logging
 
 @Service
 public class UserIntegrationService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserIntegrationService.class); // Add Logger
+
     private final WebClient webClient;
 
-    public UserIntegrationService(@Value("${user.service.url}") String userServiceBaseUrl) {
-        this.webClient = WebClient.builder().baseUrl(userServiceBaseUrl).build();
+    // Inject the JwtPropagationFilter
+    public UserIntegrationService(@Value("${user.service.url}") String userServiceBaseUrl,
+                                  JwtPropagationFilter jwtPropagationFilter) { // INJECT THE FILTER
+        this.webClient = WebClient.builder()
+                .baseUrl(userServiceBaseUrl)
+                .filter(jwtPropagationFilter) // APPLY THE FILTER HERE!
+                .build();
     }
 
     /**
@@ -35,38 +45,31 @@ public class UserIntegrationService {
     private <T> Mono<T> handleUserServiceErrors(Mono<T> mono, String contextMessage, Object resourceIdentifier, boolean isNotFoundHandledSeparately) {
         return mono
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    // This catches all WebClientResponseException subclasses (e.g., HttpClientErrorException, HttpServerErrorException)
                     if (isNotFoundHandledSeparately && e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        System.out.println("User " + resourceIdentifier + " not found in User Service (404) during " + contextMessage + ".");
+                        log.info("User {} not found in User Service (404) during {}.", resourceIdentifier, contextMessage);
                         return Mono.empty(); // Signal not found by returning empty
                     }
-                    // Handle other 4xx and all 5xx errors as ServiceUnavailableException
-                    System.err.println("WebClient response error during " + contextMessage + " for user " + resourceIdentifier + ": " + e.getMessage() + " (Status: " + e.getStatusCode() + ")");
+                    log.error("WebClient response error during {} for user {}: {} (Status: {})", contextMessage, resourceIdentifier, e.getMessage(), e.getStatusCode(), e);
                     return Mono.error(new ServiceUnavailableException("User Service communication error during " + contextMessage + " for user ID " + resourceIdentifier + ": " + e.getMessage(), e));
                 })
                 .onErrorResume(ConnectException.class, e -> {
-                    // Catches connection refused, host unreachable
-                    System.err.println("Connection error to User Service during " + contextMessage + " for user " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Connection error to User Service during {} for user {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Failed to connect to User Service (connection refused/host unreachable) during " + contextMessage + " for user ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(NoRouteToHostException.class, e -> {
-                    // Catches network routing issues
-                    System.err.println("No route to host for User Service during " + contextMessage + " for user " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("No route to host for User Service during {} for user {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("No route to host for User Service during " + contextMessage + " for user ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(UnknownHostException.class, e -> {
-                    // Catches DNS resolution failures
-                    System.err.println("Unknown host for User Service during " + contextMessage + " for user " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Unknown host for User Service during {} for user {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Unknown host for User Service during " + contextMessage + " for user ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(TimeoutException.class, e -> {
-                    // Catches general read timeouts, potentially from underlying HTTP client
-                    System.err.println("Timeout connecting to User Service during " + contextMessage + " for user " + resourceIdentifier + ": " + e.getMessage());
+                    log.error("Timeout connecting to User Service during {} for user {}: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("User Service communication timeout during " + contextMessage + " for user ID " + resourceIdentifier, e));
                 })
                 .onErrorResume(Exception.class, e -> {
-                    // Catch any other general exceptions (e.g., network issues, unexpected errors)
-                    System.err.println("Failed during " + contextMessage + " for user " + resourceIdentifier + " from User Service due to unexpected error: " + e.getMessage());
+                    log.error("Failed during {} for user {} from User Service due to unexpected error: {}", contextMessage, resourceIdentifier, e.getMessage(), e);
                     return Mono.error(new ServiceUnavailableException("Failed to connect to User Service during " + contextMessage + " for user ID " + resourceIdentifier, e));
                 });
     }
@@ -82,7 +85,6 @@ public class UserIntegrationService {
         Mono<User> responseMono = webClient.get()
                 .uri("/api/users/{userId}", userId)
                 .retrieve()
-                // Removed explicit onStatus for 4xx/5xx as common error handler will catch WebClientResponseException
                 .bodyToMono(User.class);
 
         return handleUserServiceErrors(responseMono, "fetching user", userId, true);
@@ -99,22 +101,19 @@ public class UserIntegrationService {
         Mono<Boolean> responseMono = webClient.head()
                 .uri("/api/users/{userId}", userId)
                 .retrieve()
-                // Removed explicit onStatus for 4xx/5xx as common error handler will catch WebClientResponseException
                 .toBodilessEntity()
-                .map(response -> response.getStatusCode() == HttpStatus.OK);
-
-        // For userExistsById, 404 should result in Mono.just(false) directly from WebClientResponseException
-        return responseMono
+                .map(response -> response.getStatusCode() == HttpStatus.OK)
                 .onErrorResume(WebClientResponseException.class, e -> {
                     if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        System.out.println("User " + userId + " not found in User Service (404 for HEAD).");
+                        log.info("User {} not found in User Service (404 for HEAD).", userId);
                         return Mono.just(false);
                     }
-                    System.err.println("WebClient response error during user existence check for ID " + userId + ": " + e.getMessage() + " (Status: " + e.getStatusCode() + ")");
+                    log.error("WebClient response error during user existence check for ID {}: {} (Status: {})", userId, e.getMessage(), e.getStatusCode(), e);
                     return Mono.error(new ServiceUnavailableException("User Service communication error for user ID " + userId + ": " + e.getMessage(), e));
-                })
-                // Apply the common error handling for other network/timeout issues
-                .transform(mono -> handleUserServiceErrors(mono, "checking user existence", userId, false)); // Pass false because 404 is handled directly above
+                });
+
+        return responseMono
+                .transform(mono -> handleUserServiceErrors(mono, "checking user existence", userId, false));
     }
 
     /**
@@ -128,7 +127,6 @@ public class UserIntegrationService {
         Mono<Boolean> responseMono = webClient.get()
                 .uri("/api/users/exists/username/{username}", username)
                 .retrieve()
-                // Removed explicit onStatus for 4xx/5xx as common error handler will catch WebClientResponseException
                 .bodyToMono(Boolean.class);
 
         return handleUserServiceErrors(responseMono, "checking user existence by username", username, true);
