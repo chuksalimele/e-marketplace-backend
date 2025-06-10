@@ -21,7 +21,12 @@ public class ProductCatalogServiceSecurityConfig {
             .formLogin(withDefaults()) // Disable form login
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // Expect and validate JWTs
             .authorizeExchange(exchange -> exchange
-                .anyExchange().authenticated() // All endpoints require authentication (JWT validation)
+                .pathMatchers(
+                    //"/api/products/auth/**"      // Authentication endpoints 
+                    //"/api/products/admin/**"      // Authentication endpoints 
+
+                ).authenticated()
+                .anyExchange().permitAll() //Allow the rest endpoints
             )
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless
         return http.build();

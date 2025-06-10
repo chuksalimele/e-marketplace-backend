@@ -21,7 +21,14 @@ public class LgtMedServiceSecurityConfig {
             .formLogin(withDefaults()) // Disable form login
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // Expect and validate JWTs
             .authorizeExchange(exchange -> exchange
-                .anyExchange().authenticated() // All endpoints require authentication (JWT validation)
+                .pathMatchers(
+                    //"/api/deliveries/admin/**"      // Authentication endpoints 
+                    //"/api/deliveries/auth/**"      // Authentication endpoints 
+                    //"/api/media/admin/**"      // Authentication endpoints 
+                    //"/api/media/auth/**"      // Authentication endpoints 
+
+                ).authenticated()
+                .anyExchange().permitAll() //Allow the rest endpoints
             )
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless
         return http.build();

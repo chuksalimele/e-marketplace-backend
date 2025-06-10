@@ -178,8 +178,7 @@ public class APIGatewayApplication {
                     if (authentication != null && authentication.isAuthenticated()) {
                         String userId = null;
                         // Extract user ID from JWT principal
-                        if (authentication.getPrincipal() instanceof Jwt) {
-                            Jwt jwt = (Jwt) authentication.getPrincipal();
+                        if (authentication.getPrincipal() instanceof Jwt jwt) {
                             userId = jwt.getClaimAsString("sub"); // Assuming 'sub' claim holds the user ID
                             // You can add other claims like roles if needed:
                             // String roles = authentication.getAuthorities().stream()

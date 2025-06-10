@@ -42,8 +42,14 @@ class FallbackController {
     public Mono<String> logisticsFallback() {
         return Mono.just("Logistics service is currently unavailable. Please try again later.");
     }  
+    
     @RequestMapping("/fallback/media")
     public Mono<String> mediaFallback() {
         return Mono.just("Media service is currently unavailable. Please try again later.");
-    }       
+    }   
+    
+    @RequestMapping("/fallback/notifications")
+    public Mono<String> notificationFallback() {
+        return Mono.just("Notification service is currently unavailable. Please try again later.");
+    }   
 }
