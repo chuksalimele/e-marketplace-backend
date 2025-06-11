@@ -6,7 +6,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
     // Spring Cloud Netflix Eureka Client dependency for service discovery
-    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
     
-    implementation 'org.springframework.security:spring-security-oauth2-jose'
+    implementation("org.springframework.security:spring-security-oauth2-jose:6.5.0")
 }

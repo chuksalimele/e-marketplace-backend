@@ -14,7 +14,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtEncoder; // For signing JWTs
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder; // For signing JWTs
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import javax.crypto.spec.SecretKeySpec; // For symmetric key
@@ -53,7 +53,7 @@ public class UserServiceSecurityConfig {
         // Ensure your jwtSecret is at least 32 bytes (256 bits) for HS256
         SecretKeySpec secretKey = new SecretKeySpec(jwtSecret.getBytes(), "HmacSha256");
         JWKSource<SecurityContext> immutableSecret = new ImmutableSecret<>(secretKey);
-        return new NimbusReactiveJwtEncoder(immutableSecret);
+        return new NimbusJwtEncoder(immutableSecret);
     }
 
     @Bean

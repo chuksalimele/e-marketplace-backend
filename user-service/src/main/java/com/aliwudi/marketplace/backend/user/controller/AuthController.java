@@ -1,9 +1,9 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.common.model.User;
+import com.aliwudi.marketplace.backend.common.model.User; // Ensure this is your custom User model
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.user.dto.LoginRequest; // NEW: Import LoginRequest
-import com.aliwudi.marketplace.backend.user.dto.JwtResponse; // NEW: Import JwtResponse
+import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
+import com.aliwudi.marketplace.backend.user.dto.JwtResponse;
 import com.aliwudi.marketplace.backend.user.dto.SignupRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.service.UserService;
@@ -11,21 +11,23 @@ import com.aliwudi.marketplace.backend.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.ReactiveAuthenticationManager; // NEW: Import ReactiveAuthenticationManager
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; // NEW: Import UsernamePasswordAuthenticationToken
-import org.springframework.security.core.Authentication; // NEW: Import Authentication
-import org.springframework.security.core.GrantedAuthority; // NEW: Import GrantedAuthority
-import org.springframework.security.core.context.ReactiveSecurityContextHolder; // NEW: for context
-import org.springframework.security.oauth2.jwt.JwtClaimsSet; // NEW: For JWT claims
-import org.springframework.security.oauth2.jwt.JwtEncoder; // NEW: For JWT encoding
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters; // NEW: For JWT encoding parameters
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication; // THIS IS CRUCIAL: Ensure this is imported
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder; // THIS IS CRUCIAL: Ensure this is imported
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context; // NEW: Import reactor.util.context.Context if not already
 
-import java.time.Instant; // NEW: For JWT expiration
-import java.time.temporal.ChronoUnit; // NEW: For JWT expiration units
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.stream.Collectors; // NEW: For stream operations
+import java.util.stream.Collectors;
+import reactor.core.scheduler.Schedulers;
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600)
 @RestController
@@ -34,16 +36,9 @@ import java.util.stream.Collectors; // NEW: For stream operations
 public class AuthController {
 
     private final UserService userService;
-    private final ReactiveAuthenticationManager authenticationManager; // NEW: Inject ReactiveAuthenticationManager
-    private final JwtEncoder jwtEncoder; // NEW: Inject JwtEncoder
+    private final ReactiveAuthenticationManager authenticationManager;
+    private final JwtEncoder jwtEncoder;
 
-    /**
-     * Endpoint for new user registration.
-     * Delegates the creation logic to UserService.
-     *
-     * @param signUpRequest The DTO containing user registration data.
-     * @return A Mono emitting the created User object (HTTP 201 Created).
-     */
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<User> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
@@ -51,31 +46,24 @@ public class AuthController {
                 signUpRequest.getUsername(),
                 signUpRequest.getEmail(),
                 signUpRequest.getPassword(),
-                null, null, null, // firstName, lastName, shippingAddress (if not in signup)
+                null, null, null,
                 signUpRequest.getRole()
         );
         return userService.createUser(userRequest);
     }
 
-    /**
-     * NEW: Endpoint for user login and JWT token issuance.
-     *
-     * @param loginRequest The DTO containing username and password.
-     * @return A Mono emitting JwtResponse with the generated JWT.
-     */
     @PostMapping("/signin")
     @ResponseStatus(HttpStatus.OK)
     public Mono<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         return authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
             )
+            // Fix for 'then' error: Use subscriberContext to set the Authentication in the Reactor Context
             .flatMap(authentication -> {
-                // Set the authenticated user in the security context
-                return ReactiveSecurityContextHolder.withAuthentication(authentication)
-                    .then(Mono.just(authentication));
-            })
-            .flatMap(authentication -> {
-                // Get user details from the authenticated object
+                // 'authentication.getPrincipal()' IS VALID here.
+                // It returns an Object, which you then cast to org.springframework.security.core.userdetails.User.
+                // If 'getPrincipal()' is still "symbol not found", it indicates a deeper classpath issue
+                // related to spring-security-core being missing or not recognized.
                 org.springframework.security.core.userdetails.User springUser =
                     (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
 
@@ -88,19 +76,22 @@ public class AuthController {
                     .collect(Collectors.toList());
 
                 JwtClaimsSet claims = JwtClaimsSet.builder()
-                    .issuer("self") // Or your service name/domain
+                    .issuer("self")
                     .issuedAt(now)
                     .expiresAt(now.plus(expiry, ChronoUnit.SECONDS))
                     .subject(springUser.getUsername())
-                    .claim("roles", roles) // Add roles as a claim
+                    .claim("roles", roles)
                     .build();
 
                 // Encode the JWT
                 return Mono.fromCallable(() -> this.jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue())
+                    .subscribeOn(Schedulers.boundedElastic()) // Offload blocking call to dedicated thread pool
                     .flatMap(jwtToken -> {
-                        // Fetch the full User entity to get ID and email (if not available in UserDetails)
+                        // Fetch the full User entity to get ID and email
                         return userService.findByUsername(springUser.getUsername())
-                            .map(userDetails -> (User) userDetails) // Cast back to your custom User model if necessary
+                            // IMPORTANT: Ensure your com.aliwudi.marketplace.backend.common.model.User
+                            // is correctly mapped here from UserDetails if needed for JwtResponse
+                            .map(userDetails -> (User) userDetails) // Cast back to your custom User model
                             .map(userEntity -> new JwtResponse(
                                 jwtToken,
                                 userEntity.getId(),
@@ -109,6 +100,7 @@ public class AuthController {
                                 roles
                             ));
                     });
+
             });
     }
 }

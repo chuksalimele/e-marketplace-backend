@@ -52,7 +52,7 @@ public class UserService  implements ReactiveUserDetailsService{
      */
     @Override
     public Mono<UserDetails> findByUsername(String username) {
-        log.info("Attempting to load user by username: {}", username);
+        log.debug("Attempting to load user by username: {}", username);
         return userRepository.findByUsername(username)
                 .switchIfEmpty(Mono.error(new UsernameNotFoundException("User not found with username: " + username)))
                 .map(user -> {
@@ -61,7 +61,7 @@ public class UserService  implements ReactiveUserDetailsService{
                             .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                             .collect(Collectors.toList());
 
-                    return new org.springframework.security.core.userdetails.User(
+                    return (UserDetails)new org.springframework.security.core.userdetails.User(
                             user.getUsername(),
                             user.getPassword(),
                             user.isEnabled(), // Account enabled
@@ -71,7 +71,7 @@ public class UserService  implements ReactiveUserDetailsService{
                             authorities
                     );
                 })
-                .doOnSuccess(userDetails -> log.info("User '{}' loaded successfully for authentication.", userDetails.getUsername()))
+                .doOnSuccess(userDetails -> log.debug("User '{}' loaded successfully for authentication.", userDetails.getUsername()))
                 .doOnError(e -> log.error("Error loading user by username {}: {}", username, e.getMessage(), e));
     }
     
@@ -119,7 +119,7 @@ public class UserService  implements ReactiveUserDetailsService{
      */
     @Transactional
     public Mono<User> createUser(UserRequest userRequest) {
-        log.info("Attempting to create user with username: {} and email: {}", userRequest.getUsername(), userRequest.getEmail());
+        log.debug("Attempting to create user with username: {} and email: {}", userRequest.getUsername(), userRequest.getEmail());
 
         // Check for duplicate username and email concurrently
         Mono<Boolean> usernameExists = userRepository.existsByUsername(userRequest.getUsername());
@@ -152,7 +152,7 @@ public class UserService  implements ReactiveUserDetailsService{
                             .enabled(true)
                             .build();
 
-                        log.info("Saving new user: {}", user.getUsername());
+                        log.debug("Saving new user: {}", user.getUsername());
                     // Resolve roles
                     Mono<Set<Role>> rolesMono;
                     if (userRequest.getRoleNames() != null && !userRequest.getRoleNames().isEmpty()) {
@@ -180,7 +180,7 @@ public class UserService  implements ReactiveUserDetailsService{
                                 return userRepository.save(user); // Save the user
                             })
                             .flatMap(this::prepareDto) // Enrich the saved user
-                            .doOnSuccess(u -> log.info("User created successfully with ID: {}", u.getId()))
+                            .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                             .doOnError(e -> log.error("Error creating user {}: {}", userRequest.getUsername(), e.getMessage(), e));
                 });
     }
@@ -199,7 +199,7 @@ public class UserService  implements ReactiveUserDetailsService{
      */
     @Transactional
     public Mono<User> updateUser(Long id, UserRequest userRequest) {
-        log.info("Attempting to update user with ID: {}", id);
+        log.debug("Attempting to update user with ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
                 .flatMap(existingUser -> {
@@ -284,7 +284,7 @@ public class UserService  implements ReactiveUserDetailsService{
                     return userSaveMono;
                 })
                 .flatMap(this::prepareDto) // Enrich the updated user
-                .doOnSuccess(u -> log.info("User updated successfully with ID: {}", u.getId()))
+                .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
                 .doOnError(e -> log.error("Error updating user {}: {}", id, e.getMessage(), e));
     }
 
@@ -301,7 +301,7 @@ public class UserService  implements ReactiveUserDetailsService{
      */
     @Transactional
     public Mono<Void> updateUserPassword(Long id, PasswordUpdateRequest passwordUpdateRequest) {
-        log.info("Attempting to update password for user with ID: {}", id);
+        log.debug("Attempting to update password for user with ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
                 .flatMap(existingUser -> {
@@ -318,7 +318,7 @@ public class UserService  implements ReactiveUserDetailsService{
                     return userRepository.save(existingUser);
                 })
                 .then() // Convert to Mono<Void> after the save operation completes
-                .doOnSuccess(v -> log.info("Password updated successfully for user ID: {}", id))
+                .doOnSuccess(v -> log.debug("Password updated successfully for user ID: {}", id))
                 .doOnError(e -> log.error("Error updating password for user {}: {}", id, e.getMessage(), e));
     }
 
@@ -332,11 +332,11 @@ public class UserService  implements ReactiveUserDetailsService{
      */
     @Transactional
     public Mono<Void> deleteUser(Long id) {
-        log.info("Attempting to delete user with ID: {}", id);
+        log.debug("Attempting to delete user with ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
                 .flatMap(userRepository::delete)
-                .doOnSuccess(v -> log.info("User deleted successfully with ID: {}", id))
+                .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", id))
                 .doOnError(e -> log.error("Error deleting user {}: {}", id, e.getMessage(), e));
     }
 
@@ -348,11 +348,11 @@ public class UserService  implements ReactiveUserDetailsService{
      * @throws ResourceNotFoundException if the user is not found.
      */
     public Mono<User> getUserById(Long id) {
-        log.info("Retrieving user by ID: {}", id);
+        log.debug("Retrieving user by ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
                 .flatMap(this::prepareDto) // Enrich the user
-                .doOnSuccess(user -> log.info("User retrieved successfully: {}", user.getId()))
+                .doOnSuccess(user -> log.debug("User retrieved successfully: {}", user.getId()))
                 .doOnError(e -> log.error("Error retrieving user {}: {}", id, e.getMessage(), e));
     }
 
@@ -364,11 +364,11 @@ public class UserService  implements ReactiveUserDetailsService{
      * @throws ResourceNotFoundException if the user is not found.
      */
     public Mono<User> getUserByUsername(String username) {
-        log.info("Retrieving user by username: {}", username);
+        log.debug("Retrieving user by username: {}", username);
         return userRepository.findByUsername(username)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_USERNAME + username)))
                 .flatMap(this::prepareDto) // Enrich the user
-                .doOnSuccess(user -> log.info("User retrieved successfully by username: {}", user.getUsername()))
+                .doOnSuccess(user -> log.debug("User retrieved successfully by username: {}", user.getUsername()))
                 .doOnError(e -> log.error("Error retrieving user by username {}: {}", username, e.getMessage(), e));
     }
 
@@ -380,11 +380,11 @@ public class UserService  implements ReactiveUserDetailsService{
      * @throws ResourceNotFoundException if the user is not found.
      */
     public Mono<User> getUserByEmail(String email) {
-        log.info("Retrieving user by email: {}", email);
+        log.debug("Retrieving user by email: {}", email);
         return userRepository.findByEmail(email)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_EMAIL + email)))
                 .flatMap(this::prepareDto) // Enrich the user
-                .doOnSuccess(user -> log.info("User retrieved successfully by email: {}", user.getEmail()))
+                .doOnSuccess(user -> log.debug("User retrieved successfully by email: {}", user.getEmail()))
                 .doOnError(e -> log.error("Error retrieving user by email {}: {}", email, e.getMessage(), e));
     }
 
@@ -395,10 +395,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting all users (enriched).
      */
     public Flux<User> getAllUsers(Pageable pageable) {
-        log.info("Retrieving all users with pagination: {}", pageable);
+        log.debug("Retrieving all users with pagination: {}", pageable);
         return userRepository.findAllBy(pageable)
                 .flatMap(this::prepareDto) // Enrich each user
-                .doOnComplete(() -> log.info("Finished retrieving all users for page {} with size {}.", pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished retrieving all users for page {} with size {}.", pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error retrieving all users: {}", e.getMessage(), e));
     }
 
@@ -408,9 +408,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the total count of users.
      */
     public Mono<Long> countAllUsers() {
-        log.info("Counting all users.");
+        log.debug("Counting all users.");
         return userRepository.count()
-                .doOnSuccess(count -> log.info("Total user count: {}", count))
+                .doOnSuccess(count -> log.debug("Total user count: {}", count))
                 .doOnError(e -> log.error("Error counting all users: {}", e.getMessage(), e));
     }
 
@@ -422,10 +422,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting matching users (enriched).
      */
     public Flux<User> getUsersByFirstName(String firstName, Pageable pageable) {
-        log.info("Finding users by first name '{}' with pagination: {}", firstName, pageable);
+        log.debug("Finding users by first name '{}' with pagination: {}", firstName, pageable);
         return userRepository.findByFirstNameContainingIgnoreCase(firstName, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.info("Finished finding users by first name '{}' for page {} with size {}.", firstName, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished finding users by first name '{}' for page {} with size {}.", firstName, pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error finding users by first name {}: {}", firstName, e.getMessage(), e));
     }
 
@@ -436,9 +436,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the count of matching users.
      */
     public Mono<Long> countUsersByFirstName(String firstName) {
-        log.info("Counting users by first name '{}'", firstName);
+        log.debug("Counting users by first name '{}'", firstName);
         return userRepository.countByFirstNameContainingIgnoreCase(firstName)
-                .doOnSuccess(count -> log.info("Total count for first name '{}': {}", firstName, count))
+                .doOnSuccess(count -> log.debug("Total count for first name '{}': {}", firstName, count))
                 .doOnError(e -> log.error("Error counting users by first name {}: {}", firstName, e.getMessage(), e));
     }
 
@@ -450,10 +450,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting matching users (enriched).
      */
     public Flux<User> getUsersByLastName(String lastName, Pageable pageable) {
-        log.info("Finding users by last name '{}' with pagination: {}", lastName, pageable);
+        log.debug("Finding users by last name '{}' with pagination: {}", lastName, pageable);
         return userRepository.findByLastNameContainingIgnoreCase(lastName, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.info("Finished finding users by last name '{}' for page {} with size {}.", lastName, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished finding users by last name '{}' for page {} with size {}.", lastName, pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error finding users by last name {}: {}", lastName, e.getMessage(), e));
     }
 
@@ -464,9 +464,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the count of matching users.
      */
     public Mono<Long> countUsersByLastName(String lastName) {
-        log.info("Counting users by last name '{}'", lastName);
+        log.debug("Counting users by last name '{}'", lastName);
         return userRepository.countByLastNameContainingIgnoreCase(lastName)
-                .doOnSuccess(count -> log.info("Total count for last name '{}': {}", lastName, count))
+                .doOnSuccess(count -> log.debug("Total count for last name '{}': {}", lastName, count))
                 .doOnError(e -> log.error("Error counting users by last name {}: {}", lastName, e.getMessage(), e));
     }
 
@@ -478,10 +478,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting matching users (enriched).
      */
     public Flux<User> getUsersByUsernameOrEmail(String searchTerm, Pageable pageable) {
-        log.info("Finding users by username or email containing '{}' with pagination: {}", searchTerm, pageable);
+        log.debug("Finding users by username or email containing '{}' with pagination: {}", searchTerm, pageable);
         return userRepository.findByUsernameOrEmailContainingIgnoreCase(searchTerm, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.info("Finished finding users by username or email containing '{}' for page {} with size {}.", searchTerm, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished finding users by username or email containing '{}' for page {} with size {}.", searchTerm, pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error finding users by username or email {}: {}", searchTerm, e.getMessage(), e));
     }
 
@@ -492,9 +492,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the count of matching users.
      */
     public Mono<Long> countUsersByUsernameOrEmail(String searchTerm) {
-        log.info("Counting users by username or email containing '{}'", searchTerm);
+        log.debug("Counting users by username or email containing '{}'", searchTerm);
         return userRepository.countByUsernameOrEmailContainingIgnoreCase(searchTerm)
-                .doOnSuccess(count -> log.info("Total count for username or email containing '{}': {}", searchTerm, count))
+                .doOnSuccess(count -> log.debug("Total count for username or email containing '{}': {}", searchTerm, count))
                 .doOnError(e -> log.error("Error counting users by username or email {}: {}", searchTerm, e.getMessage(), e));
     }
 
@@ -506,10 +506,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting matching users (enriched).
      */
     public Flux<User> getUsersByCreatedAtAfter(LocalDateTime date, Pageable pageable) {
-        log.info("Finding users created after {} with pagination: {}", date, pageable);
+        log.debug("Finding users created after {} with pagination: {}", date, pageable);
         return userRepository.findByCreatedAtAfter(date, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.info("Finished finding users created after '{}' for page {} with size {}.", date, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished finding users created after '{}' for page {} with size {}.", date, pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error finding users created after {}: {}", date, e.getMessage(), e));
     }
 
@@ -520,9 +520,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the count of matching users.
      */
     public Mono<Long> countUsersByCreatedAtAfter(LocalDateTime date) {
-        log.info("Counting users created after {}", date);
+        log.debug("Counting users created after {}", date);
         return userRepository.countByCreatedAtAfter(date)
-                .doOnSuccess(count -> log.info("Total count for users created after {}: {}", date, count))
+                .doOnSuccess(count -> log.debug("Total count for users created after {}: {}", date, count))
                 .doOnError(e -> log.error("Error counting users created after {}: {}", date, e.getMessage(), e));
     }
 
@@ -534,10 +534,10 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Flux emitting matching users (enriched).
      */
     public Flux<User> getUsersByShippingAddress(String shippingAddress, Pageable pageable) {
-        log.info("Finding users by shipping address containing '{}' with pagination: {}", shippingAddress, pageable);
+        log.debug("Finding users by shipping address containing '{}' with pagination: {}", shippingAddress, pageable);
         return userRepository.findByShippingAddressContainingIgnoreCase(shippingAddress, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.info("Finished finding users by shipping address containing '{}' for page {} with size {}.", shippingAddress, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnComplete(() -> log.debug("Finished finding users by shipping address containing '{}' for page {} with size {}.", shippingAddress, pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error finding users by shipping address {}: {}", shippingAddress, e.getMessage(), e));
     }
 
@@ -548,9 +548,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting the count of matching users.
      */
     public Mono<Long> countUsersByShippingAddress(String shippingAddress) {
-        log.info("Counting users by shipping address containing '{}'", shippingAddress);
+        log.debug("Counting users by shipping address containing '{}'", shippingAddress);
         return userRepository.countByShippingAddressContainingIgnoreCase(shippingAddress)
-                .doOnSuccess(count -> log.info("Total count for shipping address containing '{}': {}", shippingAddress, count))
+                .doOnSuccess(count -> log.debug("Total count for shipping address containing '{}': {}", shippingAddress, count))
                 .doOnError(e -> log.error("Error counting users by shipping address {}: {}", shippingAddress, e.getMessage(), e));
     }
 
@@ -561,9 +561,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting true if the user exists, false otherwise.
      */
     public Mono<Boolean> existsByEmail(String email) {
-        log.info("Checking if user exists by email: {}", email);
+        log.debug("Checking if user exists by email: {}", email);
         return userRepository.existsByEmail(email)
-                .doOnSuccess(exists -> log.info("User with email {} exists: {}", email, exists))
+                .doOnSuccess(exists -> log.debug("User with email {} exists: {}", email, exists))
                 .doOnError(e -> log.error("Error checking user existence by email {}: {}", email, e.getMessage(), e));
     }
 
@@ -574,9 +574,9 @@ public class UserService  implements ReactiveUserDetailsService{
      * @return A Mono emitting true if the user exists, false otherwise.
      */
     public Mono<Boolean> existsByUsername(String username) {
-        log.info("Checking if user exists by username: {}", username);
+        log.debug("Checking if user exists by username: {}", username);
         return userRepository.existsByUsername(username)
-                .doOnSuccess(exists -> log.info("User with username {} exists: {}", username, exists))
+                .doOnSuccess(exists -> log.debug("User with username {} exists: {}", username, exists))
                 .doOnError(e -> log.error("Error checking user existence by username {}: {}", username, e.getMessage(), e));
     }
 
