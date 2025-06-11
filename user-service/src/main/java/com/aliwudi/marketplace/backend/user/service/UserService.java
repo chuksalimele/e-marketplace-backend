@@ -30,16 +30,51 @@ import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @Service
 @RequiredArgsConstructor // Generates a constructor for final fields (UserRepository, RoleRepository, PasswordEncoder)
 @Slf4j // Enables Lombok's logging
-public class UserService {
+public class UserService  implements ReactiveUserDetailsService{
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+
+    /**
+     * NEW: Implements ReactiveUserDetailsService to load user by username for Spring Security.
+     * @param username The username to retrieve.
+     * @return A Mono emitting UserDetails.
+     */
+    @Override
+    public Mono<UserDetails> findByUsername(String username) {
+        log.info("Attempting to load user by username: {}", username);
+        return userRepository.findByUsername(username)
+                .switchIfEmpty(Mono.error(new UsernameNotFoundException("User not found with username: " + username)))
+                .map(user -> {
+                    // Convert your custom User model to Spring Security's UserDetails
+                    List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
+                            .map(role -> new SimpleGrantedAuthority(role.getName().name()))
+                            .collect(Collectors.toList());
+
+                    return new org.springframework.security.core.userdetails.User(
+                            user.getUsername(),
+                            user.getPassword(),
+                            user.isEnabled(), // Account enabled
+                            true, // Account non-expired
+                            true, // Credentials non-expired
+                            true, // Account non-locked
+                            authorities
+                    );
+                })
+                .doOnSuccess(userDetails -> log.info("User '{}' loaded successfully for authentication.", userDetails.getUsername()))
+                .doOnError(e -> log.error("Error loading user by username {}: {}", username, e.getMessage(), e));
+    }
+    
     // IMPORTANT: This prepareDto method is for enriching the User model.
     // It is placed here as per your instruction to move it to an appropriate location
     // and is not modified. It enriches the User object with its associated roles.
@@ -97,11 +132,11 @@ public class UserService {
 
                     if (isUsernameTaken) {
                         log.warn("Username already taken: {}", userRequest.getUsername());
-                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_TAKEN));
+                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS));
                     }
                     if (isEmailInUse) {
                         log.warn("Email already in use: {}", userRequest.getEmail());
-                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_IN_USE));
+                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS));
                     }
 
                     // Build user object
@@ -114,8 +149,10 @@ public class UserService {
                             .shippingAddress(userRequest.getShippingAddress())
                             .createdAt(LocalDateTime.now())
                             .updatedAt(LocalDateTime.now())
+                            .enabled(true)
                             .build();
 
+                        log.info("Saving new user: {}", user.getUsername());
                     // Resolve roles
                     Mono<Set<Role>> rolesMono;
                     if (userRequest.getRoleNames() != null && !userRequest.getRoleNames().isEmpty()) {
@@ -174,7 +211,7 @@ public class UserService {
                                 .flatMap(exists -> {
                                     if (exists) {
                                         log.warn("Attempt to update username to an existing one: {}", userRequest.getUsername());
-                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_TAKEN));
+                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS));
                                     }
                                     return Mono.empty();
                                 });
@@ -188,7 +225,7 @@ public class UserService {
                                 .flatMap(exists -> {
                                     if (exists) {
                                         log.warn("Attempt to update email to an existing one: {}", userRequest.getEmail());
-                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_IN_USE));
+                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS));
                                     }
                                     return Mono.empty();
                                 });
@@ -542,4 +579,5 @@ public class UserService {
                 .doOnSuccess(exists -> log.info("User with username {} exists: {}", username, exists))
                 .doOnError(e -> log.error("Error checking user existence by username {}: {}", username, e.getMessage(), e));
     }
+
 }

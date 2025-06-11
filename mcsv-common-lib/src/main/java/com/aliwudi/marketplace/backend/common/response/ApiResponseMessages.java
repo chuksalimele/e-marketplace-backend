@@ -38,8 +38,8 @@ public interface ApiResponseMessages {
     String INVALID_USER_ID_FORMAT = "Authenticated principal is not a valid user ID format";
     String INVALID_USER_ID = "Authenticated principal is not a valid user ID"; // General invalid user ID format
     String SECURITY_CONTEXT_NOT_FOUND = "Security context not found";
-    String USERNAME_ALREADY_TAKEN = "Error: Username is already taken!";
-    String EMAIL_ALREADY_IN_USE = "Error: Email is already in use!";
+    String USERNAME_ALREADY_EXISTS = "Error: Username already exists!";
+    String EMAIL_ALREADY_EXISTS = "Error: Email already exists!";
     String USER_REGISTERED_SUCCESS = "User registered successfully!";
     String ROLE_USER_NOT_FOUND = "Error: Default role 'ROLE_USER' is not found in the database. Please ensure it's configured";
     String ROLE_NOT_FOUND = "Error: Role is not found in the database"; // Append role name

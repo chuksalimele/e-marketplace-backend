@@ -34,6 +34,8 @@ public class User {
     private String phoneNumber;
     private String shippingAddress;
     
+    private boolean enabled;
+    
     @CreatedDate // Automatically populated with creation timestamp
     private LocalDateTime createdAt;
 

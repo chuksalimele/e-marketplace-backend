@@ -26,3 +26,11 @@ eureka:
   instance:
     hostname: localhost # For local development, use localhost
     prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)
+    
+
+# NEW: Add the JWT secret here for the user-service to sign its own tokens
+jwt:
+  secret: aVeryLongAndSecureSecretKeyForSigningYourJWTsThatIsAtLeast32BytesLong
+  # IMPORTANT: For production, this secret should be a strong, randomly generated string
+  # and managed securely (e.g., via environment variables, Kubernetes secrets, or a secret management service).
+  # It must be at least 32 bytes (256 bits) for HS256 algorithm.    
