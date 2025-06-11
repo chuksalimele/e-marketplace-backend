@@ -7,5 +7,5 @@ dependencies {
 
     // Spring Cloud Netflix Eureka Client dependency for service discovery
     implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
-
+    
 }

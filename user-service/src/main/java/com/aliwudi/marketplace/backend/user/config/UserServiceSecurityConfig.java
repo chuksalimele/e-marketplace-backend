@@ -17,8 +17,8 @@ public class UserServiceSecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable) // Disable CSRF for stateless APIs
-            .httpBasic(withDefaults()) // Disable basic auth, or configure as needed for internal calls
-            .formLogin(withDefaults()) // Disable form login
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // Disable basic auth, or configure as needed for internal calls
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable) // Disable form login
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // Expect and validate JWTs
             .authorizeExchange(exchange -> exchange
                 .anyExchange().authenticated() // All endpoints require authentication (JWT validation)

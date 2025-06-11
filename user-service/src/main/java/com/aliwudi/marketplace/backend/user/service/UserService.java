@@ -359,7 +359,7 @@ public class UserService {
      */
     public Flux<User> getAllUsers(Pageable pageable) {
         log.info("Retrieving all users with pagination: {}", pageable);
-        return userRepository.findAll(pageable)
+        return userRepository.findAllBy(pageable)
                 .flatMap(this::prepareDto) // Enrich each user
                 .doOnComplete(() -> log.info("Finished retrieving all users for page {} with size {}.", pageable.getPageNumber(), pageable.getPageSize()))
                 .doOnError(e -> log.error("Error retrieving all users: {}", e.getMessage(), e));

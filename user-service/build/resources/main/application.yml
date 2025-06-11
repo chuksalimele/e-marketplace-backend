@@ -1,0 +1,28 @@
+## YAML Template.
+---
+# src/main/resources/application.yml for Product Service
+server:
+  port: 5001 # A unique port for this microservice 
+
+spring:
+  application:
+    name: user-service # The unique name of this service, used by Eureka
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # This issuer-uri is good for matching the 'iss' claim in the JWT.
+          # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.
+          issuer-uri: http://localhost:8080 # Replace with your Auth Server's actual issuer URI
+
+          # THIS IS CRUCIAL FOR SIGNATURE VERIFICATION.
+          # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
+          # This should point to the JWK Set endpoint of your Authorization Server.
+          jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # Pointing to your Eureka Server
+  instance:
+    hostname: localhost # For local development, use localhost
+    prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)

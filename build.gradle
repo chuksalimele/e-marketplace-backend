@@ -41,7 +41,7 @@ subprojects {
 	//implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	//implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
 	//implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
+	//implementation 'org.springframework.boot:spring-boot-starter-web'
 
         implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
         runtimeOnly 'com.h2database:h2'

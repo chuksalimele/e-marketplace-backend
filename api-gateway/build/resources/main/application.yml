@@ -142,6 +142,24 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
                 statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
                 methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
 
+        # Route for 'notification-service'
+        - id: notification-service-route
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
+          filters:
+            - RewritePath=/notifications/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: notificationCircuitBreaker
+                fallbackUri: forward:/fallback/notifications
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
   # Spring Security OAuth2 Resource Server configuration for JWT validation (MOVED HERE)
   security:
     oauth2:

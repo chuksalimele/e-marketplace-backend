@@ -12,7 +12,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     // --- Basic CRUD operations are inherited from ReactiveCrudRepository ---
 
-    public Flux<User> findAll(Pageable pageable);
+    //Flux<User> findAll(Pageable pageable);
+    Flux<User> findAllBy(Pageable pageable);
     
     // Find a user by username
     Mono<User> findByUsername(String username);
