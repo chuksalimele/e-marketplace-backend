@@ -1,0 +1,201 @@
+## YAML Template.
+---
+server:
+  port: 5000 # Default port for the API Gateway
+
+logging:
+  level:
+    # Set logging levels to INFO for production to avoid excessive logs
+    root: INFO
+    org.springframework.security: DEBUG # In production do not use DEBUG
+    org.springframework.cloud.gateway: DEBUG # In production do not use DEBUG
+    reactor.netty: INFO # Netty specific logs
+    # For debugging, you can temporarily set to DEBUG:
+    # org.springframework.security: DEBUG
+    # org.springframework.cloud.gateway: DEBUG
+
+spring: # ONLY ONE TOP-LEVEL 'spring' KEY
+  main:
+    web-application-type: REACTIVE # Crucial for Spring Cloud Gateway
+  application:
+    name: api-gateway # Name of the API Gateway service for Eureka
+
+  # Spring Cloud Gateway Configuration
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true # Enables the DiscoveryClientRouteDefinitionLocator
+          lower-case-service-id: true # Converts service IDs to lowercase for routing
+      default-filters:
+        # Deduplicate common response headers (e.g., from multiple services)
+        - DedupeResponseHeader=Vary Access-Control-Allow-Origin, RETAIN_FIRST
+        # Prevent internal services from setting cookies directly on the client
+        - RemoveResponseHeader=Set-Cookie
+        # Automatically relays the JWT from the client to downstream services (if using OAuth2TokenRelay filter bean)
+        # This is an alternative/complement to CustomAuthenticationHeaderFilter
+        # - TokenRelay=
+        # Apply rate limiting globally to all routes (unless overridden per route)
+        - name: RequestRateLimiter
+          args:
+            key-resolver: '#{@userKeyResolver}' # Use the user-based resolver defined as a bean
+            # Requires a running Redis instance of Rate Limiter to function
+            redis-rate-limiter.replenishRate: 10 # Number of requests allowed per second
+            redis-rate-limiter.burstCapacity: 20 # Max number of requests allowed in a burst
+            redis-rate-limiter.requestedTokens: 1 # Number of tokens to consume per request
+        # Apply a default Circuit Breaker to all routes (unless overridden per route)
+        #- name: CircuitBreaker
+        #  args:
+        #    name: globalCircuitBreaker # A generic name for the global circuit breaker
+        #    fallbackUri: forward:/fallback # Default fallback endpoint
+
+      routes:
+        # Route for 'product-catalog-service'
+        - id: product-catalog-service-route
+          uri: lb://product-catalog-service # 'lb' for load balancing, uses service ID from Eureka
+          predicates:
+            - Path=/products/** # Routes requests starting with /products/ to product-service
+          filters:
+            - RewritePath=/products/(?<segment>.*), /${segment} # Rewrites path to remove /products/
+            # Specific Circuit Breaker for this route (overrides global if different config needed)
+            - name: CircuitBreaker
+              args:
+                name: productCatalogCircuitBreaker # Unique name for this circuit breaker
+                fallbackUri: forward:/fallback/products # Custom fallback for products
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+
+        # Route for 'order-processing-service'
+        - id: order-processing-service-route
+          uri: lb://order-processing-service
+          predicates:
+            - Path=/orders/**
+          filters:
+            - RewritePath=/orders/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: orderProcessingCircuitBreaker
+                fallbackUri: forward:/fallback/orders
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+        # Route for 'user-service'
+        - id: user-service-route
+          uri: lb://user-service
+          predicates:
+            - Path=/users/**
+          filters:
+            - RewritePath=/users/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: userCircuitBreaker
+                fallbackUri: forward:/fallback/users
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+        # Route for 'logistics' part of logistics-media-service
+        - id: logistics-service-route
+          uri: lb://logistics-media-service
+          predicates:
+            - Path=/logistics/**
+          filters:
+            - RewritePath=/logistics/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: logisticsCircuitBreaker
+                fallbackUri: forward:/fallback/logistics
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+        # Route for 'media' part of logistics-media-service
+        - id: media-service-route
+          uri: lb://logistics-media-service
+          predicates:
+            - Path=/media/**
+          filters:
+            - RewritePath=/media/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: mediaCircuitBreaker
+                fallbackUri: forward:/fallback/media
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+        # Route for 'notification-service'
+        - id: notification-service-route
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
+          filters:
+            - RewritePath=/notifications/(?<segment>.*), /${segment}
+            - name: CircuitBreaker
+              args:
+                name: notificationCircuitBreaker
+                fallbackUri: forward:/fallback/notifications
+            # Retry mechanism for this route
+            - name: Retry
+              args:
+                retries: 3 # Number of retries
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
+                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+
+  # Spring Security OAuth2 Resource Server configuration for JWT validation (MOVED HERE)
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # IMPORTANT: Replace with the actual JWK Set URI of your Authorization Server (e.g., Keycloak, Auth0)
+          # Spring Security will use this to fetch public keys for JWT signature verification.
+          jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+
+# Eureka Client Configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/ # URL of the Eureka Server
+  instance:
+    hostname: localhost # Hostname for this gateway instance
+
+# Actuator and Tracing for Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        # In production, expose only necessary endpoints and secure them
+        # E.g., "health,info,metrics,prometheus"
+        include: "*" # For development, include all. For production, restrict!
+  metrics:
+    export:
+      prometheus:
+        enabled: true # Enable Prometheus endpoint for metrics scraping
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0 # Sampling rate for traces (1.0 = 100% for development, adjust for prod)
+    service:
+      name: api-gateway # Service name that will appear in tracing tools (e.g., Zipkin)
+    zipkin:
+      sender:
+        type: http
+        base-url: http://localhost:9411 # Your Zipkin server URL (e.g., where Zipkin is running)

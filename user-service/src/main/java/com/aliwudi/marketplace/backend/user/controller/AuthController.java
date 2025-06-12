@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import reactor.core.scheduler.Schedulers;
 
-@CrossOrigin(origins = "http://localhost:8080", maxAge = 3600)
+@CrossOrigin(origins = "http://localhost:8080", maxAge = 3600)//comeback
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

@@ -9,8 +9,6 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -27,9 +25,7 @@ import org.springframework.stereotype.Component;
 // CORRECTED: Updated import for ReferrerPolicy enum based on your feedback
 import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHeadersWriter.ReferrerPolicy;
 
-import java.util.Arrays;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.springframework.context.annotation.Primary;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -71,15 +67,17 @@ public class APIGatewayApplication {
 
             // Configure authorization rules based on request paths
             .authorizeExchange(exchanges -> exchanges
+
                 // Public routes that do NOT require authentication
                 .pathMatchers(
-                    "/users/auth/**",      // Authentication endpoints (login, register, etc.)
-                    "/products/**",        // Allow public access to product catalog
+                    "/users/**",          // Allow public endpoints
+                    "/products/**",       // Allow public access to product catalog
                     "/media/**",          // Allow public access to media (e.g images and videos)
                     "/eureka/**",          // Eureka dashboard (secure this in production environments!)
                     "/actuator/**",        // Spring Boot Actuator endpoints (secure these heavily in production!)
                     "/fallback/**"         // Fallback endpoints for circuit breaker
                 ).permitAll()
+                         
                 // All other requests require authentication (JWT must be valid)
                 .anyExchange().authenticated()
             )
