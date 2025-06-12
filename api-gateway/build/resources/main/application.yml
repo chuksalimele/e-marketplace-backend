@@ -19,7 +19,12 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
     web-application-type: REACTIVE # Crucial for Spring Cloud Gateway
   application:
     name: api-gateway # Name of the API Gateway service for Eureka
-
+    
+  data:
+    redis:
+      host: localhost # Or the IP address/hostname of your Redis server if not local
+      port: 6379     # Or the port your Redis server is listening on if not default
+      
   # Spring Cloud Gateway Configuration
   cloud:
     gateway:
@@ -27,6 +32,9 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
         locator:
           enabled: true # Enables the DiscoveryClientRouteDefinitionLocator
           lower-case-service-id: true # Converts service IDs to lowercase for routing
+      httpclient:
+          connect-timeout: 10000 # 10 seconds for connection establishment (adjust as needed)
+          response-timeout: 30s # 30 seconds for the full response (adjust as needed, 's' for seconds, 'ms' for milliseconds)          
       default-filters:
         # Deduplicate common response headers (e.g., from multiple services)
         - DedupeResponseHeader=Vary Access-Control-Allow-Origin, RETAIN_FIRST
