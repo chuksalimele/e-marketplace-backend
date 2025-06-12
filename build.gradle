@@ -26,6 +26,10 @@ subprojects {
     apply plugin: 'eclipse'
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
+        
+    test {
+        useJUnitPlatform() // Explicitly tells Gradle to use JUnit Platform for test execution
+    }
 
     dependencies {
         implementation fileTree(dir: "${rootProject.projectDir}/lib", include: ["**/*.jar"])
@@ -80,7 +84,6 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.statemachine:spring-statemachine-bom:${springStatemachineVersion}"
-            mavenBom "org.springframework.cloud:spring-cloud-dependencies:2023.0.1" // Example: use 2023.0.x for Spring Boot 3.2.x
         }
 
     }
