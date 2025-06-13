@@ -10,6 +10,8 @@ logging:
 eureka:
   instance:
     hostname: localhost # Hostname of the Eureka server
+    ip-address: 127.0.0.1 # Explicitly force the loopback IP
+    prefer-ip-address: true # Keep this, but it will now use the specified ip-address    
   client:
     register-with-eureka: false # Eureka server itself should not register with Eureka
     fetch-registry: false       # Eureka server should not fetch registry from itself

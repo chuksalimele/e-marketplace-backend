@@ -53,26 +53,36 @@ public class UserService  implements ReactiveUserDetailsService{
     @Override
     public Mono<UserDetails> findByUsername(String username) {
         log.debug("Attempting to load user by username: {}", username);
-        return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new UsernameNotFoundException("User not found with username: " + username)))
-                .map(user -> {
-                    // Convert your custom User model to Spring Security's UserDetails
-                    List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
-                            .map(role -> new SimpleGrantedAuthority(role.getName().name()))
-                            .collect(Collectors.toList());
 
-                    return (UserDetails)new org.springframework.security.core.userdetails.User(
-                            user.getUsername(),
-                            user.getPassword(),
-                            user.isEnabled(), // Account enabled
-                            true, // Account non-expired
-                            true, // Credentials non-expired
-                            true, // Account non-locked
-                            authorities
-                    );
-                })
-                .doOnSuccess(userDetails -> log.debug("User '{}' loaded successfully for authentication.", userDetails.getUsername()))
-                .doOnError(e -> log.error("Error loading user by username {}: {}", username, e.getMessage(), e));
+        return userRepository.findByUsername(username) // 1. Find the User by username
+            .switchIfEmpty(Mono.error(new UsernameNotFoundException("User not found with username: " + username)))
+            .flatMap(user -> { // 2. Once user is found, flatMap to fetch roles
+                // Fetch roles for the found user ID
+                return roleRepository.findRolesByUserId(user.getId()) // This will return Flux<Role>
+                    .collect(Collectors.toSet()) // Collect all roles into a Set
+                    .defaultIfEmpty(new HashSet<>()) // IMPORTANT: If no roles, ensure an empty Set, not null
+                    .map(roles -> {
+                        user.setRoles(roles); // Set the fetched roles on the user object
+                        return user; // Return the user object with roles populated
+                    });
+            })
+            .map(userWithRoles -> { // 3. Now, convert the User object (with roles) to UserDetails
+                List<SimpleGrantedAuthority> authorities = userWithRoles.getRoles().stream()
+                        .map(role -> new SimpleGrantedAuthority(role.getName().name()))
+                        .collect(Collectors.toList());
+
+                return(UserDetails) new org.springframework.security.core.userdetails.User(
+                        userWithRoles.getUsername(),
+                        userWithRoles.getPassword(),
+                        userWithRoles.isEnabled(), // Account enabled
+                        true, // Account non-expired
+                        true, // Credentials non-expired
+                        true, // Account non-locked
+                        authorities
+                );
+            })
+            .doOnSuccess(userDetails -> log.debug("User '{}' loaded successfully for authentication.", userDetails.getUsername()))
+            .doOnError(e -> log.error("Error loading user by username {}: {}", username, e.getMessage(), e));
     }
     
     // IMPORTANT: This prepareDto method is for enriching the User model.
