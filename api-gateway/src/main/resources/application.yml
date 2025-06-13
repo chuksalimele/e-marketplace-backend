@@ -37,9 +37,16 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
           response-timeout: 30s # 30 seconds for the full response (adjust as needed, 's' for seconds, 'ms' for milliseconds)          
       default-filters:
         # Deduplicate common response headers (e.g., from multiple services)
-        - DedupeResponseHeader=Vary Access-Control-Allow-Origin, RETAIN_FIRST
+        - name: DedupeResponseHeader
+          args:
+            headers: Vary Access-Control-Allow-Origin
+            strategy: RETAIN_FIRST
+          order: -500 # A very early order
         # Prevent internal services from setting cookies directly on the client
-        - RemoveResponseHeader=Set-Cookie
+        #- name: RemoveResponseHeader
+        #  args:
+        #    name: Set-Cookie
+        #  order: -499 # Run immediately after DedupeResponseHeader
         # Automatically relays the JWT from the client to downstream services (if using OAuth2TokenRelay filter bean)
         # This is an alternative/complement to CustomAuthenticationHeaderFilter
         # - TokenRelay=
@@ -207,3 +214,78 @@ management:
       sender:
         type: http
         base-url: http://localhost:9411 # Your Zipkin server URL (e.g., where Zipkin is running)
+        
+# Add/Modify the Resilience4j configuration
+resilience4j: # This is the top-level configuration key for all Resilience4j properties.
+  timelimiter: # Configuration for the TimeLimiter component.
+    instances: # Defines specific instances of TimeLimiters.
+      # The 'default' TimeLimiter instance.
+      # This configuration applies to any circuit breaker or time limiter that
+      # is used in a route but doesn't have a specific instance name configured.
+      default:
+        # If an operation (e.g., a call to a downstream microservice) doesn't
+        # complete within this duration, it's considered a timeout.
+        # This directly addresses the 'GATEWAY_TIMEOUT' error.
+        # Setting it to 30 seconds provides a reasonable default buffer.
+        timeout-duration: 30s
+        # Recommended for reactive applications (like Spring Cloud Gateway).
+        # If an operation times out, this setting attempts to cancel the
+        # underlying reactive stream. This helps to free up resources
+        # (e.g., HTTP connections, threads) that might still be tied up
+        # by the slow downstream call.
+        cancel-running-future: true
+
+      # A specific TimeLimiter instance named 'userCircuitBreaker'.
+      # This name matches the 'name' parameter you use in your Gateway route filter:
+      # `- SpringCloudCircuitBreakerResilience4jFilterFactory name = 'userCircuitBreaker'`
+      # This configuration overrides the 'default' one for routes explicitly
+      # using 'userCircuitBreaker'.
+      userCircuitBreaker:
+        # Sets a specific timeout duration for the 'userCircuitBreaker'.
+        # This was the direct fix for the 1000ms timeout error.
+        timeout-duration: 40s
+        # Same as above, highly recommended for reactive streams to ensure
+        # resources are released on timeout.
+        cancel-running-future: true
+
+  circuitbreaker: # Configuration for the Circuit Breaker component.
+    instances: # Defines specific instances of Circuit Breakers.
+      # The 'default' Circuit Breaker instance.
+      # This configuration applies to any circuit breaker that doesn't
+      # have a specific instance name configured in a route.
+      default:
+        # Defines the size of the sliding window (number of recent calls)
+        # that the circuit breaker observes to determine the health of the service.
+        # In this case, it looks at the last 10 calls.
+        sliding-window-size: 10
+        # The percentage of failed calls within the sliding window that will
+        # cause the circuit to transition from CLOSED to OPEN.
+        # If 50% or more of the last 10 calls fail (i.e., 5 failures), the circuit opens.
+        failure-rate-threshold: 50
+        # The duration (in seconds) that the circuit will stay in the OPEN state.
+        # While OPEN, all requests are immediately rejected without attempting to
+        # call the downstream service, preventing further overload.
+        wait-duration-in-open-state: 60s
+        # When the 'wait-duration-in-open-state' expires, the circuit transitions
+        # to the HALF_OPEN state. In this state, only a limited number of requests
+        # (here, 3) are allowed to pass through to the downstream service.
+        # If these 3 calls are successful, the circuit closes. If they fail, it re-opens.
+        permitted-number-of-calls-in-half-open-state: 3
+
+      # A specific Circuit Breaker instance named 'userCircuitBreaker'.
+      # This name should match the one used in your gateway filter for user-service.
+      userCircuitBreaker:
+        # Sets a larger sliding window for the user-service (20 calls).
+        # This means it observes more historical calls before making a decision.
+        sliding-window-size: 20
+        # A higher failure rate threshold (70%). The circuit for user-service
+        # will only open if 70% or more of the last 20 calls fail. This makes
+        # the circuit for this service less sensitive to transient failures.
+        failure-rate-threshold: 70
+        # The circuit for user-service will stay open for a shorter duration (30 seconds)
+        # before attempting to transition to HALF_OPEN.
+        wait-duration-in-open-state: 30s
+        # (Implicitly uses default for permitted-number-of-calls-in-half-open-state if not specified,
+        # or you can add it here if you want a different value for this specific instance.)
+        
+      # TODO - other circuit breaker instance goes here e.g orderCircuitBreaker e.t.c
