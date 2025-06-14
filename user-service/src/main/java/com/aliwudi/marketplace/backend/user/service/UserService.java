@@ -112,8 +112,10 @@ public class UserService{
 
                     // Build user object
                     User user = User.builder()
+                            .authId(userRequest.getAuthId())
                             .username(userRequest.getUsername())
                             .email(userRequest.getEmail())
+                            .phoneNumber(userRequest.getPhoneNumber())
                             //.password(passwordEncoder.encode(userRequest.getPassword())) //@Deprecated
                             .firstName(userRequest.getFirstName())
                             .lastName(userRequest.getLastName())
@@ -208,12 +210,19 @@ public class UserService{
                 })
                 .flatMap(existingUser -> {
                     // Apply updates
+                    if (userRequest.getAuthId() != null && !userRequest.getAuthId().isBlank()) {
+                        existingUser.setAuthId(userRequest.getAuthId()); //although it is permanent!
+                    }
+                    
                     if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank()) {
                         existingUser.setUsername(userRequest.getUsername());
-                    }
+                    }                    
                     if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()) {
                         existingUser.setEmail(userRequest.getEmail());
                     }
+                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()) {
+                        existingUser.setPhoneNumber(userRequest.getPhoneNumber());
+                    }                    
                     if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
                         existingUser.setFirstName(userRequest.getFirstName());
                     }
@@ -225,7 +234,7 @@ public class UserService{
                     }
                     existingUser.setUpdatedAt(LocalDateTime.now());
 
-                    Mono<User> userSaveMono = Mono.just(existingUser);
+                    Mono<User> userSaveMono;
 
                     // Update roles if provided
                     if (userRequest.getRoleNames() != null) { // If roleNames is provided (can be empty set to clear roles)
@@ -259,39 +268,6 @@ public class UserService{
                 .doOnError(e -> log.error("Error updating user {}: {}", id, e.getMessage(), e));
     }
 
-    /**
-     * Updates a user's password.
-     * Checks if the old password matches the current one before updating.
-     * This operation is transactional.
-     *
-     * @param id The ID of the user whose password to update.
-     * @param passwordUpdateRequest DTO containing old and new passwords.
-     * @return A Mono<Void> indicating completion.
-     * @throws ResourceNotFoundException if the user is not found.
-     * @throws InvalidPasswordException if the old password does not match or new password is too short/weak.
-     */
-    @Transactional
-    public Mono<Void> updateUserPassword(Long id, PasswordUpdateRequest passwordUpdateRequest) {
-        log.debug("Attempting to update password for user with ID: {}", id);
-        return userRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
-                .flatMap(existingUser -> {
-                    if (!passwordEncoder.matches(passwordUpdateRequest.getOldPassword(), existingUser.getPassword())) {
-                        log.warn("Old password mismatch for user ID: {}", id);
-                        return Mono.error(new InvalidPasswordException(ApiResponseMessages.OLD_PASSWORD_MISMATCH));
-                    }
-
-                    // Password strength validation from DTO's @Size annotation is typically enough
-                    // but you could add more complex logic here if needed.
-
-                    existingUser.setPassword(passwordEncoder.encode(passwordUpdateRequest.getNewPassword()));
-                    existingUser.setUpdatedAt(LocalDateTime.now());
-                    return userRepository.save(existingUser);
-                })
-                .then() // Convert to Mono<Void> after the save operation completes
-                .doOnSuccess(v -> log.debug("Password updated successfully for user ID: {}", id))
-                .doOnError(e -> log.error("Error updating password for user {}: {}", id, e.getMessage(), e));
-    }
 
     /**
      * Deletes a user by their ID.

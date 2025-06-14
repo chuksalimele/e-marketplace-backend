@@ -27,6 +27,8 @@ public interface NotificationRepository extends R2dbcRepository<Notification, Lo
      * @return A Flux emitting Notification entities.
      */
     Flux<Notification> findByUserId(Long userId, Pageable pageable);
+    
+    Flux<Notification> findByUserAuthId(String userAuthId, Pageable pageable);
 
     /**
      * Finds all notifications for a specific user and a specific status, with pagination.

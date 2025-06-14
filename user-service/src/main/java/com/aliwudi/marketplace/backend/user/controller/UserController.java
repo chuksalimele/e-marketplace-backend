@@ -26,6 +26,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException; // For date parsing from request params
 import org.springframework.validation.annotation.Validated;
 
+/*
+NOTE: In order to align with industry best practices we have removed
+      authentication service implementation (jwt encoding, decoding e.t.c)
+      from user-service microservice. Authentication is now solely done 
+      by authorization server (e.g keycloak)
+*/
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor // Generates a constructor for final fields
@@ -97,28 +104,7 @@ public class UserController {
         return userService.updateUser(id, userRequest);
         // Exceptions are handled by GlobalExceptionHandler.
     }
-    
-    /**
-     * Endpoint to update a user's password.
-     * Accessible by 'USER' (for their own password) or 'ADMIN' (for any user's password).
-     *
-     * @param id The ID of the user whose password to update.
-     * @param passwordUpdateRequest DTO containing old and new passwords.
-     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
-     * @throws IllegalArgumentException if input validation fails.
-     * @throws ResourceNotFoundException if the user is not found.
-     * @throws InvalidPasswordException if the old password does not match or new password is too short/weak.
-     */
-    @PutMapping("/{id}/password")
-    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful update
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)") // Example authorization
-    public Mono<Void> updateUserPassword(@PathVariable Long id, @Valid @RequestBody PasswordUpdateRequest passwordUpdateRequest) {
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
-        }
-        return userService.updateUserPassword(id, passwordUpdateRequest);
-        // Exceptions are handled by GlobalExceptionHandler.
-    }
+
 
     /**
      * Endpoint to delete a user by their ID.

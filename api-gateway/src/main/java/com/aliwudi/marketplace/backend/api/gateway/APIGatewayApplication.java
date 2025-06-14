@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.api.gateway;
 
+import com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders;
+import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHeadersWriter.ReferrerPolicy;
 
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.context.annotation.Primary;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -161,7 +164,7 @@ public class APIGatewayApplication {
 
     /**
      * A custom GlobalFilter to propagate the authenticated user's ID (and potentially roles)
-     * from the SecurityContextHolder into custom HTTP headers (e.g., X-User-ID)
+     * from the SecurityContextHolder into custom HTTP headers (e.g., X-User-AuthID)
      * before forwarding the request to downstream microservices.
      * Downstream services can then trust these headers for user identity.
      */
@@ -174,23 +177,36 @@ public class APIGatewayApplication {
                 .map(context -> {
                     Authentication authentication = context.getAuthentication();
                     if (authentication != null && authentication.isAuthenticated()) {
+                        String authId = null;
                         String userId = null;
+                        String email = null;
+                        String phone = null;
+                        String firstName = null;
+                        String lastName = null;
+                        String rolesStr = null;
                         // Extract user ID from JWT principal
                         if (authentication.getPrincipal() instanceof Jwt jwt) {
-                            userId = jwt.getClaimAsString("sub"); // Assuming 'sub' claim holds the user ID
-                            // You can add other claims like roles if needed:
-                            // String roles = authentication.getAuthorities().stream()
-                            //     .map(a -> a.getAuthority().replace("ROLE_", "")) // Remove "ROLE_" prefix
-                            //     .collect(Collectors.joining(","));
-                        } else if (authentication.getPrincipal() instanceof String) {
-                            // Fallback if principal is just a username, or if your auth system puts ID directly
-                            userId = authentication.getName(); // Or cast to Long if principal is Long
+                            authId = jwt.getClaimAsString(JwtClaims.sub.getClaimName()); // Assuming 'sub' claim holds the user auth ID
+                            userId = jwt.getClaimAsString(JwtClaims.userId.getClaimName());
+                            email = jwt.getClaimAsString(JwtClaims.email.getClaimName());
+                            phone = jwt.getClaimAsString(JwtClaims.phone.getClaimName());
+                            firstName = jwt.getClaimAsString(JwtClaims.firstName.getClaimName());
+                            lastName = jwt.getClaimAsString(JwtClaims.lastName.getClaimName());
+                            
+                            rolesStr = authentication.getAuthorities().stream()
+                                    .map(a -> a.getAuthority())
+                                    .collect(Collectors.joining(","));
                         }
 
-                        if (userId != null) {
+                        if (authId != null) {
                             ServerHttpRequest request = exchange.getRequest().mutate()
-                                .header("X-User-ID", userId) // Propagate user ID
-                                // .header("X-User-Roles", roles) // Propagate roles
+                                .header(BasicAuthHeaders.X_USER_AUTH_ID.getHeaderName(), authId) // Propagate user auth ID
+                                .header(BasicAuthHeaders.X_USER_ID.getHeaderName(), userId) // Propagate user ID - registration id on the database
+                                .header(BasicAuthHeaders.X_USER_EMAIL.getHeaderName(), email) // Propagate user email
+                                .header(BasicAuthHeaders.X_USER_PHONE.getHeaderName(), phone) // Propagate user phone number
+                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), phone) // Propagate user first name number
+                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), phone) // Propagate user last name number
+                                .header(BasicAuthHeaders.X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user email
                                 .build();
                             return exchange.mutate().request(request).build();
                         }

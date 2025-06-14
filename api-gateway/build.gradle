@@ -3,6 +3,7 @@ description = 'api-gateway'
 
 
 dependencies {
+    implementation project(':mcsv-common-lib')
     // Spring Cloud Gateway (reactive web stack)
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     // Spring Boot Starter Web is often pulled by other dependencies,
