@@ -16,14 +16,14 @@ public class OrderProcessingServiceSecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable) // Disable CSRF for stateless APIs
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // Disable basic auth, or configure as needed for internal calls
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable) // Disable form login
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // Expect and validate JWTs
-            .authorizeExchange(exchange -> exchange
+                .csrf(ServerHttpSecurity.CsrfSpec::disable) // Disable CSRF for stateless APIs
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // Disable basic auth, or configure as needed for internal calls
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable) // Disable form login
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // Expect and validate JWTs
+                .authorizeExchange(exchange -> exchange
                 .anyExchange().authenticated() // All endpoints require authentication (JWT validation)
-            )
-            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless
+                )
+                .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless
         return http.build();
     }
 }
