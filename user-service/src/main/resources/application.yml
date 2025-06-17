@@ -19,6 +19,14 @@ spring:
           # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+
+keycloak:
+  auth-server-url: http://localhost:8080 # Your Keycloak URL
+  realm: chuks-emaketplace-realm         # Your application realm
+  admin-cli-client-id: admin-cli         # Default client for admin access
+  admin-username: admin                  # Your Keycloak admin username
+  admin-password: admin                  # Your Keycloak admin password (CHANGE FOR PRODUCTION!)
+
 eureka:
   client:
     service-url:

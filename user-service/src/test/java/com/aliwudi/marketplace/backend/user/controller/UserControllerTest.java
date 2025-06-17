@@ -89,7 +89,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("createUser - Success: Should create a new user and return 201 CREATED")
     void createUser_Success() {
-        UserRequest userRequest = new UserRequest("newuser", "test@example.com", "John", "Doe", "123 Main St", Set.of("USER"));
+        UserRequest userRequest = new UserRequest("the auth id","newuser", "phone here", "test@example.com", "John", "Doe", "123 Main St", Set.of("USER"));
         User createdUser = createDummyUser(1L, "newuser", "test@example.com");
 
         when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.just(createdUser));
@@ -113,7 +113,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("createUser - Failure: Should return 400 BAD_REQUEST for invalid input (blank username)")
     void createUser_InvalidInput_BlankUsername() {
-        UserRequest userRequest = new UserRequest(" ", "test@example.com",  "John", "Doe", "123 Main St", Set.of("USER"));
+        UserRequest userRequest = new UserRequest(" ", "test@example.com", " " ," ","John", "Doe", "123 Main St", Set.of("USER"));
 
         webTestClient.post().uri("/api/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -129,7 +129,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("createUser - Failure: Should return 400 BAD_REQUEST for invalid input (blank email)")
     void createUser_InvalidInput_BlankEmail() {
-        UserRequest userRequest = new UserRequest("newuser", " ",  "John", "Doe", "123 Main St", Set.of("USER"));
+        UserRequest userRequest = new UserRequest("the auth id", "newuser", "phone here" , " ",  "John", "Doe", "123 Main St", Set.of("USER"));
 
         webTestClient.post().uri("/api/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -145,7 +145,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("createUser - Failure: Should return 409 CONFLICT for duplicate username")
     void createUser_DuplicateUsername() {
-        UserRequest userRequest = new UserRequest("existinguser", "test@example.com",  "John", "Doe", "123 Main St", Set.of("USER"));
+        UserRequest userRequest = new UserRequest("the auth id","existinguser", "phone here", "test@example.com",  "John", "Doe", "123 Main St", Set.of("USER"));
 
         when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.error(new DuplicateResourceException("Username 'existinguser' already exists.")));
 
@@ -163,7 +163,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("createUser - Failure: Should return 400 BAD_REQUEST for invalid role name")
     void createUser_RoleNotFound() {
-        UserRequest userRequest = new UserRequest("newuser", "test@example.com",  "John", "Doe", "123 Main St", Set.of("NON_EXISTENT_ROLE"));
+        UserRequest userRequest = new UserRequest("the auth id", "newuser", "phone here", "test@example.com",  "John", "Doe", "123 Main St", Set.of("NON_EXISTENT_ROLE"));
 
         when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.error(new RoleNotFoundException("Role(s) not found: [NON_EXISTENT_ROLE]")));
 
@@ -189,7 +189,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Success: Should update user by ID (ADMIN) and return 200 OK")
     void updateUser_Admin_Success() {
         Long userId = 1L;
-        UserRequest userRequest = new UserRequest(null, "updated@example.com", "UpdatedFirstName", null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id",null, "phone here", "updated@example.com", "UpdatedFirstName", null, null, null);
         User updatedUser = createDummyUser(userId, "existinguser", "updated@example.com");
         updatedUser.setFirstName("UpdatedFirstName");
 
@@ -215,7 +215,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Success: Should allow user to update self by ID (USER) and return 200 OK")
     void updateUser_UserSelf_Success() {
         Long userId = 1L;
-        UserRequest userRequest = new UserRequest(null, "updated@example.com",  "UpdatedFirstName", null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id",null, "phone here","updated@example.com",  "UpdatedFirstName", null, null, null);
         User updatedUser = createDummyUser(userId, "user1", "updated@example.com");
         updatedUser.setFirstName("UpdatedFirstName");
 
@@ -241,7 +241,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Failure: Should return 403 FORBIDDEN if user tries to update another user")
     void updateUser_UserOther_Forbidden() {
         Long userId = 2L; // Trying to update user 2
-        UserRequest userRequest = new UserRequest(null, "updated@example.com", "UpdatedFirstName", null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id",null,"phone here", "updated@example.com", "UpdatedFirstName", null, null, null);
 
         webTestClient.put().uri("/api/users/{id}", userId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -256,7 +256,7 @@ public class UserControllerTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     @DisplayName("updateUser - Failure: Should return 400 BAD_REQUEST for invalid user ID (ADMIN)")
     void updateUser_InvalidId() {
-        UserRequest userRequest = new UserRequest(null, "updated@example.com",  "UpdatedFirstName", null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id", null,"phone here", "updated@example.com",  "UpdatedFirstName", null, null, null);
 
         webTestClient.put().uri("/api/users/{id}", 0L) // Invalid ID
                 .contentType(MediaType.APPLICATION_JSON)
@@ -274,7 +274,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Failure: Should return 404 NOT_FOUND if user not found (ADMIN)")
     void updateUser_NotFound() {
         Long userId = 99L;
-        UserRequest userRequest = new UserRequest(null, "updated@example.com", "UpdatedFirstName", null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id",null,"phone here", "updated@example.com", "UpdatedFirstName", null, null, null);
 
         when(userService.updateUser(eq(userId), any(UserRequest.class))).thenReturn(Mono.error(new ResourceNotFoundException("User not found with ID: " + userId)));
 
@@ -294,7 +294,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Failure: Should return 400 BAD_REQUEST for insufficient update data (ADMIN)")
     void updateUser_InsufficientData() {
         Long userId = 1L;
-        UserRequest userRequest = new UserRequest(null, null, null, null, null, null); // All null fields
+        UserRequest userRequest = new UserRequest(null, null, null, null, null, null, null, null); // All null fields
 
         webTestClient.put().uri("/api/users/{id}", userId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -312,7 +312,7 @@ public class UserControllerTest {
     @DisplayName("updateUser - Failure: Should return 409 CONFLICT for duplicate email on update (ADMIN)")
     void updateUser_DuplicateEmail() {
         Long userId = 1L;
-        UserRequest userRequest = new UserRequest(null, "duplicate@example.com", null,  null, null, null);
+        UserRequest userRequest = new UserRequest("the auth id",null,"phone here", "duplicate@example.com", null,  null, null, null);
 
         when(userService.updateUser(eq(userId), any(UserRequest.class))).thenReturn(Mono.error(new DuplicateResourceException("Email 'duplicate@example.com' already in use.")));
 
@@ -325,123 +325,6 @@ public class UserControllerTest {
                 .jsonPath("$.message").isEqualTo("Email 'duplicate@example.com' already in use.");
 
         verify(userService, times(1)).updateUser(eq(userId), any(UserRequest.class));
-    }
-
-    /*
-     * --------------------------------------------------------------------------
-     * updateUserPassword (/api/users/{id}/password) Tests
-     * --------------------------------------------------------------------------
-     */
-
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"}, authorities = "1")
-    @DisplayName("updateUserPassword - Success: Should update password (ADMIN) and return 204 NO_CONTENT")
-    void updateUserPassword_Admin_Success() {
-        Long userId = 1L;
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("oldPass", "newPass123!");
-
-        when(userService.updateUserPassword(eq(userId), any(PasswordUpdateRequest.class))).thenReturn(Mono.empty());
-
-        webTestClient.put().uri("/api/users/{id}/password", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isNoContent()
-                .expectBody().isEmpty(); // No content expected
-
-        verify(userService, times(1)).updateUserPassword(eq(userId), any(PasswordUpdateRequest.class));
-    }
-
-    @Test
-    @WithMockUser(username = "user1", roles = {"USER"}, authorities = "1")
-    @DisplayName("updateUserPassword - Success: Should allow user to update their own password and return 204 NO_CONTENT")
-    void updateUserPassword_UserSelf_Success() {
-        Long userId = 1L;
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("oldPass", "newPass123!");
-
-        when(userService.updateUserPassword(eq(userId), any(PasswordUpdateRequest.class))).thenReturn(Mono.empty());
-
-        webTestClient.put().uri("/api/users/{id}/password", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isNoContent()
-                .expectBody().isEmpty();
-
-        verify(userService, times(1)).updateUserPassword(eq(userId), any(PasswordUpdateRequest.class));
-    }
-
-    @Test
-    @WithMockUser(username = "user1", roles = {"USER"}, authorities = "1")
-    @DisplayName("updateUserPassword - Failure: Should return 403 FORBIDDEN if user tries to update another user's password")
-    void updateUserPassword_UserOther_Forbidden() {
-        Long userId = 2L;
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("oldPass", "newPass123!");
-
-        webTestClient.put().uri("/api/users/{id}/password", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isForbidden();
-
-        verifyNoInteractions(userService);
-    }
-
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    @DisplayName("updateUserPassword - Failure: Should return 400 BAD_REQUEST for invalid ID")
-    void updateUserPassword_InvalidId() {
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("oldPass", "newPass123!");
-
-        webTestClient.put().uri("/api/users/{id}/password", 0L)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.message").isEqualTo(ApiResponseMessages.INVALID_USER_ID);
-
-        verifyNoInteractions(userService);
-    }
-
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    @DisplayName("updateUserPassword - Failure: Should return 404 NOT_FOUND if user not found")
-    void updateUserPassword_NotFound() {
-        Long userId = 99L;
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("oldPass", "newPass123!");
-
-        when(userService.updateUserPassword(eq(userId), any(PasswordUpdateRequest.class))).thenReturn(Mono.error(new ResourceNotFoundException("User not found")));
-
-        webTestClient.put().uri("/api/users/{id}/password", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isNotFound()
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("User not found");
-
-        verify(userService, times(1)).updateUserPassword(eq(userId), any(PasswordUpdateRequest.class));
-    }
-
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    @DisplayName("updateUserPassword - Failure: Should return 400 BAD_REQUEST for invalid old password")
-    void updateUserPassword_InvalidOldPassword() {
-        Long userId = 1L;
-        PasswordUpdateRequest passwordUpdateRequest = new PasswordUpdateRequest("wrongPass", "newPass123!");
-
-        when(userService.updateUserPassword(eq(userId), any(PasswordUpdateRequest.class))).thenReturn(Mono.error(new InvalidPasswordException("Invalid old password")));
-
-        webTestClient.put().uri("/api/users/{id}/password", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(passwordUpdateRequest))
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("Invalid old password");
-
-        verify(userService, times(1)).updateUserPassword(eq(userId), any(PasswordUpdateRequest.class));
     }
 
     /*

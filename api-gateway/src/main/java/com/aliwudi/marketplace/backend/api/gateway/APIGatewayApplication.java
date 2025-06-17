@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.api.gateway;
 
 import com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
+import com.aliwudi.marketplace.backend.common.util.JwtAuthConverter;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -29,7 +30,10 @@ import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHe
 
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
@@ -41,9 +45,21 @@ import org.springframework.web.server.ServerWebExchange;
 @EnableDiscoveryClient // Enables this application to act as a Eureka client
 @EnableWebFluxSecurity // Enables Spring Security for reactive applications (Spring Cloud Gateway is reactive)
 public class APIGatewayApplication {
-
+    @Value("${jwt.auth.converter.principle-attribute}")
+    private String principleAttribute;
+    
+    @Value("${jwt.auth.converter.resource-id}")
+    private String resourceId;
+    
     public static void main(String[] args) {
         SpringApplication.run(APIGatewayApplication.class, args);
+    }
+    private Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> jwtAuthConverter;
+    
+
+    @Bean
+    public JwtAuthConverter getJwtAuthConverter(){
+        return new JwtAuthConverter(principleAttribute, resourceId);
     }
 
     /**
@@ -63,10 +79,9 @@ public class APIGatewayApplication {
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
 
             // Configure OAuth2 Resource Server for JWT validation
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {
-                // JWK Set URI is configured in application.yml (spring.security.oauth2.resourceserver.jwt.jwk-set-uri)
-                // Spring Security will fetch public keys from this URI to verify JWT signatures.
-            }))
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> 
+                jwt.jwtAuthenticationConverter(jwtAuthConverter)
+            ))
 
             // Configure authorization rules based on request paths
             .authorizeExchange(exchanges -> exchanges

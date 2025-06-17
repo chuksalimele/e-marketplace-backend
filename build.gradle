@@ -48,6 +48,9 @@ subprojects {
 	//implementation 'org.springframework.boot:spring-boot-starter-web'
 
         implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+
+        implementation 'org.springframework.security:spring-security-oauth2-jose'
+
         runtimeOnly 'com.h2database:h2'
         runtimeOnly 'com.mysql:mysql-connector-j'
         runtimeOnly 'io.asyncer:r2dbc-mysql'
@@ -66,7 +69,7 @@ subprojects {
         // Spring Cloud OpenFeign for declarative REST clients
         //implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 
-
+        implementation("org.keycloak:keycloak-admin-client:26.0.5")
                 
         implementation 'org.springframework.boot:spring-boot-starter-validation'        
         implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
