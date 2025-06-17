@@ -289,3 +289,12 @@ resilience4j: # This is the top-level configuration key for all Resilience4j pro
         # or you can add it here if you want a different value for this specific instance.)
         
       # TODO - other circuit breaker instance goes here e.g orderCircuitBreaker e.t.c
+      
+
+jwt:
+  auth:
+    converter:
+      resource-id: emaketplace-app
+      principle-attribute: preferred_username
+      
+      

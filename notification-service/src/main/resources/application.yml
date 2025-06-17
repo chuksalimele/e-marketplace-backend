@@ -35,3 +35,13 @@ eureka:
   instance:
     hostname: localhost # For local development, use localhost
     prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)
+    
+    
+
+jwt:
+  auth:
+    converter:
+      resource-id: emaketplace-app
+      principle-attribute: preferred_username
+      
+      
