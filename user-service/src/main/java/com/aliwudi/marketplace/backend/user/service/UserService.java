@@ -25,24 +25,25 @@ import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
+import java.util.List;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 
 @Service
 @RequiredArgsConstructor // Generates a constructor for final fields (UserRepository, RoleRepository, PasswordEncoder)
 @Slf4j // Enables Lombok's logging
-public class UserService{
+public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-
-
 
     // IMPORTANT: This prepareDto method is for enriching the User model.
     // It is placed here as per your instruction to move it to an appropriate location
     // and is not modified. It enriches the User object with its associated roles.
     /**
-     * Helper method to map User entity to User DTO for public exposure.
-     * This method enriches the User object with its associated Role details.
-     * Assumes that the User model has a 'Set<Role> roles' field that can be set.
+     * Helper method to map User entity to User DTO for public exposure. This
+     * method enriches the User object with its associated Role details. Assumes
+     * that the User model has a 'Set<Role> roles' field that can be set.
      */
     private Mono<User> prepareDto(User user) {
         if (user == null) {
@@ -67,11 +68,43 @@ public class UserService{
         return Mono.just(user);
     }
 
+    Mono<Set<Role>> getRolesOfAuthenticatedUser() {
+        //Get the roles in the authentication as provided by the authorization
+        //server in the jwt token
+        return ReactiveSecurityContextHolder.getContext()
+                .map(context -> {
+                    Authentication authenticatoion = context.getAuthentication();
+                    Set<String> roles = authenticatoion.getAuthorities()
+                            .stream().map(f -> {
+                                System.out.println(f.getAuthority());
+                                return f.getAuthority();
+                            })
+                            .filter(str -> str.startsWith("ROLE_"))//filter only the roles. skip the scopes and any others
+                            .map(roleStr -> roleStr.replaceFirst("ROLE_", ""))//remove the ROLE_ prefix
+                            .collect(Collectors.toSet());
+
+                    return Flux.fromIterable(roles)
+                            .flatMap(roleName
+                                    -> roleRepository.findByName(roleName)
+                                     //throw error if the role in the authentication object does not exist on the server (database)
+                                     //it means the role is invalid because the role in authorizatio server
+                                     //must match with what we have on this server database
+                                    .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + ": " + roleName)))
+                            )
+                            .collectList();
+                })
+                .flatMap(roleListMono -> roleListMono)
+                .map(roleList -> roleList
+                .stream()
+                .collect(Collectors.toSet()));
+
+    }
+
     /**
-     * Creates a new user in the system.
-     * Performs checks for duplicate username and email, hashes the password,
-     * and assigns default roles if none are specified, or specific roles if provided.
-     * This operation is transactional.
+     * Creates a new user in the system. Performs checks for duplicate username
+     * and email, hashes the password, and assigns default roles if none are
+     * specified, or specific roles if provided. This operation is
+     * transactional.
      *
      * @param userRequest The DTO containing user creation data.
      * @return A Mono emitting the created User (enriched with roles).
@@ -115,33 +148,13 @@ public class UserService{
                             .enabled(true)
                             .build();
 
-                        log.debug("Saving new user: {}", user.getUsername());
-                    // Resolve roles
-                    Mono<Set<Role>> rolesMono;
-                    if (userRequest.getRoleNames() != null && !userRequest.getRoleNames().isEmpty()) {
-                        rolesMono = Flux.fromIterable(userRequest.getRoleNames())
-                                .flatMap(roleName -> {
-                                    try {
-                                        ERole eRole = ERole.valueOf(roleName.toUpperCase());
-                                        return roleRepository.findByName(eRole)
-                                                .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND_MSG + " " + roleName)));
-                                    } catch (IllegalArgumentException e) {
-                                        return Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND_MSG + " " + roleName));
-                                    }
-                                })
-                                .collect(Collectors.toSet());
-                    } else {
-                        // Default to ROLE_USER if no roles specified
-                        rolesMono = roleRepository.findByName(ERole.ROLE_USER)
-                                .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND_MSG + " " + ERole.ROLE_USER.name())))
-                                .map(Set::of); // Wrap single role in a Set
-                    }
-
-                    return rolesMono // This is Mono<Set<Role>>
+                    //Get the roles from the authentication object
+                    return getRolesOfAuthenticatedUser()// This is Mono<Set<Role>>                            
                             .flatMap(roles -> { // 'roles' here is the Set<Role> obtained from rolesMono
                                 user.setRoles(roles); // Set roles on the user object
                                 return userRepository.save(user); // Save the user
                             })
+                            .flatMap(newUser -> setUserIdAsClaimOnAuthorizationServer(newUser, true))
                             .flatMap(this::prepareDto) // Enrich the saved user
                             .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                             .doOnError(e -> log.error("Error creating user {}: {}", userRequest.getUsername(), e.getMessage(), e));
@@ -149,16 +162,18 @@ public class UserService{
     }
 
     /**
-     * Updates an existing user's information.
-     * Handles partial updates and ensures email/username uniqueness if changed.
-     * This operation is transactional.
+     * Updates an existing user's information. Handles partial updates and
+     * ensures email/username uniqueness if changed. This operation is
+     * transactional.
      *
      * @param id The ID of the user to update.
      * @param userRequest The DTO containing updated user data.
      * @return A Mono emitting the updated User (enriched).
      * @throws ResourceNotFoundException if the user is not found.
-     * @throws DuplicateResourceException if updated username or email already exist.
-     * @throws RoleNotFoundException if any specified role does not exist during role update.
+     * @throws DuplicateResourceException if updated username or email already
+     * exist.
+     * @throws RoleNotFoundException if any specified role does not exist during
+     * role update.
      */
     @Transactional
     public Mono<User> updateUser(Long id, UserRequest userRequest) {
@@ -168,8 +183,8 @@ public class UserService{
                 .flatMap(existingUser -> {
                     // Check for duplicate username if changed
                     Mono<Void> usernameCheck = Mono.empty();
-                    if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank() &&
-                        !existingUser.getUsername().equalsIgnoreCase(userRequest.getUsername())) {
+                    if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank()
+                            && !existingUser.getUsername().equalsIgnoreCase(userRequest.getUsername())) {
                         usernameCheck = userRepository.existsByUsername(userRequest.getUsername())
                                 .flatMap(exists -> {
                                     if (exists) {
@@ -182,8 +197,8 @@ public class UserService{
 
                     // Check for duplicate email if changed
                     Mono<Void> emailCheck = Mono.empty();
-                    if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank() &&
-                        !existingUser.getEmail().equalsIgnoreCase(userRequest.getEmail())) {
+                    if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
+                            && !existingUser.getEmail().equalsIgnoreCase(userRequest.getEmail())) {
                         emailCheck = userRepository.existsByEmail(userRequest.getEmail())
                                 .flatMap(exists -> {
                                     if (exists) {
@@ -203,16 +218,16 @@ public class UserService{
                     if (userRequest.getAuthId() != null && !userRequest.getAuthId().isBlank()) {
                         existingUser.setAuthId(userRequest.getAuthId()); //although it is permanent!
                     }
-                    
+
                     if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank()) {
                         existingUser.setUsername(userRequest.getUsername());
-                    }                    
+                    }
                     if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()) {
                         existingUser.setEmail(userRequest.getEmail());
                     }
                     if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()) {
                         existingUser.setPhoneNumber(userRequest.getPhoneNumber());
-                    }                    
+                    }
                     if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
                         existingUser.setFirstName(userRequest.getFirstName());
                     }
@@ -224,44 +239,19 @@ public class UserService{
                     }
                     existingUser.setUpdatedAt(LocalDateTime.now());
 
-                    Mono<User> userSaveMono;
-
-                    // Update roles if provided
-                    if (userRequest.getRoleNames() != null) { // If roleNames is provided (can be empty set to clear roles)
-                        userSaveMono = Flux.fromIterable(userRequest.getRoleNames())
-                                .flatMap(roleName -> {
-                                    try {
-                                        ERole eRole = ERole.valueOf(roleName.toUpperCase());
-                                        return roleRepository.findByName(eRole)
-                                                .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND_MSG + " " + roleName)));
-                                    } catch (IllegalArgumentException e) {
-                                        return Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND_MSG + " " + roleName));
-                                    }
-                                })
-                                .collect(Collectors.toSet())
-                                .flatMap(roles -> {
-                                    existingUser.setRoles(roles);
-                                    return userRepository.save(existingUser);
-                                });
-                    } else {
-                        // If roleNames is null, save without changing roles on the user object itself (assuming R2DBC handles this naturally).
-                        // If roles should be explicitly kept as they were, no action is needed here besides saving the user.
-                        // If roleNames is an empty set, `collect(Collectors.toSet())` would produce an empty set,
-                        // effectively clearing roles on `existingUser.setRoles(roles);`
-                        userSaveMono = userRepository.save(existingUser);
-                    }
-
-                    return userSaveMono;
+                    return getRolesOfAuthenticatedUser()
+                            .flatMap(roles -> { // 'roles' here is the Set<Role> obtained from rolesMono
+                                existingUser.setRoles(roles); // Set roles on the user object
+                                return userRepository.save(existingUser); // Save the user
+                            });
                 })
                 .flatMap(this::prepareDto) // Enrich the updated user
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
                 .doOnError(e -> log.error("Error updating user {}: {}", id, e.getMessage(), e));
     }
 
-
     /**
-     * Deletes a user by their ID.
-     * This operation is transactional.
+     * Deletes a user by their ID. This operation is transactional.
      *
      * @param id The ID of the user to delete.
      * @return A Mono<Void> indicating completion.
@@ -352,7 +342,8 @@ public class UserService{
     }
 
     /**
-     * Finds users by first name (case-insensitive, contains) with pagination, enriching each.
+     * Finds users by first name (case-insensitive, contains) with pagination,
+     * enriching each.
      *
      * @param firstName The first name to search for.
      * @param pageable Pagination information.
@@ -380,7 +371,8 @@ public class UserService{
     }
 
     /**
-     * Finds users by last name (case-insensitive, contains) with pagination, enriching each.
+     * Finds users by last name (case-insensitive, contains) with pagination,
+     * enriching each.
      *
      * @param lastName The last name to search for.
      * @param pageable Pagination information.
@@ -408,7 +400,8 @@ public class UserService{
     }
 
     /**
-     * Finds users by username or email (case-insensitive, contains) with pagination, enriching each.
+     * Finds users by username or email (case-insensitive, contains) with
+     * pagination, enriching each.
      *
      * @param searchTerm The search term for username or email.
      * @param pageable Pagination information.
@@ -464,7 +457,8 @@ public class UserService{
     }
 
     /**
-     * Finds users with a specific shipping address (case-insensitive, contains) with pagination, enriching each.
+     * Finds users with a specific shipping address (case-insensitive, contains)
+     * with pagination, enriching each.
      *
      * @param shippingAddress The shipping address to search for.
      * @param pageable Pagination information.
@@ -479,7 +473,8 @@ public class UserService{
     }
 
     /**
-     * Counts users with a specific shipping address (case-insensitive, contains).
+     * Counts users with a specific shipping address (case-insensitive,
+     * contains).
      *
      * @param shippingAddress The shipping address to search for.
      * @return A Mono emitting the count of matching users.
@@ -515,6 +510,14 @@ public class UserService{
         return userRepository.existsByUsername(username)
                 .doOnSuccess(exists -> log.debug("User with username {} exists: {}", username, exists))
                 .doOnError(e -> log.error("Error checking user existence by username {}: {}", username, e.getMessage(), e));
+    }
+
+    private Mono<User> setUserIdAsClaimOnAuthorizationServer(User user, boolean isNew) {
+        //TODO 
+
+        //Send the request to set the user id as claim 
+        //if the operation fails delete the user if newly created
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
 }

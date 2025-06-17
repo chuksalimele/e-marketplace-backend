@@ -16,10 +16,10 @@ public class RoleService  {
 
     /**
      * Finds a role by its enum name.
-     * @param name The ERole enum representing the role name.
+     * @param name
      * @return Mono of Role if found, Mono.empty() otherwise.
      */
-    public Mono<Role> findByName(ERole name) {
+    public Mono<Role> findByName(String name) {
         return roleRepository.findByName(name);
     }
 }

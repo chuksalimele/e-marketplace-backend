@@ -13,8 +13,8 @@ public interface RoleRepository extends R2dbcRepository<Role, Long> {
 
     // --- Basic CRUD operations are inherited from ReactiveCrudRepository ---
 
-    // Find a role by its name (ERole enum)
-    Mono<Role> findByName(ERole name);
+    // Find a role by its name
+    Mono<Role> findByName(String name);
     
     /**
      * Finds all roles associated with a given user ID.
