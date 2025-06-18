@@ -18,11 +18,13 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 
 import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
+@EnableReactiveMethodSecurity // For @PreAuthorize etc.
 public class UserServiceSecurityConfig {
 
     private final ReactiveUserDetailsService userDetailsService;
@@ -64,6 +66,9 @@ public class UserServiceSecurityConfig {
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))) // Configure as Resource Server to validate JWTs
             .authorizeExchange(exchange -> exchange
                 .pathMatchers("/api/auth/**").permitAll() // Allow /api/auth/** for signup/login
+                                // Allow the /api/users/profiles endpoint only for the service account with specific role
+                .pathMatchers("/api/users/profile/create").hasRole("user-profile-sync") // IMPORTANT: Check for the role
+                .pathMatchers("/api/users/profile/update").hasRole("user-profile-sync") // IMPORTANT: Check for the role
                 .anyExchange().authenticated() // All other requests require authentication
             )
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless

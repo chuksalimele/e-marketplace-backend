@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
@@ -44,6 +45,7 @@ import org.springframework.web.server.ServerWebExchange;
 @SpringBootApplication
 @EnableDiscoveryClient // Enables this application to act as a Eureka client
 @EnableWebFluxSecurity // Enables Spring Security for reactive applications (Spring Cloud Gateway is reactive)
+@EnableReactiveMethodSecurity // For @PreAuthorize etc.
 public class APIGatewayApplication {
     @Value("${jwt.auth.converter.principle-attribute}")
     private String principleAttribute;

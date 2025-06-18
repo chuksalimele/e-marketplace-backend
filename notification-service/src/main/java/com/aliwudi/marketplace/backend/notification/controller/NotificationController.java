@@ -42,7 +42,7 @@ public class NotificationController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SERVICE')") // 'SERVICE' role for internal microservice calls
+    @PreAuthorize("hasRole('admin') or hasRole('SERVICE')") // 'SERVICE' role for internal microservice calls
     public Mono<Notification> createNotification(@Valid @RequestBody NotificationRequest request) {
         // Basic controller-level validation for critical fields
         if (request.getUserId() == null || request.getUserId() <= 0 ||
@@ -65,7 +65,7 @@ public class NotificationController {
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Flux<Notification> getRealTimeNotifications(ServerWebExchange exchange) {
         return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(notificationService::getRealTimeNotificationsStream)
@@ -87,7 +87,7 @@ public class NotificationController {
      */
     @GetMapping("/me")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Flux<Notification> getAllMyNotifications(
             ServerWebExchange exchange,
             @RequestParam(defaultValue = "0") int page,
@@ -120,7 +120,7 @@ public class NotificationController {
      */
     @GetMapping("/me/status/{status}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Flux<Notification> getMyNotificationsByStatus(
             ServerWebExchange exchange,
             @PathVariable String status,
@@ -160,7 +160,7 @@ public class NotificationController {
      */
     @GetMapping("/me/type/{type}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Flux<Notification> getMyNotificationsByType(
             ServerWebExchange exchange,
             @PathVariable String type,
@@ -196,7 +196,7 @@ public class NotificationController {
      */
     @PutMapping("/me/{id}/read")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Mono<Notification> markNotificationAsRead(
             ServerWebExchange exchange, 
             @PathVariable Long id) {
@@ -220,7 +220,7 @@ public class NotificationController {
      */
     @DeleteMapping("/me/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Mono<Void> deleteMyNotification(
             ServerWebExchange exchange,
             @PathVariable Long id) {
@@ -243,7 +243,7 @@ public class NotificationController {
      */
     @GetMapping("/me/count")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Mono<Long> countMyNotifications(ServerWebExchange exchange) {
         return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(notificationService::countNotificationsForUser)
@@ -261,7 +261,7 @@ public class NotificationController {
      */
     @GetMapping("/me/count/status/{status}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SELLER') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
     public Mono<Long> countMyNotificationsByStatus(
             ServerWebExchange exchange,
             @PathVariable String status) {

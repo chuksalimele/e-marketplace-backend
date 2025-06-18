@@ -37,7 +37,7 @@ public class ProductController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created for resource creation
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Product> createProduct(@Valid @RequestBody ProductRequest productRequest) {
         // Basic validation for required fields
         if (productRequest.getName() == null || productRequest.getName().isBlank() ||
@@ -66,7 +66,7 @@ public class ProductController {
      */
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest productRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);
@@ -77,7 +77,7 @@ public class ProductController {
 
     /**
      * Endpoint to decrease the stock quantity of a specific product.
-     * Accessible by 'USER', 'SELLER', or 'ADMIN' roles.
+     * Accessible by 'user', 'seller', or 'admin' roles.
      *
      * @param productId The ID of the product whose stock needs to be decreased.
      * @param quantity The amount to decrease the stock by.
@@ -88,7 +88,7 @@ public class ProductController {
      */
     @PutMapping("/{productId}/decrease-stock")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAnyRole('USER', 'SELLER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('user', 'seller', 'admin')")
     public Mono<Product> decreaseProductStock(
             @PathVariable Long productId,
             @RequestParam Integer quantity) {
@@ -159,7 +159,7 @@ public class ProductController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful deletion
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Void> deleteProduct(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);

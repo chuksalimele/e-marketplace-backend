@@ -12,11 +12,13 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository; // Important for statelessness
 
 import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity // Enables Spring Security for reactive applications
+@EnableReactiveMethodSecurity // For @PreAuthorize etc.
 public class NotificationServiceSecurityConfig {
     
     @Value("${jwt.auth.converter.principle-attribute}")

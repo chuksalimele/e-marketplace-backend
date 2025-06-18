@@ -42,7 +42,7 @@ public class UserController {
 
     /**
      * Endpoint to create a new user.
-     * Accessible by 'ADMIN' or can be exposed for public registration.
+     * Accessible by 'admin' or can be exposed for public registration.
      *
      * @param userRequest The DTO containing user creation data.
      * @return A Mono emitting the created User.
@@ -50,7 +50,8 @@ public class UserController {
      * @throws DuplicateResourceException if username or email already exist.
      * @throws RoleNotFoundException if any specified role does not exist.
      */
-    @PostMapping("/register")
+    @PostMapping("/profiles/create")
+    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
     @ResponseStatus(HttpStatus.CREATED)
     // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
     // This will activate the @Size constraint on the 'password' field that belongs to this group.
@@ -74,7 +75,7 @@ public class UserController {
 
     /**
      * Endpoint to update an existing user's information.
-     * Accessible by 'ADMIN' or the 'USER' themselves.
+     * Accessible by 'admin' or the 'user' themselves.
      *
      * @param id The ID of the user to update.
      * @param userRequest The DTO containing updated user data.
@@ -84,9 +85,9 @@ public class UserController {
      * @throws DuplicateResourceException if updated username or email already exist.
      * @throws RoleNotFoundException if any specified role does not exist during role update.
      */
-    @PutMapping("/{id}")
+    @PostMapping("/profiles/update/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)")
+    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
     // Here, we use just @Valid (or @Validated without a group).
     // This means only default validation constraints (those without a 'groups' attribute, or with 'groups=Default.class')
     // will be applied. The @Size constraint on 'password' in UserRequest will NOT be active here,
@@ -108,7 +109,7 @@ public class UserController {
 
     /**
      * Endpoint to delete a user by their ID.
-     * Accessible only by 'ADMIN'.
+     * Accessible only by 'admin'.
      *
      * @param id The ID of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
@@ -117,7 +118,7 @@ public class UserController {
      */
     @DeleteMapping("/admin/{id}") // Admin endpoint
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Void> deleteUser(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
@@ -128,7 +129,7 @@ public class UserController {
 
     /**
      * Endpoint to retrieve a user by their ID.
-     * Accessible by 'ADMIN' or the 'USER' themselves.
+     * Accessible by 'admin' or the 'user' themselves.
      *
      * @param id The ID of the user to retrieve.
      * @return A Mono emitting the User.
@@ -137,7 +138,7 @@ public class UserController {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #id == authentication.principal.id)") // Example authorization
+    @PreAuthorize("hasRole('admin') or hasRole('user')") // Example authorization
     public Mono<User> getUserById(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
@@ -148,7 +149,7 @@ public class UserController {
 
     /**
      * Endpoint to retrieve a user by their username.
-     * Accessible by 'ADMIN' or for specific public lookups (e.g., username availability check).
+     * Accessible by 'admin' or for specific public lookups (e.g., username availability check).
      *
      * @param username The username of the user.
      * @return A Mono emitting the User.
@@ -157,7 +158,7 @@ public class UserController {
      */
     @GetMapping("/byUsername/{username}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')") // Typically admin only, or if public profile viewing is allowed
+    @PreAuthorize("hasRole('admin')") // Typically admin only, or if public profile viewing is allowed
     public Mono<User> getUserByUsername(@PathVariable String username) {
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USERNAME);
@@ -168,7 +169,7 @@ public class UserController {
 
     /**
      * Endpoint to retrieve a user by their email.
-     * Accessible by 'ADMIN' only due to privacy concerns.
+     * Accessible by 'admin' only due to privacy concerns.
      *
      * @param email The email of the user.
      * @return A Mono emitting the User.
@@ -177,7 +178,7 @@ public class UserController {
      */
     @GetMapping("/byEmail/{email}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<User> getUserByEmail(@PathVariable String email) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
@@ -188,7 +189,7 @@ public class UserController {
 
     /**
      * Endpoint to retrieve all users with pagination.
-     * Accessible by 'ADMIN' only.
+     * Accessible by 'admin' only.
      *
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -199,7 +200,7 @@ public class UserController {
      */
     @GetMapping("/admin/all")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -216,13 +217,13 @@ public class UserController {
 
     /**
      * Endpoint to count all users.
-     * Accessible by 'ADMIN' only.
+     * Accessible by 'admin' only.
      *
      * @return A Mono emitting the total count of users.
      */
     @GetMapping("/admin/count")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countAllUsers() {
         return userService.countAllUsers();
         // Errors are handled by GlobalExceptionHandler.
@@ -230,7 +231,7 @@ public class UserController {
 
     /**
      * Finds users by first name (case-insensitive, contains) with pagination.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param firstName The first name to search for.
      * @param page The page number (0-indexed).
@@ -242,7 +243,7 @@ public class UserController {
      */
     @GetMapping("/admin/byFirstName")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getUsersByFirstName(
             @RequestParam String firstName,
             @RequestParam(defaultValue = "0") int page,
@@ -260,7 +261,7 @@ public class UserController {
 
     /**
      * Counts users by first name (case-insensitive, contains).
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param firstName The first name to search for.
      * @return A Mono emitting the count of matching users.
@@ -268,7 +269,7 @@ public class UserController {
      */
     @GetMapping("/admin/countByFirstName")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countUsersByFirstName(@RequestParam String firstName) {
         if (firstName == null || firstName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_FIRST_NAME);
@@ -279,7 +280,7 @@ public class UserController {
 
     /**
      * Finds users by last name (case-insensitive, contains) with pagination.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param lastName The last name to search for.
      * @param page The page number (0-indexed).
@@ -291,7 +292,7 @@ public class UserController {
      */
     @GetMapping("/admin/byLastName")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getUsersByLastName(
             @RequestParam String lastName,
             @RequestParam(defaultValue = "0") int page,
@@ -309,7 +310,7 @@ public class UserController {
 
     /**
      * Counts users by last name (case-insensitive, contains).
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param lastName The last name to search for.
      * @return A Mono emitting the count of matching users.
@@ -317,7 +318,7 @@ public class UserController {
      */
     @GetMapping("/admin/countByLastName")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countUsersByLastName(@RequestParam String lastName) {
         if (lastName == null || lastName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_LAST_NAME);
@@ -328,7 +329,7 @@ public class UserController {
 
     /**
      * Finds users by username or email (case-insensitive, contains) with pagination.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param searchTerm The search term for username or email.
      * @param page The page number (0-indexed).
@@ -340,7 +341,7 @@ public class UserController {
      */
     @GetMapping("/admin/byUsernameOrEmail")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getUsersByUsernameOrEmail(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
@@ -358,7 +359,7 @@ public class UserController {
 
     /**
      * Counts users by username or email (case-insensitive, contains).
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param searchTerm The search term for username or email.
      * @return A Mono emitting the count of matching users.
@@ -366,7 +367,7 @@ public class UserController {
      */
     @GetMapping("/admin/countByUsernameOrEmail")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countUsersByUsernameOrEmail(@RequestParam String searchTerm) {
         if (searchTerm == null || searchTerm.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM);
@@ -377,7 +378,7 @@ public class UserController {
 
     /**
      * Finds users created after a certain date with pagination.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @param page The page number (0-indexed).
@@ -389,7 +390,7 @@ public class UserController {
      */
     @GetMapping("/admin/byCreatedAtAfter")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getUsersByCreatedAtAfter(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
@@ -413,7 +414,7 @@ public class UserController {
 
     /**
      * Counts users created after a certain date.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @return A Mono emitting the count of matching users.
@@ -421,7 +422,7 @@ public class UserController {
      */
     @GetMapping("/admin/countByCreatedAtAfter")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countUsersByCreatedAtAfter(@RequestParam String date) {
         if (date == null || date.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_DATE_FORMAT);
@@ -437,7 +438,7 @@ public class UserController {
 
     /**
      * Finds users with a specific shipping address (case-insensitive, contains) with pagination.
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param shippingAddress The shipping address to search for.
      * @param page The page number (0-indexed).
@@ -449,7 +450,7 @@ public class UserController {
      */
     @GetMapping("/admin/byShippingAddress")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<User> getUsersByShippingAddress(
             @RequestParam String shippingAddress,
             @RequestParam(defaultValue = "0") int page,
@@ -467,7 +468,7 @@ public class UserController {
 
     /**
      * Counts users with a specific shipping address (case-insensitive, contains).
-     * Accessible by 'ADMIN'.
+     * Accessible by 'admin'.
      *
      * @param shippingAddress The shipping address to search for.
      * @return A Mono emitting the count of matching users.
@@ -475,7 +476,7 @@ public class UserController {
      */
     @GetMapping("/admin/countByShippingAddress")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countUsersByShippingAddress(@RequestParam String shippingAddress) {
         if (shippingAddress == null || shippingAddress.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SHIPPING_ADDRESS);

@@ -41,7 +41,7 @@ public class DeliveryController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Delivery> createDelivery(@Valid @RequestBody DeliveryRequest request) {
         // Basic input validation
         if (request.getOrderId() == null || request.getOrderId() <= 0
@@ -109,7 +109,7 @@ public class DeliveryController {
      */
     @PutMapping("/update-status")
     @ResponseStatus(HttpStatus.OK) // Or HttpStatus.ACCEPTED if status update is async
-    @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('admin') or hasRole('delivery-agent')")
     public Mono<Delivery> updateDeliveryStatus(@Valid @RequestBody DeliveryUpdateRequest request) {
         if (request.getTrackingNumber() == null || request.getTrackingNumber().isBlank()
                 || request.getNewStatus() == null) { // Enum check is in service
@@ -136,7 +136,7 @@ public class DeliveryController {
      */
     @PutMapping("/cancel/{trackingNumber}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Delivery> cancelDelivery(
             @PathVariable String trackingNumber,
             @RequestParam(required = false) String reason) {
@@ -157,7 +157,7 @@ public class DeliveryController {
      */
     @DeleteMapping("/admin/{trackingNumber}") // Updated path for admin access
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Void> deleteDelivery(@PathVariable String trackingNumber) {
         if (trackingNumber == null || trackingNumber.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_TRACKING_NUMBER);
@@ -180,7 +180,7 @@ public class DeliveryController {
      */
     @GetMapping("/admin/all") // Updated path for admin access
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<Delivery> getAllDeliveriesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -208,7 +208,7 @@ public class DeliveryController {
      */
     @GetMapping("/admin/byStatus/{status}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('admin') or hasRole('delivery-agent')")
     public Flux<Delivery> getDeliveriesByStatus(
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
@@ -243,7 +243,7 @@ public class DeliveryController {
      */
     @GetMapping("/admin/byAgent/{deliveryAgent}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('admin') or hasRole('delivery-agent')")
     public Flux<Delivery> getDeliveriesByDeliveryAgent(
             @PathVariable String deliveryAgent,
             @RequestParam(defaultValue = "0") int page,
@@ -273,7 +273,7 @@ public class DeliveryController {
      */
     @GetMapping("/admin/estimatedBefore")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<Delivery> getDeliveriesByEstimatedDeliveryDateBefore(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
@@ -309,7 +309,7 @@ public class DeliveryController {
      */
     @GetMapping("/admin/byLocation")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<Delivery> getDeliveriesByCurrentLocationContaining(
             @RequestParam String location,
             @RequestParam(defaultValue = "0") int page,
@@ -332,7 +332,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/all")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countAllDeliveries() {
         return deliveryService.countAllDeliveries();
         // Errors are handled by GlobalExceptionHandler.
@@ -347,7 +347,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/byOrder/{orderId}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Long> countDeliveriesByOrderId(@PathVariable Long orderId) {
         if (orderId == null || orderId <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_ORDER_ID);
@@ -365,7 +365,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/byStatus/{status}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('admin') or hasRole('delivery-agent')")
     public Mono<Long> countDeliveriesByStatus(@PathVariable String status) {
         if (status == null || status.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_DELIVERY_STATUS);
@@ -389,7 +389,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/byAgent/{deliveryAgent}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("hasRole('admin') or hasRole('delivery-agent')")
     public Mono<Long> countDeliveriesByAgent(@PathVariable String deliveryAgent) {
         if (deliveryAgent == null || deliveryAgent.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_DELIVERY_AGENT);
@@ -408,7 +408,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/estimatedBefore")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countDeliveriesByEstimatedDeliveryDateBefore(@RequestParam String date) {
         if (date == null || date.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_DATE_FORMAT);
@@ -432,7 +432,7 @@ public class DeliveryController {
      */
     @GetMapping("/count/byLocation")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countDeliveriesByCurrentLocationContaining(@RequestParam String location) {
         if (location == null || location.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_LOCATION);

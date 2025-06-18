@@ -42,7 +42,7 @@ public class StoreController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Store> createStore(@Valid @RequestBody StoreRequest storeRequest) {
         // Basic input validation
         if (storeRequest.getName() == null || storeRequest.getName().isBlank()
@@ -157,7 +157,7 @@ public class StoreController {
      */
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Store> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_STORE_ID);
@@ -177,7 +177,7 @@ public class StoreController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Void> deleteStore(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_STORE_ID);

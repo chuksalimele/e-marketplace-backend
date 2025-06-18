@@ -88,7 +88,7 @@ public class SellerController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Seller> createSeller(@Valid @RequestBody SellerRequest sellerRequest) {
         // Basic input validation
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank() ||
@@ -112,7 +112,7 @@ public class SellerController {
      */
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Seller> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
@@ -134,7 +134,7 @@ public class SellerController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Void> deleteSeller(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);

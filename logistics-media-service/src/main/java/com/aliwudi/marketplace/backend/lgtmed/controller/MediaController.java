@@ -37,7 +37,7 @@ public class MediaController {
      */
     @PostMapping("/upload")
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER') or hasRole('USER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller') or hasRole('user')")
     public Mono<MediaAsset> uploadMedia(@Valid @RequestBody MediaUploadRequest request) {
         // Basic input validation
         if (request.getAssetName() == null || request.getAssetName().isBlank()
@@ -133,7 +133,7 @@ public class MediaController {
      */
     @DeleteMapping("/admin/{uniqueFileName}") // Updated path for admin access
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PreAuthorize("hasRole('admin') or hasRole('seller')")
     public Mono<Void> deleteMediaAsset(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME);
@@ -155,7 +155,7 @@ public class MediaController {
      */
     @GetMapping("/admin/all") // Updated path for admin access
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<MediaAsset> getAllMediaAssetsPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -183,7 +183,7 @@ public class MediaController {
      */
     @GetMapping("/admin/byEntityType/{entityType}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<MediaAsset> getMediaAssetsByEntityType(
             @PathVariable String entityType,
             @RequestParam(defaultValue = "0") int page,
@@ -212,7 +212,7 @@ public class MediaController {
      */
     @GetMapping("/admin/byFileType/{fileType}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<MediaAsset> getMediaAssetsByFileType(
             @PathVariable String fileType,
             @RequestParam(defaultValue = "0") int page,
@@ -242,7 +242,7 @@ public class MediaController {
      */
     @GetMapping("/admin/byAssetNameContaining")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Flux<MediaAsset> getMediaAssetsByAssetNameContaining(
             @RequestParam String assetName,
             @RequestParam(defaultValue = "0") int page,
@@ -267,7 +267,7 @@ public class MediaController {
      */
     @GetMapping("/count/byEntityType/{entityType}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countMediaAssetsByEntityType(@PathVariable String entityType) {
         if (entityType == null || entityType.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS);
@@ -285,7 +285,7 @@ public class MediaController {
      */
     @GetMapping("/count/byFileType/{fileType}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countMediaAssetsByFileType(@PathVariable String fileType) {
         if (fileType == null || fileType.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_FILE_TYPE);
@@ -304,7 +304,7 @@ public class MediaController {
      */
     @GetMapping("/count/byAssetNameContaining")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     public Mono<Long> countMediaAssetsByAssetNameContaining(@RequestParam String assetName) {
         if (assetName == null || assetName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_ASSET_NAME);
