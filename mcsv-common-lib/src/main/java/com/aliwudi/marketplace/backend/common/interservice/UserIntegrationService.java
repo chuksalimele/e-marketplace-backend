@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.common.interservice;
 
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import com.aliwudi.marketplace.backend.common.filter.JwtPropagationFilter;
@@ -22,12 +23,15 @@ public class UserIntegrationService {
     private static final Logger log = LoggerFactory.getLogger(UserIntegrationService.class); // Add Logger
 
     private final WebClient webClient;
+    private final String path = "lb://user-service"+USER_CONTROLLER_BASE;
 
-    // Inject the JwtPropagationFilter
-    public UserIntegrationService(@Value("${user.service.url}") String userServiceBaseUrl,
-                                  JwtPropagationFilter jwtPropagationFilter) { // INJECT THE FILTER
+    // Constructor injection for WebClient.Builder and JwtPropagationFilter
+    public UserIntegrationService(WebClient.Builder webClientBuilder,
+                                     JwtPropagationFilter jwtPropagationFilter) { // INJECT THE FILTER
+        // Build WebClient instance. The base URL uses the Eureka service ID.
+        // 'lb://' prefix indicates client-side load balancing via Eureka.        
         this.webClient = WebClient.builder()
-                .baseUrl(userServiceBaseUrl)
+                .baseUrl(path)
                 .filter(jwtPropagationFilter) // APPLY THE FILTER HERE!
                 .build();
     }
@@ -83,7 +87,7 @@ public class UserIntegrationService {
      */
     public Mono<User> getUserById(Long userId) {
         Mono<User> responseMono = webClient.get()
-                .uri("/api/users/{userId}", userId)
+                .uri(USER_GET_BY_ID, userId)
                 .retrieve()
                 .bodyToMono(User.class);
 
@@ -91,44 +95,61 @@ public class UserIntegrationService {
     }
 
     /**
-     * Checks if a user exists by their ID.
-     * This method is optimized to only check existence (HEAD request).
-     * @param userId The ID of the user to check.
+     * Checks if a user exists by their user ID.
+     * @param userId The user ID of the user to check.
      * @return Mono<Boolean> true if user exists, false otherwise.
      * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
      */
-    public Mono<Boolean> userExistsById(Long userId) {
-        Mono<Boolean> responseMono = webClient.head()
-                .uri("/api/users/{userId}", userId)
+    public Mono<Boolean> userExistsByUserId(Long userId) {
+        Mono<Boolean> responseMono = webClient.get()
+                .uri(USER_EXISTS_BY_USER_ID, userId)
                 .retrieve()
-                .toBodilessEntity()
-                .map(response -> response.getStatusCode() == HttpStatus.OK)
-                .onErrorResume(WebClientResponseException.class, e -> {
-                    if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        log.info("User {} not found in User Service (404 for HEAD).", userId);
-                        return Mono.just(false);
-                    }
-                    log.error("WebClient response error during user existence check for ID {}: {} (Status: {})", userId, e.getMessage(), e.getStatusCode(), e);
-                    return Mono.error(new ServiceUnavailableException("User Service communication error for user ID " + userId + ": " + e.getMessage(), e));
-                });
+                .bodyToMono(Boolean.class);
 
-        return responseMono
-                .transform(mono -> handleUserServiceErrors(mono, "checking user existence", userId, false));
+        return handleUserServiceErrors(responseMono, "checking user existence by user id", userId, true);
     }
+    /**
+     * Checks if a user exists by their auth ID.
+     * @param authId The auth ID of the user to check.
+     * @return Mono<Boolean> true if user exists, false otherwise.
+     * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
+     */
+    public Mono<Boolean> userExistsByAuthId(String authId) {
+        Mono<Boolean> responseMono = webClient.get()
+                .uri(USER_EXISTS_BY_AUTH_ID, authId)
+                .retrieve()
+                .bodyToMono(Boolean.class);
 
+        return handleUserServiceErrors(responseMono, "checking user existence by user id", authId, true);
+    }
+    
     /**
      * Checks if a user exists by their username.
-     * Assumes an endpoint like /api/users/exists/username/{username} on the User Service.
+     * @param email The email of the user to check.
+     * @return Mono<Boolean> true if user exists, false otherwise.
+     * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
+     */
+    public Mono<Boolean> userExistsByEmail(String email) {
+        Mono<Boolean> responseMono = webClient.get()
+                .uri(USER_EXISTS_BY_EMAIL, email)
+                .retrieve()
+                .bodyToMono(Boolean.class);
+
+        return handleUserServiceErrors(responseMono, "checking user existence by email", email, true);
+    }
+    
+    /**
+     * Checks if a user exists by their username.
      * @param username The username of the user to check.
      * @return Mono<Boolean> true if user exists, false otherwise.
      * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
      */
     public Mono<Boolean> userExistsByUsername(String username) {
         Mono<Boolean> responseMono = webClient.get()
-                .uri("/api/users/exists/username/{username}", username)
+                .uri(USER_EXISTS_BY_USERNAME, username)
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
         return handleUserServiceErrors(responseMono, "checking user existence by username", username, true);
-    }
+    }    
 }

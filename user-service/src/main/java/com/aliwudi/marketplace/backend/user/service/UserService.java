@@ -510,6 +510,32 @@ public class UserService {
     }
 
     /**
+     * Checks if a user with the given user id exists.
+     *
+     * @param userId The userId to check.
+     * @return A Mono emitting true if the user exists, false otherwise.
+     */
+    public Mono<Boolean> existsByUserId(Long userId) {
+        log.debug("Checking if user exists by user id: {}", userId);
+        return userRepository.existsById(userId)
+                .doOnSuccess(exists -> log.debug("User with id {} exists: {}", userId, exists))
+                .doOnError(e -> log.error("Error checking user existence by id {}: {}", userId, e.getMessage(), e));
+    }
+
+    /**
+     * Checks if a user with the given authorization id exists.
+     *
+     * @param authId The authId to check.
+     * @return A Mono emitting true if the user exists, false otherwise.
+     */
+    public Mono<Boolean> existsByAuthId(String authId) {
+        log.debug("Checking if user exists by authorization id: {}", authId);
+        return userRepository.existsByAuthId(authId)
+                .doOnSuccess(exists -> log.debug("User with authorization id {} exists: {}", authId, exists))
+                .doOnError(e -> log.error("Error checking user existence by authorization id {}: {}", authId, e.getMessage(), e));
+    }
+
+    /**
      * Checks if a user with the given email exists.
      *
      * @param email The email to check.

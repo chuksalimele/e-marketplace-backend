@@ -321,6 +321,21 @@ public class OrderController {
         // Errors are handled by GlobalExceptionHandler.
     }
 
+      
+    /**
+     * Endpoint to check if a specific product exists within a specific order.
+     *
+     * @param orderId The ID of the order.
+     * @return A Mono emitting true if it exists, false otherwise (Boolean).
+     */
+    @GetMapping(ORDER_CHECK_EXISTS) // MODIFIED
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> checkOrderExists(@PathVariable Long orderId) {
+        return orderService.checkOrderExists(orderId);
+        // Errors are handled by GlobalExceptionHandler.
+    }
+  
+    
     /**
      * Endpoint to check if a specific product exists within a specific order.
      *

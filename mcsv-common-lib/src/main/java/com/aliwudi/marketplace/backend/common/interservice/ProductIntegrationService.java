@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.common.interservice;
 
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
 import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import com.aliwudi.marketplace.backend.common.filter.JwtPropagationFilter;
@@ -27,7 +28,7 @@ public class ProductIntegrationService {
     private static final Logger log = LoggerFactory.getLogger(ProductIntegrationService.class); // Add Logger
 
     private final WebClient webClient;
-    private final String path = "lb://product-catalog-service/api/products";
+    private final String path = "lb://product-catalog-service"+PRODUCT_CONTROLLER_BASE;
 
     // Constructor injection for WebClient.Builder and JwtPropagationFilter
     public ProductIntegrationService(WebClient.Builder webClientBuilder,
@@ -91,7 +92,7 @@ public class ProductIntegrationService {
      */
     public Mono<Product> getProductById(Long productId) {
         Mono<Product> responseMono = webClient.get()
-                .uri("/{id}", productId) // Append the product ID to the base URL
+                .uri(PRODUCT_GET_BY_ID, productId) // Append the product ID to the base URL
                 .retrieve()
                 // Removed explicit onStatus error handling here, as handleProductServiceErrors covers WebClientResponseException
                 .bodyToMono(Product.class) // Convert the response body to a Mono of a single Product object
@@ -112,7 +113,7 @@ public class ProductIntegrationService {
      */
     public Mono<Product> decreaseAndSaveStock(Long productId, Integer quantity) {
         Mono<Product> responseMono = webClient.put()
-                .uri("/{productId}/decrease-stock?quantity={quantity}", productId, quantity)
+                .uri(PRODUCT_DECREASE_STOCK, productId, quantity)
                 .retrieve()
                 // Removed explicit onStatus error handling here, as handleProductServiceErrors covers WebClientResponseException
                 .bodyToMono(Product.class)

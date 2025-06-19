@@ -111,7 +111,7 @@ public class ReviewService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.PRODUCT_NOT_FOUND + reviewRequest.getProductId())))
                 .then(), // Just interested in existence, not the Product object here
 
-            userIntegrationService.userExistsById(reviewRequest.getUserId())
+            userIntegrationService.userExistsByUserId(reviewRequest.getUserId())
                 .filter(Boolean::booleanValue) // Only proceed if user exists
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + reviewRequest.getUserId())))
                 .then(), // Just interested in existence

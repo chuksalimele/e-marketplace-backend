@@ -36,7 +36,8 @@ public interface ApiResponseMessages {
     // --- Authentication & Authorization Messages ---
     String UNAUTHENTICATED_USER = "User is not authenticated";
     String INVALID_USER_ID_FORMAT = "Authenticated principal is not a valid user ID format";
-    String INVALID_USER_ID = "Authenticated principal is not a valid user ID"; // General invalid user ID format
+    String INVALID_USER_ID = "Invalid user ID"; 
+    String INVALID_AUTHORIZATION_ID = "Invalid authorization ID"; 
     String SECURITY_CONTEXT_NOT_FOUND = "Security context not found";
     String USERNAME_ALREADY_EXISTS = "Error: Username already exists!";
     String EMAIL_ALREADY_EXISTS = "Error: Email already exists!";

@@ -515,6 +515,39 @@ public class UserController {
         return userService.countUsersByShippingAddress(shippingAddress);
         // Errors are handled by GlobalExceptionHandler.
     }
+        /**
+     * Checks if a user with the given authorization id exists.
+     *
+     * @param authId The authId to check.
+     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if email is invalid.
+     */
+    @GetMapping(USER_EXISTS_BY_AUTH_ID) // MODIFIED: Using constant for endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsByAuthId(@RequestParam String authId) {
+        if (authId == null || authId.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_AUTHORIZATION_ID);
+        }
+        return userService.existsByAuthId(authId);
+        // Errors are handled by GlobalExceptionHandler.
+    }
+
+    /**
+     * Checks if a user with the given user id exists.
+     *
+     * @param userId The userId to check.
+     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @throws IllegalArgumentException if email is invalid.
+     */
+    @GetMapping(USER_EXISTS_BY_USER_ID) // MODIFIED: Using constant for endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> existsByUserId(@RequestParam Long userId) {
+        if (userId == null || userId < 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
+        }
+        return userService.existsByUserId(userId);
+        // Errors are handled by GlobalExceptionHandler.
+    }
 
     /**
      * Checks if a user with the given email exists.
@@ -528,7 +561,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByEmail(@RequestParam String email) {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
         }
         return userService.existsByEmail(email);
         // Errors are handled by GlobalExceptionHandler.

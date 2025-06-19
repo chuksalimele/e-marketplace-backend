@@ -499,6 +499,18 @@ public class OrderService {
     }
 
     /**
+     * Check if an order exist
+     *
+     * @param orderId The ID of the order.
+     * @return A Mono emitting true if it exists, false otherwise.
+     */
+    @Transactional(readOnly = true)
+    public Mono<Boolean> checkOrderExists(Long orderId) {
+        log.info("Checking if order exists with ID {}", orderId);
+        return orderRepository.existsById(orderId);
+    }
+
+    /**
      * Check if a specific product exists within a specific order.
      *
      * @param orderId The ID of the order.

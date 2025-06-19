@@ -47,17 +47,19 @@ public final class ApiPaths {
     public static final String USER_ADMIN_COUNT_BY_CREATED_AT_AFTER = "/admin/countByCreatedAtAfter";
     public static final String USER_ADMIN_BY_SHIPPING_ADDRESS = "/admin/byShippingAddress";
     public static final String USER_ADMIN_COUNT_BY_SHIPPING_ADDRESS = "/admin/countByShippingAddress";
-    public static final String USER_EXISTS_BY_EMAIL = "/existsByEmail";
-    public static final String USER_EXISTS_BY_USERNAME = "/existsByUsername";
+    public static final String USER_EXISTS_BY_USER_ID = "/exists/user-id/{userId}";
+    public static final String USER_EXISTS_BY_AUTH_ID = "/exists/auth-id/{authId}";
+    public static final String USER_EXISTS_BY_EMAIL = "/exists/email/{email}";
+    public static final String USER_EXISTS_BY_USERNAME = "/exists/username/{username}";
 
     // --- Product Endpoints (from previous modification) ---
-    public static final String PRODUCT_CREATE = "";
-    public static final String PRODUCT_UPDATE = "/{id}";
-    public static final String PRODUCT_DECREASE_STOCK = "/{productId}/decrease-stock";
-    public static final String PRODUCT_GET_ALL = "";
+    public static final String PRODUCT_CREATE = "/create";
+    public static final String PRODUCT_UPDATE = "/update/{id}";
+    public static final String PRODUCT_DECREASE_STOCK = "/decrease-stock/{productId}?quantity={quantity}";
+    public static final String PRODUCT_GET_ALL = "/all";
     public static final String PRODUCT_COUNT_ALL = "/count";
-    public static final String PRODUCT_GET_BY_ID = "/{id}";
-    public static final String PRODUCT_DELETE = "/{id}";
+    public static final String PRODUCT_GET_BY_ID = "/count/{id}";
+    public static final String PRODUCT_DELETE = "/delete/{id}";
     public static final String PRODUCT_GET_BY_STORE = "/store/{storeId}";
     public static final String PRODUCT_COUNT_BY_STORE = "/store/{storeId}/count";
     public static final String PRODUCT_GET_BY_SELLER = "/seller/{sellerId}";
@@ -164,10 +166,11 @@ public final class ApiPaths {
     public static final String ORDER_CHECKOUT = "/checkout";
     public static final String ORDER_GET_ALL = "";
     public static final String ORDER_GET_BY_ID = "/{id}";
+    public static final String ORDER_CHECK_EXISTS = "/exists/{orderId}";
     public static final String ORDER_GET_BY_USER = "/user/{userId}";
     public static final String ORDER_UPDATE_STATUS = "/{id}/status";
     public static final String ORDER_DELETE_BY_ID = "/{id}";
-    public static final String ORDER_DELETE_BY_USER = "/user/{userId}";
+    public static final String ORDER_DELETE_BY_USER = "/delete/user/{userId}";
     public static final String ORDER_DELETE_ITEM = "/order/{orderId}/item/{orderItemId}";
     public static final String ORDER_CLEAR_ALL = "/clearAll";
     public static final String ORDER_ITEMS_GET_ALL = "/items/all";
