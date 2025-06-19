@@ -7,6 +7,7 @@ import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.user.dto.PasswordUpdateRequest;
+import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
@@ -92,7 +93,7 @@ public class UserControllerTest {
         UserRequest userRequest = new UserRequest("the auth id","newuser", "phone here", "test@example.com", "John", "Doe", "123 Main St", Set.of("USER"));
         User createdUser = createDummyUser(1L, "newuser", "test@example.com");
 
-        when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.just(createdUser));
+        when(userService.createUser(any(UserProfileCreateRequest.class))).thenReturn(Mono.just(createdUser));
 
         webTestClient.post().uri("/api/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -107,7 +108,7 @@ public class UserControllerTest {
                     assertThat(user.getEmail()).isEqualTo("test@example.com");
                 });
 
-        verify(userService, times(1)).createUser(any(UserRequest.class));
+        verify(userService, times(1)).createUser(any(UserProfileCreateRequest.class));
     }
 
     @Test
@@ -147,7 +148,7 @@ public class UserControllerTest {
     void createUser_DuplicateUsername() {
         UserRequest userRequest = new UserRequest("the auth id","existinguser", "phone here", "test@example.com",  "John", "Doe", "123 Main St", Set.of("USER"));
 
-        when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.error(new DuplicateResourceException("Username 'existinguser' already exists.")));
+        when(userService.createUser(any(UserProfileCreateRequest.class))).thenReturn(Mono.error(new DuplicateResourceException("Username 'existinguser' already exists.")));
 
         webTestClient.post().uri("/api/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -157,7 +158,7 @@ public class UserControllerTest {
                 .expectBody()
                 .jsonPath("$.message").isEqualTo("Username 'existinguser' already exists.");
 
-        verify(userService, times(1)).createUser(any(UserRequest.class));
+        verify(userService, times(1)).createUser(any(UserProfileCreateRequest.class));
     }
 
     @Test
@@ -165,7 +166,7 @@ public class UserControllerTest {
     void createUser_RoleNotFound() {
         UserRequest userRequest = new UserRequest("the auth id", "newuser", "phone here", "test@example.com",  "John", "Doe", "123 Main St", Set.of("NON_EXISTENT_ROLE"));
 
-        when(userService.createUser(any(UserRequest.class))).thenReturn(Mono.error(new RoleNotFoundException("Role(s) not found: [NON_EXISTENT_ROLE]")));
+        when(userService.createUser(any(UserProfileCreateRequest.class))).thenReturn(Mono.error(new RoleNotFoundException("Role(s) not found: [NON_EXISTENT_ROLE]")));
 
         webTestClient.post().uri("/api/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -175,7 +176,7 @@ public class UserControllerTest {
                 .expectBody()
                 .jsonPath("$.message").isEqualTo("Role(s) not found: [NON_EXISTENT_ROLE]");
 
-        verify(userService, times(1)).createUser(any(UserRequest.class));
+        verify(userService, times(1)).createUser(any(UserProfileCreateRequest.class));
     }
 
     /*
