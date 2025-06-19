@@ -18,7 +18,7 @@ import reactor.core.publisher.Flux;
 import java.util.Map; // Keep for Map.of
 
 // Static import for API path constants and roles
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(REVIEW_CONTROLLER_BASE) // MODIFIED

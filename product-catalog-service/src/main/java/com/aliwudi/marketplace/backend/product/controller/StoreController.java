@@ -24,7 +24,7 @@ import java.util.Map; // Keep for Map.of
 // as prepareDto logic moved to service
 
 // Static import for API path constants and roles
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(STORE_CONTROLLER_BASE) // MODIFIED

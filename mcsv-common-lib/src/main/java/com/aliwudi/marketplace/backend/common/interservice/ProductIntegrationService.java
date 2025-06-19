@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.common.interservice;
 
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 import com.aliwudi.marketplace.backend.common.model.Product;
 import com.aliwudi.marketplace.backend.common.exception.ServiceUnavailableException;
 import com.aliwudi.marketplace.backend.common.filter.JwtPropagationFilter;

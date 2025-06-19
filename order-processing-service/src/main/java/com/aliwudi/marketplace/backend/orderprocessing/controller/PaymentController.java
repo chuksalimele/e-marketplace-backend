@@ -20,7 +20,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Map; // Used for webhook/callback payload
 
 // Static import for API path constants
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(PAYMENT_CONTROLLER_BASE) // MODIFIED

@@ -15,7 +15,7 @@ import org.springframework.data.domain.Sort;
 import jakarta.validation.Valid; // For @Valid annotation
 
 // Static import for API path constants
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(INVENTORY_CONTROLLER_BASE) // MODIFIED

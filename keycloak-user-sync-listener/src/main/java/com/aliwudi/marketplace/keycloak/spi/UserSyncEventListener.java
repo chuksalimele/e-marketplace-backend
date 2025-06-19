@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.keycloak.spi;
 
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import org.jboss.logging.Logger;
 import org.keycloak.admin.client.Keycloak; // For admin client access
@@ -98,9 +99,9 @@ public class UserSyncEventListener implements EventListenerProvider {
 
                 // 3. Call user-service to create profile
                 HttpRequest createProfileRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(userServiceApiUrl + "/profiles/create")) // Specific create endpoint
-                        .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + serviceAccountAccessToken)
+                        .uri(URI.create(userServiceApiUrl + USER_PROFILES_CREATE))
+                        .header(HEADER_CONTENT_TYPE, MEDIA_TYPE_APPLICATION_JSON) 
+                        .header(HEADER_AUTHORIZATION, AUTH_SCHEME_BEARER + serviceAccountAccessToken) 
                         .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                         .build();
 

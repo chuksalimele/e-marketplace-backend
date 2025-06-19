@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 // Static import for API path constants
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(ROLE_CONTROLLER_BASE) // MODIFIED: Using constant for base path

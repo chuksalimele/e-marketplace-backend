@@ -1,7 +1,7 @@
 // UserServiceSecurityConfig.java
 package com.aliwudi.marketplace.backend.user.config;
 
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 import com.aliwudi.marketplace.backend.common.util.JwtAuthConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

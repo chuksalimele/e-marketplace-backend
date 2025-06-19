@@ -22,7 +22,7 @@ import java.util.Map; // Used for generic payload for remove/directUpdate, but r
 import org.springframework.web.server.ServerWebExchange;
 
 // Static import for API path constants
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(CART_CONTROLLER_BASE) // MODIFIED

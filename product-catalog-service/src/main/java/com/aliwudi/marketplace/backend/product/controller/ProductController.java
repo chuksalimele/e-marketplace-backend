@@ -20,7 +20,7 @@ import java.math.BigDecimal;
 import java.util.List; // Keep for collection methods
 
 // Static import for API path constants and roles
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(PRODUCT_CONTROLLER_BASE) // MODIFIED

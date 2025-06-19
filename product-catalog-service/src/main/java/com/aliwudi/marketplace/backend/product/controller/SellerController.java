@@ -20,7 +20,7 @@ import reactor.core.publisher.Mono;
 // as prepareDto logic moved to service
 
 // Static import for API path constants and roles
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController

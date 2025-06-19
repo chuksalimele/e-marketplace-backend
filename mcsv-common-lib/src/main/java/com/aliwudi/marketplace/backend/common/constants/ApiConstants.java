@@ -5,10 +5,10 @@ package com.aliwudi.marketplace.backend.common.constants;
  * Using constants helps centralize URL management, improve readability,
  * and provide compile-time safety for endpoint definitions.
  */
-public final class ApiPaths {
+public final class ApiConstants {
 
     // Private constructor to prevent instantiation
-    private ApiPaths() {
+    private ApiConstants() {
         // Utility class
     }
 
@@ -255,6 +255,12 @@ public final class ApiPaths {
     public static final String MEDIA_EXISTS_BY_UNIQUE_FILE_NAME = "/exists/{uniqueFileName}";
 
 
+    // --- Common HTTP Headers and MIME Types ---
+    public static final String HEADER_CONTENT_TYPE = "Content-Type";
+    public static final String MEDIA_TYPE_APPLICATION_JSON = "application/json";
+    public static final String HEADER_AUTHORIZATION = "Authorization";
+    public static final String AUTH_SCHEME_BEARER = "Bearer "; // Includes the space    
+    
     // --- Authorization Roles ---
     public static final String ROLE_ADMIN = "admin";
     public static final String ROLE_SELLER = "seller";

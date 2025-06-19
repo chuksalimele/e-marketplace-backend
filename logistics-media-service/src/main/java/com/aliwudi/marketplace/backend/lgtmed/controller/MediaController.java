@@ -21,7 +21,7 @@ import org.springframework.data.domain.Sort;
 import java.util.List;
 
 // Static import for API path constants and roles
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(MEDIA_CONTROLLER_BASE) // MODIFIED

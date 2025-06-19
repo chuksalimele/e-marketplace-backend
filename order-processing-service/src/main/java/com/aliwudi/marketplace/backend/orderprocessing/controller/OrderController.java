@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map; // Still used for status update payload
 
 // Static import for API path constants
-import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 
 @RestController
 @RequestMapping(ORDER_CONTROLLER_BASE) // MODIFIED
