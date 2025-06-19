@@ -34,6 +34,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final KeycloakAdminService keycloakAdminService; // Inject for Keycloak Admin API calls
 
     // IMPORTANT: This prepareDto method is for enriching the User model.
     // It is placed here as per your instruction to move it to an appropriate location
@@ -52,7 +53,7 @@ public class UserService {
         // This assumes a Many-to-Many relationship between User and Role,
         // and that User has a method like 'setRoles'.
         // Also assuming RoleRepository has a method to find roles by user ID if roles are not directly loaded.
-        if (user.getRoles() == null || user.getRoles().isEmpty() && user.getId() != null) {
+        if (user.getRoles() == null || (user.getRoles().isEmpty() && user.getId() != null)) {
             return roleRepository.findRolesByUserId(user.getId()) // Assuming this method exists in RoleRepository
                     .collectList()
                     .doOnNext(roles -> user.setRoles(new HashSet<>(roles))) // Convert List to HashSet
@@ -84,9 +85,9 @@ public class UserService {
                     return Flux.fromIterable(roles)
                             .flatMap(roleName
                                     -> roleRepository.findByName(roleName)
-                                     //throw error if the role in the authentication object does not exist on the server (database)
-                                     //it means the role is invalid because the role in authorizatio server
-                                     //must match with what we have on this server database
+                                    //throw error if the role in the authentication object does not exist on the server (database)
+                                    //it means the role is invalid because the role in authorizatio server
+                                    //must match with what we have on this server database
                                     .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + ": " + roleName)))
                             )
                             .collectList();
@@ -150,10 +151,18 @@ public class UserService {
                                 user.setRoles(roles); // Set roles on the user object
                                 return userRepository.save(user); // Save the user
                             })
+                            .flatMap(savedUser -> {
+                                // CRUCIAL STEP: After saving and getting the internal Long ID,
+                                // update Keycloak user attribute. This is chained reactively.
+                                String internalUserId = savedUser.getId().toString();
+                                return keycloakAdminService.updateUserAttribute(savedUser.getAuthId(),
+                                        "user_id", internalUserId)
+                                        .thenReturn(savedUser); // Return the savedUser after Keycloak update
+                            })
                             .flatMap(this::prepareDto) // Enrich the saved user
                             .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                             .doOnError(e -> log.error("Error creating user {}: {}", request.getUsername(), e.getMessage(), e));
-                            // Exceptions are handled by GlobalExceptionHandler.
+                    // Exceptions are handled by GlobalExceptionHandler.
                 });
     }
 
@@ -244,7 +253,7 @@ public class UserService {
                 .flatMap(this::prepareDto) // Enrich the updated user
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
                 .doOnError(e -> log.error("Error updating user {}: {}", id, e.getMessage(), e));
-                // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -262,7 +271,7 @@ public class UserService {
                 .flatMap(userRepository::delete)
                 .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", id))
                 .doOnError(e -> log.error("Error deleting user {}: {}", id, e.getMessage(), e));
-                // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -280,8 +289,8 @@ public class UserService {
                 .flatMap(userRepository::delete)
                 .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", authId))
                 .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
-                // Exceptions are handled by GlobalExceptionHandler.
-    }    
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
 
     /**
      * Retrieves a user by their ID, enriching them.
