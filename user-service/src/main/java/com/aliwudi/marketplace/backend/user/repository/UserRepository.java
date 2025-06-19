@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.user.repository;
 
 import com.aliwudi.marketplace.backend.common.model.User;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
@@ -14,6 +15,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     //Flux<User> findAll(Pageable pageable);
     Flux<User> findAllBy(Pageable pageable);
+        
+    Mono<User> findByAuthId(String authId);
     
     // Find a user by username
     Mono<User> findByUsername(String username);
@@ -56,6 +59,12 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     Mono<Boolean> existsByEmail(String email);
 
     Mono<Boolean> existsByUsername(String username);
+    
+    Mono<Boolean> existsByAuthId(String authId);
+    
+    @Modifying
+    @Query("DELETE FROM users WHERE auth_id = :authId")
+    Mono<Void> deleteByAuthId(String authId);    
 
     // Custom query to find a user by ID and fetch their roles
     // This query is a common pattern for loading relationships in R2DBC

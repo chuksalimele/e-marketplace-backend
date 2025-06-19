@@ -70,7 +70,8 @@ public class UserController {
 
         return userService.createUser(userRequest);
         // Exceptions (DuplicateResourceException, RoleNotFoundException, IllegalArgumentException,
-        // WebExchangeBindException from validation failures) are handled by GlobalExceptionHandler.
+        // WebExchangeBindException from validation failures)
+        // are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -126,6 +127,27 @@ public class UserController {
         return userService.deleteUser(id);
         // Exceptions are handled by GlobalExceptionHandler.
     }
+    
+    /**
+     * Endpoint to delete a user by their ID.
+     * Accessible only by 'admin'.
+     *
+     * @param authId The ID of the user to delete.
+     * @return A Mono<Void> indicating completion (HTTP 204 No Content).
+     * @throws IllegalArgumentException if user ID is invalid.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
+   @DeleteMapping("/authorizaton-server/delete-user/{authId}") // Admin endpoint
+    @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
+    @PreAuthorize("hasRole('admin')")
+    public Mono<Void> deleteUserByAuthId(@PathVariable String authId) {
+        if (authId == null || authId.isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        return userService.deleteUserByAuthId(authId);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+    
 
     /**
      * Endpoint to retrieve a user by their ID.

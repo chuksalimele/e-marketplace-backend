@@ -1,6 +1,5 @@
 package com.aliwudi.marketplace.backend.user.service;
 
-import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.common.model.User;
@@ -12,7 +11,6 @@ import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException; /
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // For transactional operations
 import reactor.core.publisher.Flux;
@@ -25,7 +23,6 @@ import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
-import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 
@@ -154,10 +151,10 @@ public class UserService {
                                 user.setRoles(roles); // Set roles on the user object
                                 return userRepository.save(user); // Save the user
                             })
-                            .flatMap(newUser -> setUserIdAsClaimOnAuthorizationServer(newUser, true))
                             .flatMap(this::prepareDto) // Enrich the saved user
                             .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                             .doOnError(e -> log.error("Error creating user {}: {}", userRequest.getUsername(), e.getMessage(), e));
+                            // Exceptions are handled by GlobalExceptionHandler.
                 });
     }
 
@@ -248,6 +245,7 @@ public class UserService {
                 .flatMap(this::prepareDto) // Enrich the updated user
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
                 .doOnError(e -> log.error("Error updating user {}: {}", id, e.getMessage(), e));
+                // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -265,7 +263,26 @@ public class UserService {
                 .flatMap(userRepository::delete)
                 .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", id))
                 .doOnError(e -> log.error("Error deleting user {}: {}", id, e.getMessage(), e));
+                // Exceptions are handled by GlobalExceptionHandler.
     }
+
+    /**
+     * Deletes a user by their ID. This operation is transactional.
+     *
+     * @param authId The ID of the user to delete.
+     * @return A Mono<Void> indicating completion.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
+    @Transactional
+    public Mono<Void> deleteUserByAuthId(String authId) {
+        log.debug("Attempting to delete user with Auth ID: {}", authId);
+        return userRepository.findByAuthId(authId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + authId)))
+                .flatMap(userRepository::delete)
+                .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", authId))
+                .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
+                // Exceptions are handled by GlobalExceptionHandler.
+    }    
 
     /**
      * Retrieves a user by their ID, enriching them.
@@ -510,14 +527,6 @@ public class UserService {
         return userRepository.existsByUsername(username)
                 .doOnSuccess(exists -> log.debug("User with username {} exists: {}", username, exists))
                 .doOnError(e -> log.error("Error checking user existence by username {}: {}", username, e.getMessage(), e));
-    }
-
-    private Mono<User> setUserIdAsClaimOnAuthorizationServer(User user, boolean isNew) {
-        //TODO 
-
-        //Send the request to set the user id as claim 
-        //if the operation fails delete the user if newly created
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
 }

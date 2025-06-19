@@ -67,8 +67,8 @@ public class UserServiceSecurityConfig {
             .authorizeExchange(exchange -> exchange
                 .pathMatchers("/api/auth/**").permitAll() // Allow /api/auth/** for signup/login
                                 // Allow the /api/users/profiles endpoint only for the service account with specific role
-                .pathMatchers("/api/users/profile/create").hasRole("user-profile-sync") // IMPORTANT: Check for the role
-                .pathMatchers("/api/users/profile/update").hasRole("user-profile-sync") // IMPORTANT: Check for the role
+                .pathMatchers("/api/users/profiles/create").hasRole("user-profile-sync") // IMPORTANT: Check for the role
+                .pathMatchers("/api/users/profiles/update").hasRole("user-profile-sync") // IMPORTANT: Check for the role
                 .anyExchange().authenticated() // All other requests require authentication
             )
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance()); // Keep stateless
