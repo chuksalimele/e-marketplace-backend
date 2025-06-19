@@ -17,8 +17,11 @@ import reactor.core.publisher.Flux;
 
 import java.util.Map; // Keep for Map.of
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/reviews")
+@RequestMapping(REVIEW_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class ReviewController {
 
@@ -34,7 +37,7 @@ public class ReviewController {
      * @throws DuplicateResourceException if a review already exists for this user and product.
      * @throws InvalidReviewDataException if the rating is invalid.
      */
-    @PostMapping
+    @PostMapping(REVIEW_SUBMIT) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
     public Mono<Review> submitReview(@Valid @RequestBody ReviewRequest reviewRequest) {
         // Basic input validation at controller level
@@ -57,7 +60,7 @@ public class ReviewController {
      * @throws ResourceNotFoundException if the review is not found.
      * @throws InvalidReviewDataException if updated review data is invalid.
      */
-    @PutMapping("/{id}")
+    @PutMapping(REVIEW_UPDATE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Review> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewRequest updateRequest) {
         if (id == null || id <= 0) {
@@ -79,7 +82,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if review ID is invalid.
      * @throws ResourceNotFoundException if the review is not found.
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping(REVIEW_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
     public Mono<Void> deleteReview(@PathVariable Long id) {
         if (id == null || id <= 0) {
@@ -97,7 +100,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if review ID is invalid.
      * @throws ResourceNotFoundException if the review is not found.
      */
-    @GetMapping("/{id}")
+    @GetMapping(REVIEW_GET_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Review> getReviewById(@PathVariable Long id) {
         if (id == null || id <= 0) {
@@ -115,7 +118,7 @@ public class ReviewController {
      * @return A Flux emitting all reviews.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping
+    @GetMapping(REVIEW_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Review> getAllReviews(
             @RequestParam(defaultValue = "0") int page,
@@ -132,7 +135,7 @@ public class ReviewController {
      *
      * @return A Mono emitting the total count of reviews.
      */
-    @GetMapping("/count")
+    @GetMapping(REVIEW_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllReviews() {
         return reviewService.countAllReviews();
@@ -149,7 +152,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if product ID or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @GetMapping("/product/{productId}")
+    @GetMapping(REVIEW_GET_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Review> getReviewsForProduct(
             @PathVariable Long productId,
@@ -170,7 +173,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if product ID is invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @GetMapping("/product/{productId}/count")
+    @GetMapping(REVIEW_COUNT_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countReviewsForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
@@ -190,7 +193,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if user ID or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @GetMapping("/user/{userId}")
+    @GetMapping(REVIEW_GET_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Review> getReviewsByUser(
             @PathVariable Long userId,
@@ -211,7 +214,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @GetMapping("/user/{userId}/count")
+    @GetMapping(REVIEW_COUNT_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countReviewsByUser(@PathVariable Long userId) {
         if (userId == null || userId <= 0) {
@@ -233,7 +236,7 @@ public class ReviewController {
      * @throws ResourceNotFoundException if the product is not found.
      * @throws InvalidReviewDataException if the minRating is out of range.
      */
-    @GetMapping("/product/{productId}/min-rating/{minRating}")
+    @GetMapping(REVIEW_GET_BY_PRODUCT_AND_MIN_RATING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Review> getReviewsByProductIdAndMinRating(
             @PathVariable Long productId,
@@ -257,7 +260,7 @@ public class ReviewController {
      * @throws ResourceNotFoundException if the product is not found.
      * @throws InvalidReviewDataException if the minRating is out of range.
      */
-    @GetMapping("/product/{productId}/min-rating/{minRating}/count")
+    @GetMapping(REVIEW_COUNT_BY_PRODUCT_AND_MIN_RATING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countReviewsByProductIdAndMinRating(
             @PathVariable Long productId,
@@ -279,7 +282,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if product ID or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @GetMapping("/product/{productId}/latest")
+    @GetMapping(REVIEW_GET_LATEST_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Review> getLatestReviewsByProductId(
             @PathVariable Long productId,
@@ -301,7 +304,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if user ID or product ID are invalid.
      * @throws ResourceNotFoundException if the review is not found.
      */
-    @GetMapping("/user/{userId}/product/{productId}")
+    @GetMapping(REVIEW_GET_BY_USER_AND_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Review> getReviewByUserIdAndProductId(
             @PathVariable Long userId,
@@ -321,7 +324,7 @@ public class ReviewController {
      * @throws IllegalArgumentException if product ID is invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @GetMapping("/product/{productId}/average-rating")
+    @GetMapping(REVIEW_GET_AVERAGE_RATING_FOR_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Double>> getAverageRatingForProduct(@PathVariable Long productId) {
         if (productId == null || productId <= 0) {
@@ -340,7 +343,7 @@ public class ReviewController {
      * @return A Mono emitting true if a review exists, false otherwise (Boolean).
      * @throws IllegalArgumentException if user ID or product ID are invalid.
      */
-    @GetMapping("/exists/user/{userId}/product/{productId}")
+    @GetMapping(REVIEW_CHECK_EXISTS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> checkReviewExists(
             @PathVariable Long userId,

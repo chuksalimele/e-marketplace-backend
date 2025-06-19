@@ -37,7 +37,7 @@ public class KeycloakAdminServiceImpl implements AdminService { // Implement the
 
     private Keycloak getKeycloakClient() {
         return keycloakClients.computeIfAbsent(adminRealm, realm -> {
-            log.info("Initializing Keycloak Admin Client for realm: {}", realm);
+            log.debug("Initializing Keycloak Admin Client for realm: {}", realm);
             return Keycloak.getInstance(
                     authServerUrl,
                     adminRealm,
@@ -61,7 +61,7 @@ public class KeycloakAdminServiceImpl implements AdminService { // Implement the
                 attributes.put(attributeName, Collections.singletonList(attributeValue));
                 user.setAttributes(attributes);
                 userResource.update(user);
-                log.info("Updated Keycloak user '{}' with attribute '{}' = '{}'", asUserId, attributeName, attributeValue);
+                log.debug("Updated Keycloak user '{}' with attribute '{}' = '{}'", asUserId, attributeName, attributeValue);
                 return (Void) null;
             } catch (Exception e) {
                 log.error("Failed to update user '%s' attribute '%s' in Keycloak: %s", asUserId, attributeName, e.getMessage());
@@ -76,7 +76,7 @@ public class KeycloakAdminServiceImpl implements AdminService { // Implement the
             Keycloak keycloak = getKeycloakClient();
             try {
                 keycloak.realm(adminRealm).users().delete(asUserId);
-                log.info("Successfully deleted user '%s' from Keycloak.", asUserId);
+                log.debug("Successfully deleted user '%s' from Keycloak.", asUserId);
                 return (Void) null;
             } catch (Exception e) {
                 log.error("Failed to delete user '%s' from Keycloak: %s", asUserId, e.getMessage());

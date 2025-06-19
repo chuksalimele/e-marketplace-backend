@@ -22,8 +22,11 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping(NOTIFICATION_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class NotificationController {
 
@@ -40,9 +43,9 @@ public class NotificationController {
      * @return A Mono emitting the created Notification.
      * @throws IllegalArgumentException if input validation fails.
      */
-    @PostMapping
+    @PostMapping(NOTIFICATION_CREATE) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('admin') or hasRole('SERVICE')") // 'SERVICE' role for internal microservice calls
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SERVICE + "')") // MODIFIED
     public Mono<Notification> createNotification(@Valid @RequestBody NotificationRequest request) {
         // Basic controller-level validation for critical fields
         if (request.getUserId() == null || request.getUserId() <= 0 ||
@@ -63,9 +66,9 @@ public class NotificationController {
      * @return A Flux emitting Notification objects as server-sent events.
      * @throws IllegalArgumentException if authenticated user ID cannot be determined.
      */
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = NOTIFICATION_STREAM, produces = MediaType.TEXT_EVENT_STREAM_VALUE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Flux<Notification> getRealTimeNotifications(ServerWebExchange exchange) {
         return authUtil.getAuthenticatedUserId(exchange)
                 .flatMapMany(notificationService::getRealTimeNotificationsStream)
@@ -85,9 +88,9 @@ public class NotificationController {
      * @return A Flux emitting Notification entities.
      * @throws IllegalArgumentException if pagination parameters are invalid or user not authenticated.
      */
-    @GetMapping("/me")
+    @GetMapping(NOTIFICATION_ME_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Flux<Notification> getAllMyNotifications(
             ServerWebExchange exchange,
             @RequestParam(defaultValue = "0") int page,
@@ -118,9 +121,9 @@ public class NotificationController {
      * @return A Flux emitting Notification entities.
      * @throws IllegalArgumentException if status or pagination parameters are invalid or user not authenticated.
      */
-    @GetMapping("/me/status/{status}")
+    @GetMapping(NOTIFICATION_ME_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Flux<Notification> getMyNotificationsByStatus(
             ServerWebExchange exchange,
             @PathVariable String status,
@@ -158,9 +161,9 @@ public class NotificationController {
      * @return A Flux emitting Notification entities.
      * @throws IllegalArgumentException if type or pagination parameters are invalid or user not authenticated.
      */
-    @GetMapping("/me/type/{type}")
+    @GetMapping(NOTIFICATION_ME_BY_TYPE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Flux<Notification> getMyNotificationsByType(
             ServerWebExchange exchange,
             @PathVariable String type,
@@ -194,9 +197,9 @@ public class NotificationController {
      * @throws IllegalArgumentException if notification ID is invalid or user not authenticated.
      * @throws NotificationNotFoundException if the notification is not found or doesn't belong to the user.
      */
-    @PutMapping("/me/{id}/read")
+    @PutMapping(NOTIFICATION_ME_MARK_READ) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Mono<Notification> markNotificationAsRead(
             ServerWebExchange exchange, 
             @PathVariable Long id) {
@@ -218,9 +221,9 @@ public class NotificationController {
      * @throws IllegalArgumentException if notification ID is invalid or user not authenticated.
      * @throws NotificationNotFoundException if the notification is not found or doesn't belong to the user.
      */
-    @DeleteMapping("/me/{id}")
+    @DeleteMapping(NOTIFICATION_ME_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Mono<Void> deleteMyNotification(
             ServerWebExchange exchange,
             @PathVariable Long id) {
@@ -241,9 +244,9 @@ public class NotificationController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if user not authenticated.
      */
-    @GetMapping("/me/count")
+    @GetMapping(NOTIFICATION_ME_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Mono<Long> countMyNotifications(ServerWebExchange exchange) {
         return authUtil.getAuthenticatedUserId(exchange)
                 .flatMap(notificationService::countNotificationsForUser)
@@ -259,9 +262,9 @@ public class NotificationController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if status is invalid or user not authenticated.
      */
-    @GetMapping("/me/count/status/{status}")
+    @GetMapping(NOTIFICATION_ME_COUNT_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user') or hasRole('admin') or hasRole('seller') or hasRole('delivery-agent')")
+    @PreAuthorize("hasRole('" + ROLE_USER + "') or hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_DELIVERY_AGENT + "')") // MODIFIED
     public Mono<Long> countMyNotificationsByStatus(
             ServerWebExchange exchange,
             @PathVariable String status) {

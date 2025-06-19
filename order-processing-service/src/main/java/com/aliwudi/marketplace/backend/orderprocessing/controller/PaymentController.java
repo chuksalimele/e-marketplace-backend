@@ -19,8 +19,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Map; // Used for webhook/callback payload
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping(PAYMENT_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class PaymentController {
 
@@ -36,7 +39,7 @@ public class PaymentController {
      * @throws com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException if the order is not found.
      * @throws com.aliwudi.marketplace.backend.common.exception.InsufficientStockException if there's insufficient stock.
      */
-    @PostMapping("/initiate")
+    @PostMapping(PAYMENT_INITIATE) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
     public Mono<Payment> initiatePayment(@Valid @RequestBody PaymentRequest request) {
         // Basic validation already done by @Valid and DTO constraints.
@@ -60,7 +63,7 @@ public class PaymentController {
      * @throws IllegalArgumentException if the status string is invalid or request data is missing.
      * @throws com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException if the payment record is not found.
      */
-    @PostMapping("/webhook/{transactionRef}")
+    @PostMapping(PAYMENT_WEBHOOK) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful processing
     public Mono<Void> handleGatewayCallback(
             @PathVariable String transactionRef,
@@ -92,7 +95,7 @@ public class PaymentController {
      * @throws IllegalArgumentException if orderId is invalid.
      * @throws com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException if payment for the order is not found.
      */
-    @GetMapping("/{orderId}")
+    @GetMapping(PAYMENT_GET_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Payment> getPaymentStatus(@PathVariable Long orderId) {
         if (orderId == null || orderId <= 0) { // Add check for non-positive IDs
@@ -113,7 +116,7 @@ public class PaymentController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Payment records.
      */
-    @GetMapping("/admin/all")
+    @GetMapping(PAYMENT_ADMIN_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Payment> getAllPayments(
             @RequestParam(defaultValue = "0") int page,
@@ -136,7 +139,7 @@ public class PaymentController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Payment records for the specified user.
      */
-    @GetMapping("/admin/byUser/{userId}")
+    @GetMapping(PAYMENT_ADMIN_GET_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Payment> getPaymentsByUserId(
             @PathVariable Long userId,
@@ -161,7 +164,7 @@ public class PaymentController {
      * @return A Flux of Payment records with the specified status.
      * @throws IllegalArgumentException if the status string is invalid.
      */
-    @GetMapping("/admin/byStatus/{status}")
+    @GetMapping(PAYMENT_ADMIN_GET_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Payment> getPaymentsByStatus(
             @PathVariable String status,
@@ -184,8 +187,8 @@ public class PaymentController {
     /**
      * Endpoint to find payments made within a specific time range with pagination.
      *
-     * @param startTime The start of the time range (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
-     * @param endTime The end of the time range (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
+     * @param startTime The start of the time range (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
+     * @param endTime The end of the time range (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
      * @param sortBy The field to sort by.
@@ -193,7 +196,7 @@ public class PaymentController {
      * @return A Flux of Payment records within the specified time range.
      * @throws IllegalArgumentException if the date format is invalid.
      */
-    @GetMapping("/admin/byTimeRange")
+    @GetMapping(PAYMENT_ADMIN_GET_BY_TIME_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Payment> getPaymentsByPaymentTimeBetween(
             @RequestParam String startTime,
@@ -225,7 +228,7 @@ public class PaymentController {
      * @return A Mono emitting the Payment record.
      * @throws com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException if the payment is not found.
      */
-    @GetMapping("/byTransactionRef/{transactionRef}")
+    @GetMapping(PAYMENT_GET_BY_TRANSACTION_REF) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Payment> getPaymentByTransactionRef(@PathVariable String transactionRef) {
         return paymentService.findPaymentByTransactionRef(transactionRef);
@@ -237,7 +240,7 @@ public class PaymentController {
      *
      * @return A Mono emitting the total count (Long).
      */
-    @GetMapping("/count/all")
+    @GetMapping(PAYMENT_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllPayments() {
         return paymentService.countAllPayments();
@@ -250,7 +253,7 @@ public class PaymentController {
      * @param userId The ID of the user.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count/byUser/{userId}")
+    @GetMapping(PAYMENT_COUNT_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countPaymentsByUserId(@PathVariable Long userId) {
         // userId was String in original, but methods now take Long in service.
@@ -266,7 +269,7 @@ public class PaymentController {
      * @return A Mono emitting the count (Long).
      * @throws IllegalArgumentException if the status string is invalid.
      */
-    @GetMapping("/count/byStatus/{status}")
+    @GetMapping(PAYMENT_COUNT_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countPaymentsByStatus(@PathVariable String status) {
         PaymentStatus paymentStatus;
@@ -282,12 +285,12 @@ public class PaymentController {
     /**
      * Endpoint to count payments made within a specific time range.
      *
-     * @param startTime The start time of the range (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
-     * @param endTime The end time of the range (ISO 8601 format: YYYY-MM-ddTHH:mm:ss).
+     * @param startTime The start time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
+     * @param endTime The end time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
      * @return A Mono emitting the count (Long).
      * @throws IllegalArgumentException if the date format is invalid.
      */
-    @GetMapping("/count/byTimeRange")
+    @GetMapping(PAYMENT_COUNT_BY_TIME_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countPaymentsByPaymentTimeBetween(
             @RequestParam String startTime,
@@ -308,7 +311,7 @@ public class PaymentController {
      * @param transactionRef The unique transaction reference.
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
-    @GetMapping("/exists/byTransactionRef/{transactionRef}")
+    @GetMapping(PAYMENT_EXISTS_BY_TRANSACTION_REF) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsPaymentByTransactionRef(@PathVariable String transactionRef) {
         return paymentService.existsPaymentByTransactionRef(transactionRef);

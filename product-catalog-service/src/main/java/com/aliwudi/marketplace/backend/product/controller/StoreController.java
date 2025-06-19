@@ -23,8 +23,11 @@ import java.util.Map; // Keep for Map.of
 // com.aliwudi.marketplace.backend.product.service.SellerService, java.util.List, java.util.stream.Collectors, org.springframework.data.domain.PageRequest, org.springframework.data.domain.Pageable
 // as prepareDto logic moved to service
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/stores")
+@RequestMapping(STORE_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class StoreController {
 
@@ -40,9 +43,9 @@ public class StoreController {
      * @throws InvalidStoreDataException if provided data is invalid.
      * @throws ResourceNotFoundException if the seller is not found.
      */
-    @PostMapping
+    @PostMapping(STORE_CREATE) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Store> createStore(@Valid @RequestBody StoreRequest storeRequest) {
         // Basic input validation
         if (storeRequest.getName() == null || storeRequest.getName().isBlank()
@@ -61,7 +64,7 @@ public class StoreController {
      * @return A Flux emitting all stores.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping
+    @GetMapping(STORE_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Store> getAllStores(
             @RequestParam(defaultValue = "0") int page,
@@ -78,7 +81,7 @@ public class StoreController {
      *
      * @return A Mono emitting the total count of stores.
      */
-    @GetMapping("/count")
+    @GetMapping(STORE_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllStores() {
         return storeService.countAllStores();
@@ -93,7 +96,7 @@ public class StoreController {
      * @throws IllegalArgumentException if store ID is invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @GetMapping("/{id}")
+    @GetMapping(STORE_GET_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Store> getStoreById(@PathVariable Long id) {
         if (id == null || id <= 0) {
@@ -113,7 +116,7 @@ public class StoreController {
      * @throws IllegalArgumentException if seller ID or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the seller is not found.
      */
-    @GetMapping("/by-seller/{sellerId}")
+    @GetMapping(STORE_GET_BY_SELLER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Store> getStoresBySeller(
             @PathVariable Long sellerId,
@@ -134,7 +137,7 @@ public class StoreController {
      * @throws IllegalArgumentException if seller ID is invalid.
      * @throws ResourceNotFoundException if the seller is not found.
      */
-    @GetMapping("/by-seller/{sellerId}/count")
+    @GetMapping(STORE_COUNT_BY_SELLER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countStoresBySeller(@PathVariable Long sellerId) {
         if (sellerId == null || sellerId <= 0) {
@@ -155,9 +158,9 @@ public class StoreController {
      * @throws DuplicateResourceException if the updated name causes a duplicate.
      * @throws InvalidStoreDataException if provided data is invalid.
      */
-    @PutMapping("/{id}")
+    @PutMapping(STORE_UPDATE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Store> updateStore(@PathVariable Long id, @Valid @RequestBody StoreRequest storeRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_STORE_ID);
@@ -175,9 +178,9 @@ public class StoreController {
      * @throws IllegalArgumentException if store ID is invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping(STORE_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Void> deleteStore(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_STORE_ID);
@@ -197,7 +200,7 @@ public class StoreController {
      * @return A Flux emitting matching stores.
      * @throws IllegalArgumentException if search term or pagination parameters are invalid.
      */
-    @GetMapping("/search/name")
+    @GetMapping(STORE_SEARCH_BY_NAME) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Store> searchStoresByName(
             @RequestParam String name,
@@ -217,7 +220,7 @@ public class StoreController {
      * @return A Mono emitting the count of matching stores.
      * @throws IllegalArgumentException if search term is invalid.
      */
-    @GetMapping("/search/name/count")
+    @GetMapping(STORE_SEARCH_BY_NAME_COUNT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countSearchStoresByName(@RequestParam String name) {
         if (name == null || name.isBlank()) {
@@ -236,7 +239,7 @@ public class StoreController {
      * @return A Flux emitting matching stores.
      * @throws IllegalArgumentException if search term or pagination parameters are invalid.
      */
-    @GetMapping("/search/locationId")
+    @GetMapping(STORE_SEARCH_BY_LOCATION_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Store> searchStoresByLocationId(
             @RequestParam String locationId,
@@ -256,7 +259,7 @@ public class StoreController {
      * @return A Mono emitting the count of matching stores.
      * @throws IllegalArgumentException if search term is invalid.
      */
-    @GetMapping("/search/locationId/count")
+    @GetMapping(STORE_SEARCH_BY_LOCATION_ID_COUNT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countSearchStoresByLocationId(@RequestParam String locationId) {
         if (locationId == null || locationId.isBlank()) {
@@ -276,7 +279,7 @@ public class StoreController {
      * @throws IllegalArgumentException if minRating or pagination parameters are invalid.
      * @throws InvalidStoreDataException if minRating is out of range.
      */
-    @GetMapping("/min-rating/{minRating}")
+    @GetMapping(STORE_GET_BY_MIN_RATING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Store> getStoresByMinRating(
             @PathVariable Double minRating,
@@ -297,7 +300,7 @@ public class StoreController {
      * @throws IllegalArgumentException if minRating is invalid.
      * @throws InvalidStoreDataException if minRating is out of range.
      */
-    @GetMapping("/min-rating/{minRating}/count")
+    @GetMapping(STORE_COUNT_BY_MIN_RATING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countStoresByMinRating(@PathVariable Double minRating) {
         if (minRating == null || minRating < 0.0 || minRating > 5.0) {
@@ -315,7 +318,7 @@ public class StoreController {
      * @return A Mono emitting true if a store with the name exists for the seller, false otherwise (Boolean).
      * @throws IllegalArgumentException if name or seller ID are invalid.
      */
-    @GetMapping("/exists/name-and-seller")
+    @GetMapping(STORE_CHECK_EXISTS_NAME_AND_SELLER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> checkStoreExistsByNameAndSeller(
             @RequestParam String name,

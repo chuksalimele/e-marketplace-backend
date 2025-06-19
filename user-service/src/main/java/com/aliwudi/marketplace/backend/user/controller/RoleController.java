@@ -16,8 +16,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/roles")
+@RequestMapping(ROLE_CONTROLLER_BASE) // MODIFIED: Using constant for base path
 @RequiredArgsConstructor
 public class RoleController {
 

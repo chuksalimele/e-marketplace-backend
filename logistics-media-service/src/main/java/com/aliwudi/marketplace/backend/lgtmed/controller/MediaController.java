@@ -20,8 +20,11 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/media")
+@RequestMapping(MEDIA_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class MediaController {
 
@@ -35,9 +38,9 @@ public class MediaController {
      * @throws IllegalArgumentException if input validation fails.
      * @throws InvalidMediaDataException if file type is unsupported, content is invalid, or duplicate unique file name.
      */
-    @PostMapping("/upload")
+    @PostMapping(MEDIA_UPLOAD) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('admin') or hasRole('seller') or hasRole('user')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "') or hasRole('" + ROLE_USER + "')") // MODIFIED
     public Mono<MediaAsset> uploadMedia(@Valid @RequestBody MediaUploadRequest request) {
         // Basic input validation
         if (request.getAssetName() == null || request.getAssetName().isBlank()
@@ -60,7 +63,7 @@ public class MediaController {
      * @throws IllegalArgumentException if unique file name is invalid.
      * @throws MediaAssetNotFoundException if the media asset is not found.
      */
-    @GetMapping("/{uniqueFileName}")
+    @GetMapping(MEDIA_GET_BY_UNIQUE_FILE_NAME) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<MediaAsset> getMediaAsset(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
@@ -82,7 +85,7 @@ public class MediaController {
      * @return A Flux of MediaAsset records.
      * @throws IllegalArgumentException if entity identifiers or pagination parameters are invalid.
      */
-    @GetMapping("/entity/{entityId}/{entityType}")
+    @GetMapping(MEDIA_GET_FOR_ENTITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<MediaAsset> getMediaAssetsForEntity(
             @PathVariable String entityId,
@@ -111,7 +114,7 @@ public class MediaController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if entity identifiers are invalid.
      */
-    @GetMapping("/entity/{entityId}/{entityType}/count")
+    @GetMapping(MEDIA_COUNT_FOR_ENTITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countMediaAssetsForEntity(
             @PathVariable String entityId,
@@ -131,9 +134,9 @@ public class MediaController {
      * @throws IllegalArgumentException if unique file name is invalid.
      * @throws MediaAssetNotFoundException if the media asset is not found.
      */
-    @DeleteMapping("/admin/{uniqueFileName}") // Updated path for admin access
+    @DeleteMapping(MEDIA_ADMIN_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Void> deleteMediaAsset(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_UNIQUE_FILE_NAME);
@@ -153,9 +156,9 @@ public class MediaController {
      * @return A Flux of MediaAsset records.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping("/admin/all") // Updated path for admin access
+    @GetMapping(MEDIA_ADMIN_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Flux<MediaAsset> getAllMediaAssetsPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -181,9 +184,9 @@ public class MediaController {
      * @return A Flux of MediaAsset records.
      * @throws IllegalArgumentException if entity type or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byEntityType/{entityType}")
+    @GetMapping(MEDIA_ADMIN_GET_BY_ENTITY_TYPE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Flux<MediaAsset> getMediaAssetsByEntityType(
             @PathVariable String entityType,
             @RequestParam(defaultValue = "0") int page,
@@ -210,9 +213,9 @@ public class MediaController {
      * @return A Flux of MediaAsset records.
      * @throws IllegalArgumentException if file type or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byFileType/{fileType}")
+    @GetMapping(MEDIA_ADMIN_GET_BY_FILE_TYPE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Flux<MediaAsset> getMediaAssetsByFileType(
             @PathVariable String fileType,
             @RequestParam(defaultValue = "0") int page,
@@ -240,9 +243,9 @@ public class MediaController {
      * @return A Flux of MediaAsset records.
      * @throws IllegalArgumentException if asset name or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byAssetNameContaining")
+    @GetMapping(MEDIA_ADMIN_GET_BY_ASSET_NAME_CONTAINING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Flux<MediaAsset> getMediaAssetsByAssetNameContaining(
             @RequestParam String assetName,
             @RequestParam(defaultValue = "0") int page,
@@ -265,9 +268,9 @@ public class MediaController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if entity type is invalid.
      */
-    @GetMapping("/count/byEntityType/{entityType}")
+    @GetMapping(MEDIA_COUNT_BY_ENTITY_TYPE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Long> countMediaAssetsByEntityType(@PathVariable String entityType) {
         if (entityType == null || entityType.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_ENTITY_IDENTIFIERS);
@@ -283,9 +286,9 @@ public class MediaController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if file type is invalid.
      */
-    @GetMapping("/count/byFileType/{fileType}")
+    @GetMapping(MEDIA_COUNT_BY_FILE_TYPE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Long> countMediaAssetsByFileType(@PathVariable String fileType) {
         if (fileType == null || fileType.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_FILE_TYPE);
@@ -302,9 +305,9 @@ public class MediaController {
      * @return A Mono emitting the count.
      * @throws IllegalArgumentException if asset name is invalid.
      */
-    @GetMapping("/count/byAssetNameContaining")
+    @GetMapping(MEDIA_COUNT_BY_ASSET_NAME_CONTAINING) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Long> countMediaAssetsByAssetNameContaining(@RequestParam String assetName) {
         if (assetName == null || assetName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_ASSET_NAME);
@@ -320,7 +323,7 @@ public class MediaController {
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      * @throws IllegalArgumentException if unique file name is invalid.
      */
-    @GetMapping("/exists/{uniqueFileName}")
+    @GetMapping(MEDIA_EXISTS_BY_UNIQUE_FILE_NAME) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByUniqueFileName(@PathVariable String uniqueFileName) {
         if (uniqueFileName == null || uniqueFileName.isBlank()) {

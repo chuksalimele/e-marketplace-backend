@@ -19,8 +19,11 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.List; // Keep for collection methods
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping(PRODUCT_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class ProductController {
 
@@ -35,9 +38,9 @@ public class ProductController {
      * @throws InvalidProductDataException if product data is invalid (e.g., negative price).
      * @throws DuplicateResourceException if a product with the same name already exists for the seller.
      */
-    @PostMapping
+    @PostMapping(PRODUCT_CREATE) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created for resource creation
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Product> createProduct(@Valid @RequestBody ProductRequest productRequest) {
         // Basic validation for required fields
         if (productRequest.getName() == null || productRequest.getName().isBlank() ||
@@ -64,9 +67,9 @@ public class ProductController {
      * @throws InvalidProductDataException if updated product data is invalid.
      * @throws DuplicateResourceException if the updated name causes a duplicate.
      */
-    @PutMapping("/{id}")
+    @PutMapping(PRODUCT_UPDATE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest productRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);
@@ -86,9 +89,9 @@ public class ProductController {
      * @throws ResourceNotFoundException if the product is not found.
      * @throws InvalidProductDataException if there's insufficient stock.
      */
-    @PutMapping("/{productId}/decrease-stock")
+    @PutMapping(PRODUCT_DECREASE_STOCK) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAnyRole('user', 'seller', 'admin')")
+    @PreAuthorize("hasAnyRole('" + ROLE_USER + "', '" + ROLE_SELLER + "', '" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Product> decreaseProductStock(
             @PathVariable Long productId,
             @RequestParam Integer quantity) {
@@ -107,7 +110,7 @@ public class ProductController {
      * @return A Flux of Products.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping
+    @GetMapping(PRODUCT_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
@@ -124,7 +127,7 @@ public class ProductController {
      *
      * @return A Mono emitting the total count of products.
      */
-    @GetMapping("/count")
+    @GetMapping(PRODUCT_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllProducts() {
         return productService.countAllProducts();
@@ -139,7 +142,7 @@ public class ProductController {
      * @throws IllegalArgumentException if product ID is invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @GetMapping("/{id}")
+    @GetMapping(PRODUCT_GET_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Product> getProductById(@PathVariable Long id) {
         if (id == null || id <= 0) {
@@ -157,9 +160,9 @@ public class ProductController {
      * @throws IllegalArgumentException if product ID is invalid.
      * @throws ResourceNotFoundException if the product is not found.
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping(PRODUCT_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful deletion
-    @PreAuthorize("hasRole('admin') or hasRole('seller')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_SELLER + "')") // MODIFIED
     public Mono<Void> deleteProduct(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_PRODUCT_ID);
@@ -180,7 +183,7 @@ public class ProductController {
      * @throws IllegalArgumentException if store ID or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @GetMapping("/store/{storeId}")
+    @GetMapping(PRODUCT_GET_BY_STORE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByStore(
             @PathVariable Long storeId,
@@ -201,7 +204,7 @@ public class ProductController {
      * @throws IllegalArgumentException if store ID is invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @GetMapping("/store/{storeId}/count")
+    @GetMapping(PRODUCT_COUNT_BY_STORE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByStore(@PathVariable Long storeId) {
         if (storeId == null || storeId <= 0) {
@@ -220,7 +223,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if seller ID or pagination parameters are invalid.
      */
-    @GetMapping("/seller/{sellerId}")
+    @GetMapping(PRODUCT_GET_BY_SELLER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsBySeller(
             @PathVariable Long sellerId,
@@ -240,7 +243,7 @@ public class ProductController {
      * @return A Mono emitting the count of products for the seller.
      * @throws IllegalArgumentException if seller ID is invalid.
      */
-    @GetMapping("/seller/{sellerId}/count")
+    @GetMapping(PRODUCT_COUNT_BY_SELLER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsBySeller(@PathVariable Long sellerId) {
         if (sellerId == null || sellerId <= 0) {
@@ -259,7 +262,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if category or pagination parameters are invalid.
      */
-    @GetMapping("/category/{category}")
+    @GetMapping(PRODUCT_GET_BY_CATEGORY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByCategory(
             @PathVariable String category,
@@ -279,7 +282,7 @@ public class ProductController {
      * @return A Mono emitting the count of products for the category.
      * @throws IllegalArgumentException if category is invalid.
      */
-    @GetMapping("/category/{category}/count")
+    @GetMapping(PRODUCT_COUNT_BY_CATEGORY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByCategory(@PathVariable String category) {
         if (category == null || category.isBlank()) {
@@ -299,7 +302,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if price range or pagination parameters are invalid.
      */
-    @GetMapping("/price-range")
+    @GetMapping(PRODUCT_GET_BY_PRICE_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByPriceRange(
             @RequestParam BigDecimal minPrice,
@@ -321,7 +324,7 @@ public class ProductController {
      * @return A Mono emitting the count of products within the price range.
      * @throws IllegalArgumentException if price range is invalid.
      */
-    @GetMapping("/price-range/count")
+    @GetMapping(PRODUCT_COUNT_BY_PRICE_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByPriceRange(
             @RequestParam BigDecimal minPrice,
@@ -344,7 +347,7 @@ public class ProductController {
      * @throws IllegalArgumentException if store ID, category or pagination parameters are invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @GetMapping("/store/{storeId}/category/{category}")
+    @GetMapping(PRODUCT_GET_BY_STORE_AND_CATEGORY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByStoreAndCategory(
             @PathVariable Long storeId,
@@ -367,7 +370,7 @@ public class ProductController {
      * @throws IllegalArgumentException if store ID or category are invalid.
      * @throws ResourceNotFoundException if the store is not found.
      */
-    @GetMapping("/store/{storeId}/category/{category}/count")
+    @GetMapping(PRODUCT_COUNT_BY_STORE_AND_CATEGORY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByStoreAndCategory(
             @PathVariable Long storeId,
@@ -389,7 +392,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if seller ID, category or pagination parameters are invalid.
      */
-    @GetMapping("/seller/{sellerId}/category/{category}")
+    @GetMapping(PRODUCT_GET_BY_SELLER_AND_CATEGORY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsBySellerAndCategory(
             @PathVariable Long sellerId,
@@ -414,7 +417,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if category, price range or pagination parameters are invalid.
      */
-    @GetMapping("/category/{category}/price-range")
+    @GetMapping(PRODUCT_GET_BY_CATEGORY_AND_PRICE_BETWEEN) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByCategoryAndPriceBetween(
             @PathVariable String category,
@@ -438,7 +441,7 @@ public class ProductController {
      * @return A Flux emitting matching products.
      * @throws IllegalArgumentException if search term or pagination parameters are invalid.
      */
-    @GetMapping("/search")
+    @GetMapping(PRODUCT_SEARCH) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> searchProducts(
             @RequestParam String name,
@@ -458,7 +461,7 @@ public class ProductController {
      * @return A Mono emitting the count of matching products.
      * @throws IllegalArgumentException if search term is invalid.
      */
-    @GetMapping("/search/count")
+    @GetMapping(PRODUCT_SEARCH_COUNT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countSearchProducts(@RequestParam String name) {
         if (name == null || name.isBlank()) {
@@ -479,7 +482,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if location ID or pagination parameters are invalid.
      */
-    @GetMapping("/location/{locationId}")
+    @GetMapping(PRODUCT_GET_BY_LOCATION_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByLocationId(
             @PathVariable Long locationId,
@@ -499,7 +502,7 @@ public class ProductController {
      * @return A Mono emitting the count of products.
      * @throws IllegalArgumentException if location ID is invalid.
      */
-    @GetMapping("/location/{locationId}/count")
+    @GetMapping(PRODUCT_COUNT_BY_LOCATION_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByLocationId(@PathVariable Long locationId) {
         if (locationId == null || locationId <= 0) {
@@ -519,7 +522,7 @@ public class ProductController {
      * @return A Flux emitting products.
      * @throws IllegalArgumentException if country, city or pagination parameters are invalid.
      */
-    @GetMapping("/location/country/{country}/city/{city}")
+    @GetMapping(PRODUCT_GET_BY_COUNTRY_AND_CITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Product> getProductsByCountryAndCity(
             @PathVariable String country,
@@ -541,7 +544,7 @@ public class ProductController {
      * @return A Mono emitting the count of products.
      * @throws IllegalArgumentException if country or city are invalid.
      */
-    @GetMapping("/location/country/{country}/city/{city}/count")
+    @GetMapping(PRODUCT_COUNT_BY_COUNTRY_AND_CITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countProductsByCountryAndCity(
             @PathVariable String country,

@@ -1,5 +1,8 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
@@ -33,7 +36,7 @@ NOTE: In order to align with industry best practices we have removed
 */
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping(USER_CONTROLLER_BASE) // MODIFIED: Using constant for base path
 @RequiredArgsConstructor // Generates a constructor for final fields
 public class UserController {
 
@@ -49,8 +52,8 @@ public class UserController {
      * @throws DuplicateResourceException if username or email already exist.
      * @throws RoleNotFoundException if any specified role does not exist.
      */
-    @PostMapping("/profiles/create")
-    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
+    @PostMapping(USER_PROFILES_CREATE) // MODIFIED: Using constant for endpoint
+    @PreAuthorize("hasRole('" + ROLE_USER_PROFILE_SYNC + "')") // MODIFIED: Using constant for role
     @ResponseStatus(HttpStatus.CREATED)
     // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
     // This will activate the @Size constraint on the 'password' field that belongs to this group.
@@ -85,9 +88,9 @@ public class UserController {
      * @throws DuplicateResourceException if updated username or email already exist.
      * @throws RoleNotFoundException if any specified role does not exist during role update.
      */
-    @PostMapping("/profiles/update/{id}")
+    @PostMapping(USER_PROFILES_UPDATE) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
+    @PreAuthorize("hasRole('" + ROLE_USER_PROFILE_SYNC + "')") // MODIFIED: Using constant for role
     // Here, we use just @Valid (or @Validated without a group).
     // This means only default validation constraints (those without a 'groups' attribute, or with 'groups=Default.class')
     // will be applied. The @Size constraint on 'password' in UserRequest will NOT be active here,
@@ -116,9 +119,9 @@ public class UserController {
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @DeleteMapping("/profiles/delete/{id}") // Admin endpoint
+    @DeleteMapping(USER_PROFILES_DELETE) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Void> deleteUser(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
@@ -136,17 +139,16 @@ public class UserController {
      * an error occurs while creating the corresponding user on 
      * the micro service after creation in the authorization server
      * or any such related errors that can cause inconsistency
-     * 
-     *
+     * *
      * @param authId The auth ID (ID at the authorization server e.g Keycloak)
-     *               of the user to delete.
+     * of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @DeleteMapping("/profiles/delete-to-rollback/{authId}") 
+    @DeleteMapping(USER_PROFILES_DELETE_ROLLBACK) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
+    @PreAuthorize("hasRole('" + ROLE_USER_PROFILE_SYNC + "')") // MODIFIED: Using constant for role
     public Mono<Void> deleteUserByAuthId(@PathVariable String authId) {
         if (authId == null || authId.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
@@ -165,9 +167,9 @@ public class UserController {
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @GetMapping("/{id}")
+    @GetMapping(USER_GET_BY_ID) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin') or hasRole('user')") // Example authorization
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "') or hasRole('" + ROLE_USER + "')") // MODIFIED: Using constants for roles
     public Mono<User> getUserById(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
@@ -185,9 +187,9 @@ public class UserController {
      * @throws IllegalArgumentException if username is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @GetMapping("/byUsername/{username}")
+    @GetMapping(USER_GET_BY_USERNAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')") // Typically admin only, or if public profile viewing is allowed
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<User> getUserByUsername(@PathVariable String username) {
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USERNAME);
@@ -205,15 +207,15 @@ public class UserController {
      * @throws IllegalArgumentException if email is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @GetMapping("/byEmail/{email}")
+    @GetMapping(USER_GET_BY_EMAIL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<User> getUserByEmail(@PathVariable String email) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
         }
         return userService.getUserByEmail(email);
-        // Exceptions are handled by GlobalExceptionHandler.
+        // Errors are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -227,9 +229,9 @@ public class UserController {
      * @return A Flux of User records.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping("/admin/all")
+    @GetMapping(USER_ADMIN_ALL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -250,9 +252,9 @@ public class UserController {
      *
      * @return A Mono emitting the total count of users.
      */
-    @GetMapping("/admin/count")
+    @GetMapping(USER_ADMIN_COUNT) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countAllUsers() {
         return userService.countAllUsers();
         // Errors are handled by GlobalExceptionHandler.
@@ -270,9 +272,9 @@ public class UserController {
      * @return A Flux emitting matching users.
      * @throws IllegalArgumentException if first name or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byFirstName")
+    @GetMapping(USER_ADMIN_BY_FIRST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getUsersByFirstName(
             @RequestParam String firstName,
             @RequestParam(defaultValue = "0") int page,
@@ -296,9 +298,9 @@ public class UserController {
      * @return A Mono emitting the count of matching users.
      * @throws IllegalArgumentException if first name is invalid.
      */
-    @GetMapping("/admin/countByFirstName")
+    @GetMapping(USER_ADMIN_COUNT_BY_FIRST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countUsersByFirstName(@RequestParam String firstName) {
         if (firstName == null || firstName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_FIRST_NAME);
@@ -319,9 +321,9 @@ public class UserController {
      * @return A Flux emitting matching users.
      * @throws IllegalArgumentException if last name or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byLastName")
+    @GetMapping(USER_ADMIN_BY_LAST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getUsersByLastName(
             @RequestParam String lastName,
             @RequestParam(defaultValue = "0") int page,
@@ -345,9 +347,9 @@ public class UserController {
      * @return A Mono emitting the count of matching users.
      * @throws IllegalArgumentException if last name is invalid.
      */
-    @GetMapping("/admin/countByLastName")
+    @GetMapping(USER_ADMIN_COUNT_BY_LAST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countUsersByLastName(@RequestParam String lastName) {
         if (lastName == null || lastName.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_LAST_NAME);
@@ -368,9 +370,9 @@ public class UserController {
      * @return A Flux emitting matching users.
      * @throws IllegalArgumentException if search term or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byUsernameOrEmail")
+    @GetMapping(USER_ADMIN_BY_USERNAME_OR_EMAIL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getUsersByUsernameOrEmail(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
@@ -394,9 +396,9 @@ public class UserController {
      * @return A Mono emitting the count of matching users.
      * @throws IllegalArgumentException if search term is invalid.
      */
-    @GetMapping("/admin/countByUsernameOrEmail")
+    @GetMapping(USER_ADMIN_COUNT_BY_USERNAME_OR_EMAIL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countUsersByUsernameOrEmail(@RequestParam String searchTerm) {
         if (searchTerm == null || searchTerm.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SEARCH_TERM);
@@ -417,9 +419,9 @@ public class UserController {
      * @return A Flux emitting matching users.
      * @throws IllegalArgumentException if date format or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byCreatedAtAfter")
+    @GetMapping(USER_ADMIN_BY_CREATED_AT_AFTER) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getUsersByCreatedAtAfter(
             @RequestParam String date,
             @RequestParam(defaultValue = "0") int page,
@@ -449,9 +451,9 @@ public class UserController {
      * @return A Mono emitting the count of matching users.
      * @throws IllegalArgumentException if date format is invalid.
      */
-    @GetMapping("/admin/countByCreatedAtAfter")
+    @GetMapping(USER_ADMIN_COUNT_BY_CREATED_AT_AFTER) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countUsersByCreatedAtAfter(@RequestParam String date) {
         if (date == null || date.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_DATE_FORMAT);
@@ -477,9 +479,9 @@ public class UserController {
      * @return A Flux emitting matching users.
      * @throws IllegalArgumentException if shipping address or pagination parameters are invalid.
      */
-    @GetMapping("/admin/byShippingAddress")
+    @GetMapping(USER_ADMIN_BY_SHIPPING_ADDRESS) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Flux<User> getUsersByShippingAddress(
             @RequestParam String shippingAddress,
             @RequestParam(defaultValue = "0") int page,
@@ -503,9 +505,9 @@ public class UserController {
      * @return A Mono emitting the count of matching users.
      * @throws IllegalArgumentException if shipping address is invalid.
      */
-    @GetMapping("/admin/countByShippingAddress")
+    @GetMapping(USER_ADMIN_COUNT_BY_SHIPPING_ADDRESS) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED: Using constant for role
     public Mono<Long> countUsersByShippingAddress(@RequestParam String shippingAddress) {
         if (shippingAddress == null || shippingAddress.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SHIPPING_ADDRESS);
@@ -522,7 +524,7 @@ public class UserController {
      * @return A Mono emitting true if the user exists, false otherwise (Boolean).
      * @throws IllegalArgumentException if email is invalid.
      */
-    @GetMapping("/existsByEmail")
+    @GetMapping(USER_EXISTS_BY_EMAIL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByEmail(@RequestParam String email) {
         if (email == null || email.isBlank()) {
@@ -540,7 +542,7 @@ public class UserController {
      * @return A Mono emitting true if the user exists, false otherwise (Boolean).
      * @throws IllegalArgumentException if username is invalid.
      */
-    @GetMapping("/existsByUsername")
+    @GetMapping(USER_EXISTS_BY_USERNAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByUsername(@RequestParam String username) {
         if (username == null || username.isBlank()) {

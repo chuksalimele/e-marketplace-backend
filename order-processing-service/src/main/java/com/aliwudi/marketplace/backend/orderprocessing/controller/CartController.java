@@ -21,8 +21,11 @@ import org.springframework.data.domain.Sort;
 import java.util.Map; // Used for generic payload for remove/directUpdate, but replaced with DTOs for add/update quantity
 import org.springframework.web.server.ServerWebExchange;
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/cart")
+@RequestMapping(CART_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor // Generates constructor for final fields
 @Slf4j // Enables Lombok's logging
 public class CartController {
@@ -40,7 +43,7 @@ public class CartController {
      * @param request The AddItemRequest containing productId and quantity.
      * @return A Mono emitting the updated Cart.
      */
-    @PostMapping("/add")
+    @PostMapping(CART_ADD_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK) // Common for updates; can be HttpStatus.CREATED if always new carts
     public Mono<Cart> addProductToCart(
             ServerWebExchange exchange,
@@ -57,7 +60,7 @@ public class CartController {
      * @param exchange
      * @return A Mono emitting the Cart.
      */
-    @GetMapping
+    @GetMapping(CART_GET_USER_CART) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Cart> getUserCart(ServerWebExchange exchange) {
         return  authUtil.getAuthenticatedUserId(exchange)
@@ -74,7 +77,7 @@ public class CartController {
      * @param request The UpdateItemQuantityRequest containing productId and newQuantity.
      * @return A Mono emitting the updated Cart, or Mono.empty() if the item was removed (results in 204).
      */
-    @PutMapping("/update")
+    @PutMapping(CART_UPDATE_ITEM_QUANTITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK) // 200 OK for update, 204 No Content for removal if Mono.empty() is returned
     public Mono<Cart> updateCartItem(
             ServerWebExchange exchange,
@@ -93,7 +96,7 @@ public class CartController {
      * @param payload A map containing the "productId" to remove.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @DeleteMapping("/remove")
+    @DeleteMapping(CART_REMOVE_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> removeProductFromCart(
             ServerWebExchange exchange,
@@ -115,7 +118,7 @@ public class CartController {
      * @param exchange
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @DeleteMapping("/clear")
+    @DeleteMapping(CART_CLEAR) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> clearCart(ServerWebExchange exchange) {
         return  authUtil.getAuthenticatedUserId(exchange)
@@ -135,7 +138,7 @@ public class CartController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of CartItem.
      */
-    @GetMapping("/items/all")
+    @GetMapping(CART_ITEMS_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<CartItem> getAllCartItems(
             @RequestParam(defaultValue = "0") int page,
@@ -159,7 +162,7 @@ public class CartController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of CartItem.
      */
-    @GetMapping("/items/byCart/{cartId}")
+    @GetMapping(CART_ITEMS_GET_BY_CART) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<CartItem> getCartItemsByCartId(
             @PathVariable Long cartId,
@@ -184,7 +187,7 @@ public class CartController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of CartItem.
      */
-    @GetMapping("/items/byProduct/{productId}")
+    @GetMapping(CART_ITEMS_GET_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<CartItem> getCartItemsByProductId(
             @PathVariable Long productId,
@@ -205,7 +208,7 @@ public class CartController {
      * @param productId The ID of the product.
      * @return A Mono emitting the CartItem.
      */
-    @GetMapping("/items/find/{cartId}/{productId}")
+    @GetMapping(CART_ITEMS_FIND_SPECIFIC) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<CartItem> findSpecificCartItem(
             @PathVariable Long cartId,
@@ -219,7 +222,7 @@ public class CartController {
      *
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/all")
+    @GetMapping(CART_ITEMS_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllCartItems() {
         return cartService.countAllCartItems();
@@ -232,7 +235,7 @@ public class CartController {
      * @param cartId The ID of the cart.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/byCart/{cartId}")
+    @GetMapping(CART_ITEMS_COUNT_BY_CART) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countCartItemsByCartId(@PathVariable Long cartId) {
         return cartService.countCartItemsByCartId(cartId);
@@ -245,7 +248,7 @@ public class CartController {
      * @param productId The ID of the product.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/byProduct/{productId}")
+    @GetMapping(CART_ITEMS_COUNT_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countCartItemsByProductId(@PathVariable Long productId) {
         return cartService.countCartItemsByProductId(productId);
@@ -259,7 +262,7 @@ public class CartController {
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
-    @GetMapping("/items/exists/{cartId}/{productId}")
+    @GetMapping(CART_ITEMS_CHECK_EXISTS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> checkProductExistsInCart(
             @PathVariable Long cartId,
@@ -276,7 +279,7 @@ public class CartController {
      * @param cartId The ID of the cart.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @DeleteMapping("/items/admin/deleteByCart/{cartId}")
+    @DeleteMapping(CART_ITEMS_ADMIN_DELETE_BY_CART) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteAllCartItemsByCartId(@PathVariable Long cartId) {
         return cartService.deleteAllCartItemsByCartId(cartId);
@@ -292,7 +295,7 @@ public class CartController {
      * @param productId The ID of the product.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @DeleteMapping("/items/admin/deleteByUserAndProduct/{userId}/{productId}")
+    @DeleteMapping(CART_ITEMS_ADMIN_DELETE_BY_USER_AND_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteCartItemByUserIdAndProductId(
             @PathVariable Long userId,
@@ -311,7 +314,7 @@ public class CartController {
      * @param payload A map containing the "quantity" to update.
      * @return A Mono emitting the number of rows updated (Integer).
      */
-    @PutMapping("/items/admin/directUpdateQuantity/{cartId}/{productId}")
+    @PutMapping(CART_ITEMS_ADMIN_DIRECT_UPDATE_QUANTITY) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Integer> directUpdateCartItemQuantity(
             @PathVariable Long cartId,
@@ -340,7 +343,7 @@ public class CartController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Cart.
      */
-    @GetMapping("/admin/all")
+    @GetMapping(CART_ADMIN_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Cart> getAllCarts(
             @RequestParam(defaultValue = "0") int page,
@@ -359,7 +362,7 @@ public class CartController {
      * @param userId The ID of the user.
      * @return A Mono emitting the Cart.
      */
-    @GetMapping("/byUser/{userId}")
+    @GetMapping(CART_GET_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Cart> getCartByUserId(@PathVariable Long userId) {
         return cartService.findCartByUserId(userId);
@@ -371,7 +374,7 @@ public class CartController {
      *
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count")
+    @GetMapping(CART_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllCarts() {
         return cartService.countAllCarts();
@@ -384,7 +387,7 @@ public class CartController {
      * @param userId The ID of the user.
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
-    @GetMapping("/exists/byUser/{userId}")
+    @GetMapping(CART_CHECK_EXISTS_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> checkCartExistsByUserId(@PathVariable Long userId) {
         return cartService.checkCartExistsByUserId(userId);
@@ -398,7 +401,7 @@ public class CartController {
      * @param userId The ID of the user whose cart to delete.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @DeleteMapping("/admin/deleteByUserId/{userId}")
+    @DeleteMapping(CART_ADMIN_DELETE_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteCartByUserId(@PathVariable Long userId) {
         return cartService.deleteCartByUserId(userId);

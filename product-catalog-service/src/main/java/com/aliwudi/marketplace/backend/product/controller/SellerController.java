@@ -19,9 +19,12 @@ import reactor.core.publisher.Mono;
 // Removed unused imports: java.util.List, java.util.stream.Collectors, com.aliwudi.marketplace.backend.common.model.Store, com.aliwudi.marketplace.backend.product.service.StoreService
 // as prepareDto logic moved to service
 
+// Static import for API path constants and roles
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) // Adjust for Flutter app's port
 @RestController
-@RequestMapping("/api/sellers")
+@RequestMapping(SELLER_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor // Using Lombok for constructor injection
 public class SellerController {
 
@@ -35,7 +38,7 @@ public class SellerController {
      * @return A Flux of Seller entities.
      * @throws IllegalArgumentException if pagination parameters are invalid.
      */
-    @GetMapping
+    @GetMapping(SELLER_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Seller> getAllSellers(
             @RequestParam(defaultValue = "0") Integer page,
@@ -52,7 +55,7 @@ public class SellerController {
      *
      * @return A Mono emitting the total count of sellers.
      */
-    @GetMapping("/count")
+    @GetMapping(SELLER_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllSellers() {
         return sellerService.countAllSellers();
@@ -67,7 +70,7 @@ public class SellerController {
      * @throws IllegalArgumentException if seller ID is invalid.
      * @throws ResourceNotFoundException if the seller is not found.
      */
-    @GetMapping("/{id}")
+    @GetMapping(SELLER_GET_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Seller> getSellerById(@PathVariable Long id) {
         if (id == null || id <= 0) {
@@ -86,9 +89,9 @@ public class SellerController {
      * @throws DuplicateResourceException if a seller with the same email already exists.
      * @throws InvalidSellerDataException if provided data is invalid.
      */
-    @PostMapping
+    @PostMapping(SELLER_CREATE) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Seller> createSeller(@Valid @RequestBody SellerRequest sellerRequest) {
         // Basic input validation
         if (sellerRequest.getName() == null || sellerRequest.getName().isBlank() ||
@@ -110,9 +113,9 @@ public class SellerController {
      * @throws InvalidSellerDataException if provided data is invalid.
      * @throws DuplicateResourceException if the updated email causes a duplicate (if email update is allowed).
      */
-    @PutMapping("/{id}")
+    @PutMapping(SELLER_UPDATE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Seller> updateSeller(@PathVariable Long id, @Valid @RequestBody SellerRequest sellerRequest) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
@@ -132,9 +135,9 @@ public class SellerController {
      * @throws IllegalArgumentException if seller ID is invalid.
      * @throws ResourceNotFoundException if the seller is not found.
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping(SELLER_DELETE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('" + ROLE_ADMIN + "')") // MODIFIED
     public Mono<Void> deleteSeller(@PathVariable Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_SELLER_ID);
@@ -152,7 +155,7 @@ public class SellerController {
      * @return A Flux emitting matching sellers.
      * @throws IllegalArgumentException if search query or pagination parameters are invalid.
      */
-    @GetMapping("/search")
+    @GetMapping(SELLER_SEARCH) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Seller> searchSellers(
             @RequestParam String query,
@@ -172,7 +175,7 @@ public class SellerController {
      * @return A Mono emitting the count of matching sellers.
      * @throws IllegalArgumentException if search query is invalid.
      */
-    @GetMapping("/search/count")
+    @GetMapping(SELLER_SEARCH_COUNT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countSearchSellers(@RequestParam String query) {
         if (query == null || query.isBlank()) {

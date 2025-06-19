@@ -14,8 +14,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import jakarta.validation.Valid; // For @Valid annotation
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/inventory")
+@RequestMapping(INVENTORY_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class InventoryController {
 
@@ -28,7 +31,7 @@ public class InventoryController {
      * @param productId The ID of the product.
      * @return A Mono emitting the available quantity (Integer).
      */
-    @GetMapping("/{productId}/available-stock")
+    @GetMapping(INVENTORY_GET_AVAILABLE_STOCK) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Integer> getAvailableStock(@PathVariable Long productId) {
         return inventoryService.getAvailableStock(productId);
@@ -41,7 +44,7 @@ public class InventoryController {
      * @param request The InventoryUpdateRequest containing productId and quantity.
      * @return A Mono emitting the saved Inventory.
      */
-    @PostMapping("/add-or-update")
+    @PostMapping(INVENTORY_CREATE_OR_UPDATE) // MODIFIED
     @ResponseStatus(HttpStatus.OK) // Or HttpStatus.CREATED if always new
     public Mono<Inventory> createOrUpdateInventory(@Valid @RequestBody InventoryUpdateRequest request) {
         return inventoryService.createOrUpdateInventory(request.getProductId(), request.getQuantity());
@@ -54,7 +57,7 @@ public class InventoryController {
      * @param request The StockOperationRequest containing productId and quantityToReserve.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @PostMapping("/reserve")
+    @PostMapping(INVENTORY_RESERVE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> reserveStock(@Valid @RequestBody StockOperationRequest request) {
         return inventoryService.reserveStock(request.getProductId(), request.getQuantity());
@@ -68,7 +71,7 @@ public class InventoryController {
      * @param request The StockOperationRequest containing productId and quantityToRelease.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @PostMapping("/release")
+    @PostMapping(INVENTORY_RELEASE) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> releaseStock(@Valid @RequestBody StockOperationRequest request) {
         return inventoryService.releaseStock(request.getProductId(), request.getQuantity());
@@ -81,7 +84,7 @@ public class InventoryController {
      * @param request The StockOperationRequest containing productId and quantityConfirmed.
      * @return A Mono<Void> indicating completion (results in 204 No Content).
      */
-    @PostMapping("/confirm-deduct")
+    @PostMapping(INVENTORY_CONFIRM_DEDUCT) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> confirmReservationAndDeductStock(@Valid @RequestBody StockOperationRequest request) {
         return inventoryService.confirmReservationAndDeductStock(request.getProductId(), request.getQuantity());
@@ -99,7 +102,7 @@ public class InventoryController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Inventory records.
      */
-    @GetMapping("/admin/all")
+    @GetMapping(INVENTORY_ADMIN_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Inventory> getAllInventory(
             @RequestParam(defaultValue = "0") int page,
@@ -123,7 +126,7 @@ public class InventoryController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Inventory records.
      */
-    @GetMapping("/admin/availableGreaterThan/{quantity}")
+    @GetMapping(INVENTORY_ADMIN_GET_AVAILABLE_GREATER_THAN) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Inventory> getInventoryByAvailableQuantityGreaterThan(
             @PathVariable Integer quantity,
@@ -143,7 +146,7 @@ public class InventoryController {
      * @param request A StockOperationRequest containing productId and quantity.
      * @return A Mono emitting the number of rows updated (Integer).
      */
-    @PostMapping("/admin/decrement")
+    @PostMapping(INVENTORY_ADMIN_DECREMENT_AVAILABLE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Integer> decrementAvailableQuantity(@Valid @RequestBody StockOperationRequest request) {
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
@@ -159,7 +162,7 @@ public class InventoryController {
      * @param request A StockOperationRequest containing productId and quantity.
      * @return A Mono emitting the number of rows updated (Integer).
      */
-    @PostMapping("/admin/increment")
+    @PostMapping(INVENTORY_ADMIN_INCREMENT_AVAILABLE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Integer> incrementAvailableQuantity(@Valid @RequestBody StockOperationRequest request) {
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
@@ -175,7 +178,7 @@ public class InventoryController {
      * @param request A StockOperationRequest containing productId and quantity (for reservedQuantity).
      * @return A Mono emitting the number of rows updated (Integer).
      */
-    @PutMapping("/admin/updateReserved")
+    @PutMapping(INVENTORY_ADMIN_UPDATE_RESERVED) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Integer> updateReservedQuantity(@Valid @RequestBody StockOperationRequest request) {
         if (request.getQuantity() == null || request.getQuantity() < 0) {
@@ -190,7 +193,7 @@ public class InventoryController {
      *
      * @return A Mono emitting the total count (Long).
      */
-    @GetMapping("/count/all")
+    @GetMapping(INVENTORY_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllInventory() {
         return inventoryService.countAllInventory();
@@ -204,7 +207,7 @@ public class InventoryController {
      * @param quantity The minimum available quantity.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count/availableGreaterThan/{quantity}")
+    @GetMapping(INVENTORY_COUNT_AVAILABLE_GREATER_THAN) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countInventoryByAvailableQuantityGreaterThan(@PathVariable Integer quantity) {
         return inventoryService.countInventoryByAvailableQuantityGreaterThan(quantity);
@@ -217,7 +220,7 @@ public class InventoryController {
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
-    @GetMapping("/exists/{productId}")
+    @GetMapping(INVENTORY_EXISTS_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsInventoryByProductId(@PathVariable Long productId) {
         return inventoryService.existsInventoryByProductId(productId);

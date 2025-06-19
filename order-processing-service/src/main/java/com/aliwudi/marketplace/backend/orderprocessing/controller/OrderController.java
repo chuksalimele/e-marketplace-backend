@@ -22,8 +22,11 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map; // Still used for status update payload
 
+// Static import for API path constants
+import static com.aliwudi.marketplace.backend.common.constants.ApiPaths.*;
+
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(ORDER_CONTROLLER_BASE) // MODIFIED
 @RequiredArgsConstructor
 public class OrderController {
 
@@ -36,7 +39,7 @@ public class OrderController {
      * @param checkoutRequest The CheckoutRequest DTO containing user ID, items, shipping address, and payment method.
      * @return A Mono emitting the created Order.
      */
-    @PostMapping("/checkout")
+    @PostMapping(ORDER_CHECKOUT) // MODIFIED
     @ResponseStatus(HttpStatus.CREATED) // HTTP 201 Created for resource creation
     public Mono<Order> createOrder(@Valid @RequestBody CheckoutRequest checkoutRequest) {
         // userId should ideally come from authenticated principal in API Gateway
@@ -60,7 +63,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping
+    @GetMapping(ORDER_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getAllOrders(
             @RequestParam(defaultValue = "0") int page,
@@ -79,7 +82,7 @@ public class OrderController {
      * @param id The ID of the order.
      * @return A Mono emitting the Order.
      */
-    @GetMapping("/{id}")
+    @GetMapping(ORDER_GET_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Order> getOrderById(@PathVariable Long id) {
         return orderService.getOrderById(id);
@@ -96,7 +99,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/user/{userId}")
+    @GetMapping(ORDER_GET_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getOrdersByUserId(
             @PathVariable Long userId,
@@ -118,7 +121,7 @@ public class OrderController {
      * @return A Mono emitting the updated Order.
      * @throws IllegalArgumentException if the status string is invalid or missing.
      */
-    @PutMapping("/{id}/status")
+    @PutMapping(ORDER_UPDATE_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Order> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> statusUpdate) {
         String statusString = statusUpdate.get("newStatus");
@@ -143,7 +146,7 @@ public class OrderController {
      * @param id The ID of the order to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping(ORDER_DELETE_BY_ID) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content for successful deletion
     public Mono<Void> deleteOrderById(@PathVariable Long id) {
         return orderService.deleteOrderById(id);
@@ -156,7 +159,7 @@ public class OrderController {
      * @param userId The ID of the user whose orders are to be deleted.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      */
-    @DeleteMapping("/user/{userId}")
+    @DeleteMapping(ORDER_DELETE_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteOrdersByUserId(@PathVariable Long userId) {
         return orderService.deleteOrdersByUserId(userId);
@@ -170,7 +173,7 @@ public class OrderController {
      * @param orderItemId The ID of the order item to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      */
-    @DeleteMapping("/order/{orderId}/item/{orderItemId}")
+    @DeleteMapping(ORDER_DELETE_ITEM) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteOrderItem(
             @PathVariable Long orderId,
@@ -185,7 +188,7 @@ public class OrderController {
      *
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      */
-    @DeleteMapping("/clearAll")
+    @DeleteMapping(ORDER_CLEAR_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> clearAllOrders() {
         return orderService.clearAllOrders();
@@ -203,7 +206,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of OrderItem.
      */
-    @GetMapping("/items/all")
+    @GetMapping(ORDER_ITEMS_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<OrderItem> getAllOrderItems(
             @RequestParam(defaultValue = "0") int page,
@@ -226,7 +229,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of OrderItem.
      */
-    @GetMapping("/items/byOrder/{orderId}")
+    @GetMapping(ORDER_ITEMS_GET_BY_ORDER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<OrderItem> getOrderItemsByOrderId(
             @PathVariable Long orderId,
@@ -250,7 +253,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of OrderItem.
      */
-    @GetMapping("/items/byProduct/{productId}")
+    @GetMapping(ORDER_ITEMS_GET_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<OrderItem> getOrderItemsByProductId(
             @PathVariable Long productId,
@@ -271,7 +274,7 @@ public class OrderController {
      * @param productId The ID of the product.
      * @return A Mono emitting the OrderItem.
      */
-    @GetMapping("/items/find/{orderId}/{productId}")
+    @GetMapping(ORDER_ITEMS_FIND_SPECIFIC) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<OrderItem> findSpecificOrderItem(
             @PathVariable Long orderId,
@@ -285,7 +288,7 @@ public class OrderController {
      *
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/all")
+    @GetMapping(ORDER_ITEMS_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllOrderItems() {
         return orderService.countAllOrderItems();
@@ -298,7 +301,7 @@ public class OrderController {
      * @param orderId The ID of the order.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/byOrder/{orderId}")
+    @GetMapping(ORDER_ITEMS_COUNT_BY_ORDER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrderItemsByOrderId(@PathVariable Long orderId) {
         return orderService.countOrderItemsByOrderId(orderId);
@@ -311,7 +314,7 @@ public class OrderController {
      * @param productId The ID of the product.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/items/count/byProduct/{productId}")
+    @GetMapping(ORDER_ITEMS_COUNT_BY_PRODUCT) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrderItemsByProductId(@PathVariable Long productId) {
         return orderService.countOrderItemsByProductId(productId);
@@ -325,7 +328,7 @@ public class OrderController {
      * @param productId The ID of the product.
      * @return A Mono emitting true if it exists, false otherwise (Boolean).
      */
-    @GetMapping("/items/exists/{orderId}/{productId}")
+    @GetMapping(ORDER_ITEMS_CHECK_EXISTS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> checkOrderItemExists(
             @PathVariable Long orderId,
@@ -345,7 +348,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/admin/all")
+    @GetMapping(ORDER_ADMIN_GET_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getAllOrdersPaginated(
             @RequestParam(defaultValue = "0") int page,
@@ -368,7 +371,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/admin/byUser/{userId}")
+    @GetMapping(ORDER_ADMIN_GET_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getOrdersByUserIdPaginated(
             @PathVariable Long userId,
@@ -392,7 +395,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/admin/byStatus/{status}")
+    @GetMapping(ORDER_ADMIN_GET_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getOrdersByStatus(
             @PathVariable String status,
@@ -423,7 +426,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/admin/byTimeRange")
+    @GetMapping(ORDER_ADMIN_GET_BY_TIME_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getOrdersByTimeRange(
             @RequestParam String startTime,
@@ -458,7 +461,7 @@ public class OrderController {
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux of Order.
      */
-    @GetMapping("/admin/byUserAndStatus/{userId}/{status}")
+    @GetMapping(ORDER_ADMIN_GET_BY_USER_AND_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Flux<Order> getOrdersByUserIdAndStatus(
             @PathVariable Long userId,
@@ -484,7 +487,7 @@ public class OrderController {
      *
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count/all")
+    @GetMapping(ORDER_COUNT_ALL) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countAllOrders() {
         return orderService.countAllOrders();
@@ -497,7 +500,7 @@ public class OrderController {
      * @param userId The ID of the user.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count/byUser/{userId}")
+    @GetMapping(ORDER_COUNT_BY_USER) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrdersByUserId(@PathVariable Long userId) {
         return orderService.countOrdersByUserId(userId);
@@ -509,8 +512,9 @@ public class OrderController {
      *
      * @param status The status of the order.
      * @return A Mono emitting the count (Long).
+     * @throws IllegalArgumentException if the status string is invalid.
      */
-    @GetMapping("/count/byStatus/{status}")
+    @GetMapping(ORDER_COUNT_BY_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrdersByStatus(@PathVariable String status) {
         OrderStatus orderStatus;
@@ -529,8 +533,9 @@ public class OrderController {
      * @param startTime The start time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
      * @param endTime The end time of the range (ISO 8601 format:YYYY-MM-ddTHH:mm:ss).
      * @return A Mono emitting the count (Long).
+     * @throws IllegalArgumentException if the date format is invalid.
      */
-    @GetMapping("/count/byTimeRange")
+    @GetMapping(ORDER_COUNT_BY_TIME_RANGE) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrdersByTimeRange(
             @RequestParam String startTime,
@@ -552,7 +557,7 @@ public class OrderController {
      * @param status The status of the order.
      * @return A Mono emitting the count (Long).
      */
-    @GetMapping("/count/byUserAndStatus/{userId}/{status}")
+    @GetMapping(ORDER_COUNT_BY_USER_AND_STATUS) // MODIFIED
     @ResponseStatus(HttpStatus.OK)
     public Mono<Long> countOrdersByUserIdAndStatus(
             @PathVariable Long userId,
