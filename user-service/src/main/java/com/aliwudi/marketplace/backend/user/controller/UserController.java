@@ -129,10 +129,18 @@ public class UserController {
     }
     
     /**
-     * Endpoint to delete a user by their ID.
-     * Accessible only by 'admin'.
+     * Endpoint to delete a user by their Auth ID. Accessible
+     * only by 'admin' The method is mostly called by 
+     * the authorization server (e.g Keycloak) for the purpose
+     * of rollback in the case where a error occurred during
+     * user creation to avoid data inconsistency arising when
+     * an error occurs while creating the corresponding user on 
+     * the micro service after creation in the authorization server
+     * or any such related errors that can cause inconsistency
+     * 
      *
-     * @param authId The ID of the user to delete.
+     * @param authId The auth ID (ID at the authorization server e.g Keycloak)
+     *               of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
