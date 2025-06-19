@@ -46,10 +46,10 @@ public class UserIntegrationService {
      * @param isNotFoundHandledSeparately A flag to indicate if 404 NOT_FOUND should result in Mono.empty() instead of an error.
      * @return A Mono with enhanced error handling.
      */
-    private <T> Mono<T> handleUserServiceErrors(Mono<T> mono, String contextMessage, Object resourceIdentifier, boolean isNotFoundHandledSeparately) {
+    private <T> Mono<T> handleUserServiceErrors(Mono<T> mono, String contextMessage, Object resourceIdentifier) {
         return mono
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    if (isNotFoundHandledSeparately && e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
                         log.info("User {} not found in User Service (404) during {}.", resourceIdentifier, contextMessage);
                         return Mono.empty(); // Signal not found by returning empty
                     }
@@ -91,7 +91,7 @@ public class UserIntegrationService {
                 .retrieve()
                 .bodyToMono(User.class);
 
-        return handleUserServiceErrors(responseMono, "fetching user", userId, true);
+        return handleUserServiceErrors(responseMono, "fetching user", userId);
     }
 
     /**
@@ -106,7 +106,7 @@ public class UserIntegrationService {
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
-        return handleUserServiceErrors(responseMono, "checking user existence by user id", userId, true);
+        return handleUserServiceErrors(responseMono, "checking user existence by user id", userId);
     }
     /**
      * Checks if a user exists by their auth ID.
@@ -120,7 +120,7 @@ public class UserIntegrationService {
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
-        return handleUserServiceErrors(responseMono, "checking user existence by user id", authId, true);
+        return handleUserServiceErrors(responseMono, "checking user existence by user id", authId);
     }
     
     /**
@@ -135,7 +135,7 @@ public class UserIntegrationService {
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
-        return handleUserServiceErrors(responseMono, "checking user existence by email", email, true);
+        return handleUserServiceErrors(responseMono, "checking user existence by email", email);
     }
     
     /**
@@ -150,6 +150,6 @@ public class UserIntegrationService {
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
-        return handleUserServiceErrors(responseMono, "checking user existence by username", username, true);
+        return handleUserServiceErrors(responseMono, "checking user existence by username", username);
     }    
 }

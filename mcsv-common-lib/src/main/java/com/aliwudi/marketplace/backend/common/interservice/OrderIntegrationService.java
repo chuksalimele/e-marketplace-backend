@@ -51,10 +51,10 @@ public class OrderIntegrationService {
      * should result in Mono.empty() instead of an error.
      * @return A Mono with enhanced error handling.
      */
-    private <T> Mono<T> handleOrderServiceErrors(Mono<T> mono, String contextMessage, Object resourceIdentifier, boolean isNotFoundHandledSeparately) {
+    private <T> Mono<T> handleOrderServiceErrors(Mono<T> mono, String contextMessage, Object resourceIdentifier) {
         return mono
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    if (isNotFoundHandledSeparately && e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
                         log.info("Order {} not found in Order Service (404) during {}.", resourceIdentifier, contextMessage);
                         return Mono.empty(); // Signal not found by returning empty
                     }
@@ -154,7 +154,7 @@ public class OrderIntegrationService {
                     return Mono.error(e); // Re-throw the original error
                 })
                 // Apply your common error handling for other network/timeout issues
-                .transform(mono -> handleOrderServiceErrors(mono, "checking order existence", orderId, false));
+                .transform(mono -> handleOrderServiceErrors(mono, "checking order existence", orderId));
     }
 
     /**
@@ -173,7 +173,7 @@ public class OrderIntegrationService {
                 .retrieve()
                 .bodyToMono(Order.class);
 
-        return handleOrderServiceErrors(responseMono, "fetching order", orderId, true);
+        return handleOrderServiceErrors(responseMono, "fetching order", orderId);
     }
 
     /**
