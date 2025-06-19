@@ -50,7 +50,7 @@ public class UserController {
      * @throws RoleNotFoundException if any specified role does not exist.
      */
     @PostMapping("/profiles/create")
-    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
+    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
     @ResponseStatus(HttpStatus.CREATED)
     // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
     // This will activate the @Size constraint on the 'password' field that belongs to this group.
@@ -87,7 +87,7 @@ public class UserController {
      */
     @PostMapping("/profiles/update/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
+    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
     // Here, we use just @Valid (or @Validated without a group).
     // This means only default validation constraints (those without a 'groups' attribute, or with 'groups=Default.class')
     // will be applied. The @Size constraint on 'password' in UserRequest will NOT be active here,
@@ -146,7 +146,7 @@ public class UserController {
      */
     @DeleteMapping("/profiles/delete-to-rollback/{authId}") 
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
+    @PreAuthorize("hasRole('user-profile-sync')") // Protected by the user-sync-listener's service account role
     public Mono<Void> deleteUserByAuthId(@PathVariable String authId) {
         if (authId == null || authId.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
