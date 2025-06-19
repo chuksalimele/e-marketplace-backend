@@ -26,6 +26,13 @@ keycloak:
   admin-cli-client-id: admin-cli         # Default client for admin access
   admin-username: admin                  # Your Keycloak admin username
   admin-password: admin                  # Your Keycloak admin password (CHANGE FOR PRODUCTION!)
+  
+  admin-auth-server-url: http://localhost:8080
+  admin-realm: chuks-emaketplace-realm
+  admin-client-id: user-service-admin-client     # Client ID for user-service's admin client
+  admin-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client
+
+# ... other configurations ...
 
 eureka:
   client:

@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
+import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -103,18 +104,18 @@ public class UserService {
      * specified, or specific roles if provided. This operation is
      * transactional.
      *
-     * @param userRequest The DTO containing user creation data.
+     * @param request The DTO containing user creation data.
      * @return A Mono emitting the created User (enriched with roles).
      * @throws DuplicateResourceException if username or email already exist.
      * @throws RoleNotFoundException if any specified role does not exist.
      */
     @Transactional
-    public Mono<User> createUser(UserRequest userRequest) {
-        log.debug("Attempting to create user with username: {} and email: {}", userRequest.getUsername(), userRequest.getEmail());
+    public Mono<User> createUser(UserProfileCreateRequest request) {
+        log.debug("Attempting to create user with username: {} and email: {}", request.getUsername(), request.getEmail());
 
         // Check for duplicate username and email concurrently
-        Mono<Boolean> usernameExists = userRepository.existsByUsername(userRequest.getUsername());
-        Mono<Boolean> emailExists = userRepository.existsByEmail(userRequest.getEmail());
+        Mono<Boolean> usernameExists = userRepository.existsByUsername(request.getUsername());
+        Mono<Boolean> emailExists = userRepository.existsByEmail(request.getEmail());
 
         return Mono.zip(usernameExists, emailExists)
                 .flatMap(tuple -> {
@@ -122,24 +123,22 @@ public class UserService {
                     boolean isEmailInUse = tuple.getT2();
 
                     if (isUsernameTaken) {
-                        log.warn("Username already taken: {}", userRequest.getUsername());
+                        log.warn("Username already taken: {}", request.getUsername());
                         return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS));
                     }
                     if (isEmailInUse) {
-                        log.warn("Email already in use: {}", userRequest.getEmail());
+                        log.warn("Email already in use: {}", request.getEmail());
                         return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS));
                     }
 
                     // Build user object
                     User user = User.builder()
-                            .authId(userRequest.getAuthId())
-                            .username(userRequest.getUsername())
-                            .email(userRequest.getEmail())
-                            .phoneNumber(userRequest.getPhoneNumber())
-                            //.password(passwordEncoder.encode(userRequest.getPassword())) //@Deprecated
-                            .firstName(userRequest.getFirstName())
-                            .lastName(userRequest.getLastName())
-                            .shippingAddress(userRequest.getShippingAddress())
+                            .authId(request.getAuthId())
+                            .username(request.getUsername())
+                            .email(request.getEmail())
+                            .phoneNumber(request.getPhoneNumber())
+                            .firstName(request.getFirstName())
+                            .lastName(request.getLastName())
                             .createdAt(LocalDateTime.now())
                             .updatedAt(LocalDateTime.now())
                             .enabled(true)
@@ -153,7 +152,7 @@ public class UserService {
                             })
                             .flatMap(this::prepareDto) // Enrich the saved user
                             .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
-                            .doOnError(e -> log.error("Error creating user {}: {}", userRequest.getUsername(), e.getMessage(), e));
+                            .doOnError(e -> log.error("Error creating user {}: {}", request.getUsername(), e.getMessage(), e));
                             // Exceptions are handled by GlobalExceptionHandler.
                 });
     }

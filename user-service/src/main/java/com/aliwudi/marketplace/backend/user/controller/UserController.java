@@ -1,13 +1,12 @@
 package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.user.dto.PasswordUpdateRequest;
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
-import com.aliwudi.marketplace.backend.common.exception.InvalidPasswordException;
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
+import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 
@@ -44,7 +43,7 @@ public class UserController {
      * Endpoint to create a new user.
      * Accessible by 'admin' or can be exposed for public registration.
      *
-     * @param userRequest The DTO containing user creation data.
+     * @param request The DTO containing user creation data.
      * @return A Mono emitting the created User.
      * @throws IllegalArgumentException if input validation fails.
      * @throws DuplicateResourceException if username or email already exist.
@@ -55,20 +54,20 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
     // This will activate the @Size constraint on the 'password' field that belongs to this group.
-    public Mono<User> createUser(@Validated(CreateUserValidation.class) @RequestBody UserRequest userRequest) {
+    public Mono<User> createUser(@Validated(CreateUserValidation.class) @RequestBody UserProfileCreateRequest request) {
         // Basic validation at controller level for required fields
         // Note: With @Validated(CreateUserValidation.class) and @NotBlank on username/email
         // this manual check for username/email.isBlank() might become redundant,
         // but it's kept for explicit demonstration of controller-level checks for critical fields.
-        if (userRequest.getUsername() == null || userRequest.getUsername().isBlank() ||
-            userRequest.getEmail() == null || userRequest.getEmail().isBlank()) { // Password check might be removed if @Validated covers it
+        if (request.getUsername() == null || request.getUsername().isBlank() ||
+            request.getEmail() == null || request.getEmail().isBlank()) { // Password check might be removed if @Validated covers it
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST);
         }
         // If the password was valid for the CreateUserValidation group, it means it's not blank
         // and meets the size requirement, so the manual userRequest.getPassword().isBlank() check
         // for password might become less necessary or could be simplified.
 
-        return userService.createUser(userRequest);
+        return userService.createUser(request);
         // Exceptions (DuplicateResourceException, RoleNotFoundException, IllegalArgumentException,
         // WebExchangeBindException from validation failures)
         // are handled by GlobalExceptionHandler.
@@ -117,7 +116,7 @@ public class UserController {
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-    @DeleteMapping("/admin/{id}") // Admin endpoint
+    @DeleteMapping("/profiles/delete/{id}") // Admin endpoint
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
     @PreAuthorize("hasRole('admin')")
     public Mono<Void> deleteUser(@PathVariable Long id) {
@@ -130,9 +129,9 @@ public class UserController {
     
     /**
      * Endpoint to delete a user by their Auth ID. Accessible
-     * only by 'admin' The method is mostly called by 
+     * only by 'admin' The method is typically called by 
      * the authorization server (e.g Keycloak) for the purpose
-     * of rollback in the case where a error occurred during
+     * of rollback in the case where an error occurred during
      * user creation to avoid data inconsistency arising when
      * an error occurs while creating the corresponding user on 
      * the micro service after creation in the authorization server
@@ -145,9 +144,9 @@ public class UserController {
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
      */
-   @DeleteMapping("/authorizaton-server/delete-user/{authId}") // Admin endpoint
+    @DeleteMapping("/profiles/delete-to-rollback/{authId}") 
     @ResponseStatus(HttpStatus.NO_CONTENT) // HTTP 204 No Content
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('user-profile-sync')") // Ensure this method is protected by the role
     public Mono<Void> deleteUserByAuthId(@PathVariable String authId) {
         if (authId == null || authId.isBlank()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
