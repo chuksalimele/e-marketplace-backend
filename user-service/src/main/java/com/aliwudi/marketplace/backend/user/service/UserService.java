@@ -34,7 +34,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final KeycloakAdminService keycloakAdminService; // Inject for Keycloak Admin API calls
+    private final AdminService adminService; // Inject for Authorizatio server Admin API calls
 
     // IMPORTANT: This prepareDto method is for enriching the User model.
     // It is placed here as per your instruction to move it to an appropriate location
@@ -155,8 +155,9 @@ public class UserService {
                                 // CRUCIAL STEP: After saving and getting the internal Long ID,
                                 // update Keycloak user attribute. This is chained reactively.
                                 String internalUserId = savedUser.getId().toString();
-                                return keycloakAdminService.updateUserAttribute(savedUser.getAuthId(),
-                                        "user_id", internalUserId)
+                                return adminService
+                                        .updateUserAttribute(savedUser.getAuthId(),
+                                                "user_id", internalUserId)
                                         .thenReturn(savedUser); // Return the savedUser after Keycloak update
                             })
                             .flatMap(this::prepareDto) // Enrich the saved user
@@ -266,16 +267,14 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUser(Long id) {
         log.debug("Attempting to delete user with ID: {}", id);
-        return userRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
-                .flatMap(userRepository::delete)
+        return userRepository.deleteById(id)
                 .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", id))
                 .doOnError(e -> log.error("Error deleting user {}: {}", id, e.getMessage(), e));
         // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Deletes a user by their ID. This operation is transactional.
+     * Deletes a user by Auth ID. This operation is transactional.
      *
      * @param authId The ID of the user to delete.
      * @return A Mono<Void> indicating completion.
@@ -284,11 +283,10 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUserByAuthId(String authId) {
         log.debug("Attempting to delete user with Auth ID: {}", authId);
-        return userRepository.findByAuthId(authId)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + authId)))
-                .flatMap(userRepository::delete)
-                .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", authId))
-                .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
+       return userRepository.deleteByAuthId(authId)
+                .then(adminService.deleteUser(authId)) // CRUCIAL: Also delete user from AS for consistency                
+                .doOnSuccess(v -> log.debug("User deleted successfully with Auth ID: {}", authId))
+                .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));                
         // Exceptions are handled by GlobalExceptionHandler.
     }
 
