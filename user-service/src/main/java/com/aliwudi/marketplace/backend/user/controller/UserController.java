@@ -9,7 +9,7 @@ import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundExceptio
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
-import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
+import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 

@@ -2,7 +2,29 @@ description = 'mcsv-common-lib'
 
 dependencies {
     
-    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-    
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+        // For Jakarta Bean Validation API and Hibernate Validator implementation
+        implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+        implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+        implementation 'org.springframework.boot:spring-boot-starter-security'
+
+        implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+
+        implementation 'org.springframework.security:spring-security-oauth2-jose'
+
+	compileOnly 'org.projectlombok:lombok'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	annotationProcessor 'org.projectlombok:lombok'
+
+        // Spring Boot Starter WebFlux for WebClient (reactive HTTP client)
+        implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        testImplementation 'org.springframework.security:spring-security-test'
 }

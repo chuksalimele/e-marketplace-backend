@@ -2,7 +2,7 @@ package com.aliwudi.marketplace.backend.common.util;
 
 import com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
-import com.aliwudi.marketplace.backend.common.model.BasicProfile;
+import com.aliwudi.marketplace.backend.common.dto.BasicProfile;
 import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import java.util.List;

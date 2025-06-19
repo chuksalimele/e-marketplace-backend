@@ -2,6 +2,7 @@ rootProject.name = 'e-marketplace-backend'
 
 include ':eureka-server'
 include ':api-gateway'
+include ':keycloak-user-sync-listener'
 include ':user-service'
 include ':product-catalog-service'
 include ':order-processing-service'

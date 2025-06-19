@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
-import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
+import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;

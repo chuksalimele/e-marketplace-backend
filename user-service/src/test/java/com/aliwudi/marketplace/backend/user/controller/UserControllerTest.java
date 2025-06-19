@@ -7,7 +7,7 @@ import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.user.dto.PasswordUpdateRequest;
-import com.aliwudi.marketplace.backend.user.dto.UserProfileCreateRequest;
+import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.service.UserService;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;

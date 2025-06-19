@@ -2,11 +2,45 @@ description = 'logistics-media-service'
 
 
 dependencies {
-    implementation project(':mcsv-common-lib')
+        implementation project(':mcsv-common-lib')
 
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+        implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    // Spring Cloud Netflix Eureka Client dependency for service discovery
-    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
+        // Spring Cloud Netflix Eureka Client dependency for service discovery
+        implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.1")
 
+
+        implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+
+        implementation 'org.springframework.security:spring-security-oauth2-jose'
+
+        runtimeOnly 'com.h2database:h2'
+        runtimeOnly 'com.mysql:mysql-connector-j'
+        runtimeOnly 'io.asyncer:r2dbc-mysql'
+        runtimeOnly 'io.r2dbc:r2dbc-h2'
+
+	compileOnly 'org.projectlombok:lombok'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	annotationProcessor 'org.projectlombok:lombok'
+
+        // Spring Boot Starter WebFlux for WebClient (reactive HTTP client)
+        implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+        // Spring Cloud OpenFeign for declarative REST clients
+        //implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+
+        implementation("org.keycloak:keycloak-admin-client:26.0.5")
+                
+        implementation 'org.springframework.boot:spring-boot-starter-validation'        
+        implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+
+        runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+        runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        testImplementation 'org.springframework.security:spring-security-test'
 }
