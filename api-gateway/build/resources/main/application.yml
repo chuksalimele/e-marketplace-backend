@@ -1,7 +1,7 @@
 ## YAML Template.
 ---
 server:
-  port: 5000 # Default port for the API Gateway
+  port: 7000 # Default port for the API Gateway
 
 logging:
   level:
@@ -19,7 +19,10 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
     web-application-type: REACTIVE # Crucial for Spring Cloud Gateway
   application:
     name: api-gateway # Name of the API Gateway service for Eureka
-    
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration
+      
   data:
     redis:
       host: localhost # Or the IP address/hostname of your Redis server if not local
@@ -289,3 +292,12 @@ resilience4j: # This is the top-level configuration key for all Resilience4j pro
         # or you can add it here if you want a different value for this specific instance.)
         
       # TODO - other circuit breaker instance goes here e.g orderCircuitBreaker e.t.c
+      
+
+jwt:
+  auth:
+    converter:
+      resource-id: emaketplace-app
+      principle-attribute: preferred_username
+      
+      

@@ -7,8 +7,7 @@ dependencies {
     // Spring Cloud Gateway (reactive web stack)
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     // Spring Boot Starter Web is often pulled by other dependencies,
-    // but we explicitly tell Spring Boot to use reactive type in application.yml
-    implementation 'org.springframework.boot:spring-boot-starter-web' // Keep for compatibility, but WebFlux is primary
+    // but we explicitly tell Spring Boot to use reactive type in application.yml    
 
     // Spring Cloud Netflix Eureka Client for service discovery
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'

@@ -47,6 +47,9 @@ import org.springframework.web.server.ServerWebExchange;
 @EnableWebFluxSecurity // Enables Spring Security for reactive applications (Spring Cloud Gateway is reactive)
 @EnableReactiveMethodSecurity // For @PreAuthorize etc.
 public class APIGatewayApplication {
+
+    // Removed the instance field for jwtAuthConverter, as it will be injected as a method parameter
+
     @Value("${jwt.auth.converter.principle-attribute}")
     private String principleAttribute;
     
@@ -56,11 +59,15 @@ public class APIGatewayApplication {
     public static void main(String[] args) {
         SpringApplication.run(APIGatewayApplication.class, args);
     }
-    private Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> jwtAuthConverter;
-    
 
+    /**
+     * Defines the JwtAuthConverter bean.
+     * This converter is responsible for extracting authentication details (like roles) from a JWT.
+     * It uses principleAttribute and resourceId defined in application properties.
+     * @return An instance of JwtAuthConverter.
+     */
     @Bean
-    public JwtAuthConverter getJwtAuthConverter(){
+    public Converter jwtAuthConverter(){ // Renamed for clarity, though getJwtAuthConverter is fine
         return new JwtAuthConverter(principleAttribute, resourceId);
     }
 
@@ -69,37 +76,36 @@ public class APIGatewayApplication {
      * This bean defines security rules, JWT validation, and header hardening.
      *
      * @param http ServerHttpSecurity to configure web security for reactive applications.
+     * @param jwtAuthConverter The JwtAuthConverter bean, automatically injected by Spring.
      * @return A SecurityWebFilterChain bean.
      */
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, Converter jwtAuthConverter) { // MODIFIED: Injected via method parameter
         http
             // Disable CSRF for stateless APIs (common for API Gateways)
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)//CSRF protection is disabled, which is common for stateless APIs using token-based authentication.
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
             // Disable HTTP Basic and Form Login to prevent unwanted login redirects
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
 
             // Configure OAuth2 Resource Server for JWT validation
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> 
-                jwt.jwtAuthenticationConverter(jwtAuthConverter)
+                jwt.jwtAuthenticationConverter(jwtAuthConverter) // NOW CORRECT: Uses the injected parameter
             ))
 
             // Configure authorization rules based on request paths
             .authorizeExchange(exchanges -> exchanges
-
                 // Public routes that do NOT require authentication
                 .pathMatchers(
-                    "/users/**",          // Allow public endpoints
-                    "/products/**",       // Allow public access to product catalog
-                    "/media/**",          // Allow public access to media (e.g images and videos)
-                    "/eureka/**",          // Eureka dashboard (secure this in production environments!)
-                    "/actuator/**",        // Spring Boot Actuator endpoints (secure these heavily in production!)
-                    "/fallback/**"         // Fallback endpoints for circuit breaker
+                    "/users/profiles/create", // Specific endpoint for Keycloak SPI
+                    "/api/users/**",          // General user endpoints (adjust if specific sub-paths need auth)
+                    "/api/products/**",       // General product endpoints
+                    "/api/media/**",          // General media endpoints
+                    "/eureka/**",             // Eureka dashboard (secure this in production environments!)
+                    "/actuator/**",           // Spring Boot Actuator endpoints (secure these heavily in production!)
+                    "/fallback/**"            // Fallback endpoints for circuit breaker
                 ).permitAll()
-                         
-                // All other requests require authentication (JWT must be valid)
-                .anyExchange().authenticated()
+                .anyExchange().authenticated() // All other requests require authentication (JWT must be valid)
             )
             // For stateless APIs, we don't need a session to store security context
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
@@ -108,13 +114,12 @@ public class APIGatewayApplication {
                 .frameOptions(frameOptions -> frameOptions.mode(Mode.DENY)) // Prevent clickjacking
                 .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")) // Basic Content Security Policy
                 // Referrer-Policy: Use the enum directly
-                .referrerPolicy(policy -> policy.policy(ReferrerPolicy.NO_REFERRER)) 
+                .referrerPolicy(policy -> policy.policy(ReferrerPolicy.NO_REFERRER)) // Using enum directly
                 // HSTS: Use the simpler method for maxAge and includeSubdomains
                 .hsts(hsts -> hsts.maxAge(java.time.Duration.ofSeconds(31536000)).includeSubdomains(true)) // Set maxAge using Duration
                 // Cache-Control: Commented out due to persistent compilation error.
-                // If needed, consider implementing via a custom WebFilter -  we have done that already see CacheControlWebFilter.java.
+                // If needed, consider implementing via a custom WebFilter - we have done that already see CacheControlWebFilter.java.
                 // .cacheControl().disable()
-                    
             );
         return http.build();
     }
@@ -198,8 +203,8 @@ public class APIGatewayApplication {
                         String userId = null;
                         String email = null;
                         String phone = null;
-                        String firstName = null;
-                        String lastName = null;
+                        String firstName = null; // Corrected
+                        String lastName = null;  // Corrected
                         String rolesStr = null;
                         // Extract user ID from JWT principal
                         if (authentication.getPrincipal() instanceof Jwt jwt) {
@@ -207,8 +212,8 @@ public class APIGatewayApplication {
                             userId = jwt.getClaimAsString(JwtClaims.userId.getClaimName());
                             email = jwt.getClaimAsString(JwtClaims.email.getClaimName());
                             phone = jwt.getClaimAsString(JwtClaims.phone.getClaimName());
-                            firstName = jwt.getClaimAsString(JwtClaims.firstName.getClaimName());
-                            lastName = jwt.getClaimAsString(JwtClaims.lastName.getClaimName());
+                            firstName = jwt.getClaimAsString(JwtClaims.firstName.getClaimName()); // Corrected
+                            lastName = jwt.getClaimAsString(JwtClaims.lastName.getClaimName());   // Corrected
                             
                             rolesStr = authentication.getAuthorities().stream()
                                     .map(a -> a.getAuthority())
@@ -221,9 +226,9 @@ public class APIGatewayApplication {
                                 .header(BasicAuthHeaders.X_USER_ID.getHeaderName(), userId) // Propagate user ID - registration id on the database
                                 .header(BasicAuthHeaders.X_USER_EMAIL.getHeaderName(), email) // Propagate user email
                                 .header(BasicAuthHeaders.X_USER_PHONE.getHeaderName(), phone) // Propagate user phone number
-                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), phone) // Propagate user first name number
-                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), phone) // Propagate user last name number
-                                .header(BasicAuthHeaders.X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user email
+                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), firstName) // MODIFIED: Corrected to use firstName
+                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), lastName)   // MODIFIED: Corrected to use lastName
+                                .header(BasicAuthHeaders.X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user roles
                                 .build();
                             return exchange.mutate().request(request).build();
                         }

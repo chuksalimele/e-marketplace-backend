@@ -35,10 +35,9 @@ public class UserServiceSecurityConfig {
 
     @Value("${jwt.auth.converter.resource-id}")
     private String resourceId;
-    private Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> jwtAuthConverter;
 
     @Bean
-    public JwtAuthConverter getJwtAuthConverter() {
+    public Converter getJwtAuthConverter() {
         return new JwtAuthConverter(principleAttribute, resourceId);
     }
 
@@ -57,7 +56,7 @@ public class UserServiceSecurityConfig {
     }
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, Converter jwtAuthConverter) {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable) // Disable CSRF for stateless APIs
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // Disable basic auth, or configure as needed for internal calls
