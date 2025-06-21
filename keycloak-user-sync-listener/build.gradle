@@ -47,6 +47,9 @@ application {
     mainClass = 'com.aliwudi.marketplace.backend.keycloak.user.sync.listener.App'
 }
 
+bootJar{
+    enabled = false // Disable the Spring Boot executable JAR task - since this one is not sping boot project, we do not nee the spring boot jar
+}
 
 // Ensure the JAR task produces a clean JAR without extra dependencies
 jar {

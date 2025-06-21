@@ -7,28 +7,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.authentication.ReactiveAuthenticationManager;
-import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 
-import static org.springframework.security.config.Customizer.withDefaults;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
-import org.springframework.security.oauth2.jwt.Jwt;
-import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
 @EnableReactiveMethodSecurity // For @PreAuthorize etc.
 public class UserServiceSecurityConfig {
 
-    private final ReactiveUserDetailsService userDetailsService;
-    private final PasswordEncoder passwordEncoder;
 
     @Value("${jwt.auth.converter.principle-attribute}")
     private String principleAttribute;
@@ -39,20 +29,6 @@ public class UserServiceSecurityConfig {
     @Bean
     public Converter getJwtAuthConverter() {
         return new JwtAuthConverter(principleAttribute, resourceId);
-    }
-
-    public UserServiceSecurityConfig(ReactiveUserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-        this.userDetailsService = userDetailsService;
-        this.passwordEncoder = passwordEncoder;
-    }
-
-    // Define the ReactiveAuthenticationManager bean (as previously discussed)
-    @Bean
-    public ReactiveAuthenticationManager reactiveAuthenticationManager() {
-        UserDetailsRepositoryReactiveAuthenticationManager authenticationManager
-                = new UserDetailsRepositoryReactiveAuthenticationManager(userDetailsService);
-        authenticationManager.setPasswordEncoder(passwordEncoder); // Set the password encoder
-        return authenticationManager;
     }
 
     @Bean
