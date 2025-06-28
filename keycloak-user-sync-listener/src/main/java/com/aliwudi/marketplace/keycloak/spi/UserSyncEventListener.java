@@ -22,12 +22,12 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
-import java.time.Duration; // Still technically not used by OkHttp, but not harmful
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Arrays; // Needed for OkHttp ConnectionSpecs
-import java.util.concurrent.TimeUnit; // Needed for OkHttp timeouts
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.HostnameVerifier;
@@ -35,7 +35,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;
 
 import okhttp3.ConnectionSpec;
@@ -45,7 +45,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.FormBody;
-import okhttp3.TlsVersion; // Still needed for explicit TLS version in ConnectionSpec if you re-add it, but not for MODERN_TLS
+import okhttp3.TlsVersion;
 
 /**
  * Keycloak Event Listener with robust error handling and compensating transactions
@@ -53,9 +53,11 @@ import okhttp3.TlsVersion; // Still needed for explicit TLS version in Connectio
  * This version uses direct HTTP calls to Keycloak Admin REST API to avoid
  * keycloak-admin-client SDK dependency issues.
  *
- * This version is configured to use OkHttpClient, including mTLS client
- * certificate presentation, and disables hostname verification for development.
- * It now uses OkHttp's default ConnectionSpec.MODERN_TLS for simplicity.
+ * This version is configured to use OkHttpClient for ONE-WAY TLS. It uses a dedicated
+ * truststore to validate the Keycloak server certificate but does NOT present its own
+ * client certificate. Hostname verification is implicitly enabled.
+ *
+ * Truststore path and password are now loaded from Keycloak's configuration.
  */
 public class UserSyncEventListener implements EventListenerProvider {
 
@@ -67,19 +69,25 @@ public class UserSyncEventListener implements EventListenerProvider {
     private final String serviceAccountClientId;
     private final String serviceAccountClientSecret;
 
+    // Instance variables for truststore path and password (client keystore removed)
+    private final String spiTruststorePath;
+    private final char[] spiTruststorePassword;
+
     private final OkHttpClient okHttpClient;
     private final ObjectMapper objectMapper;
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final MediaType FORM_URLENCODED = MediaType.get("application/x-www-form-urlencoded; charset=utf-8");
 
-
     public UserSyncEventListener(KeycloakSession session,
                                  String userServiceApiUrl,
                                  String keycloakAuthServerUrl,
                                  String keycloakRealm,
                                  String serviceAccountClientId,
-                                 String serviceAccountClientSecret) {
+                                 String serviceAccountClientSecret,
+                                 // NEW: Parameters for truststore path and password
+                                 String spiTruststorePath,
+                                 String spiTruststorePassword) { // Client keystore params removed for one-way TLS
         this.session = session;
         this.userServiceApiUrl = userServiceApiUrl;
         this.keycloakAuthServerUrl = keycloakAuthServerUrl;
@@ -87,41 +95,66 @@ public class UserSyncEventListener implements EventListenerProvider {
         this.serviceAccountClientId = serviceAccountClientId;
         this.serviceAccountClientSecret = serviceAccountClientSecret;
 
-        // Trust manager that trusts all certificates (for development only, not recommended for production)
-        X509TrustManager trustAllCertsManager = new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-        };
+        // Assign injected config values for truststore
+        this.spiTruststorePath = spiTruststorePath;
+        this.spiTruststorePassword = spiTruststorePassword != null ? spiTruststorePassword.toCharArray() : null; // Convert string to char array, handle null
 
         try {
-            // --- SSL Context Initialization with KeyManagers and TrustManagers ---
-            SSLContext sslContext = SSLContext.getInstance("TLS"); // Use "TLS" to get the latest protocol supported by the JVM
-            sslContext.init(null, new TrustManager[]{trustAllCertsManager}, new java.security.SecureRandom());
+            // --- Server Certificate Trust (SPI trusts Keycloak server cert) ---
+            KeyStore spiTrustStore = KeyStore.getInstance("PKCS12");
+            // Check if path is null or empty before trying to load
+            if (this.spiTruststorePath == null || this.spiTruststorePath.isEmpty()) {
+                throw new IllegalArgumentException("SPI Truststore Path must be configured.");
+            }
+            try (InputStream is = Files.newInputStream(Paths.get(this.spiTruststorePath))) {
+                // Check if password is null before trying to load (password can be null if truststore has no password)
+                if (this.spiTruststorePassword == null) {
+                    spiTrustStore.load(is, null); // Load with null password
+                } else {
+                    spiTrustStore.load(is, this.spiTruststorePassword);
+                }
+            }
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(spiTrustStore);
 
-            // HostnameVerifier that always returns true (disables verification for development)
+            X509TrustManager x509TrustManager = null;
+            for (TrustManager tm : trustManagerFactory.getTrustManagers()) {
+                if (tm instanceof X509TrustManager) {
+                    x509TrustManager = (X509TrustManager) tm;
+                    break;
+                }
+            }
+            if (x509TrustManager == null) {
+                throw new NoSuchAlgorithmException("No X509TrustManager found in TrustManagerFactory");
+            }
+
+            // --- SSL Context Initialization with ONLY TrustManagers (no KeyManagers = no client cert) ---
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            // First argument is 'null' because we are not providing any client KeyManagers (one-way TLS)
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
+            
             HostnameVerifier trustAllHostnames = new HostnameVerifier() {
                 @Override
                 public boolean verify(String hostname, SSLSession session) {
                     return true; // Trust all hostnames for development
                 }
             };
-
+            
             this.okHttpClient = new OkHttpClient.Builder()
-                    .sslSocketFactory(sslContext.getSocketFactory(), trustAllCertsManager)
-                    .hostnameVerifier(trustAllHostnames) // Apply the custom HostnameVerifier for OkHttp
-                    .connectTimeout(15, TimeUnit.SECONDS) // OkHttp uses TimeUnit
-                    .callTimeout(30, TimeUnit.SECONDS) // OkHttp uses TimeUnit                    
+                    .sslSocketFactory(sslContext.getSocketFactory(), x509TrustManager)
+                    .hostnameVerifier(trustAllHostnames)
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .callTimeout(30, TimeUnit.SECONDS)
                     .connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
                     .build();
             this.objectMapper = new ObjectMapper();
 
         } catch (Exception e) {
-            LOG.errorf(e, "Failed to initialize OkHttpClient for mTLS/SSL. This will prevent HTTP client from working.");
+            LOG.errorf(e, "Failed to initialize OkHttpClient for one-way TLS/SSL using configured truststore. This will prevent HTTP client from working.");
             throw new RuntimeException("Failed to initialize OkHttpClient", e);
         }
     }
-
+    
     @Override
     public void onEvent(Event event) {
         if (EventType.REGISTER.equals(event.getType())) {

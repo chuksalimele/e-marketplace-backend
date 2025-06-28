@@ -6,55 +6,74 @@ import org.keycloak.events.EventListenerProvider;
 import org.keycloak.events.EventListenerProviderFactory;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
-import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.USER_CONTROLLER_BASE;
 
 public class UserSyncEventListenerFactory implements EventListenerProviderFactory {
 
     private static final Logger LOG = Logger.getLogger(UserSyncEventListenerFactory.class);
+
     public static final String PROVIDER_ID = "user-sync-listener";
-    static final private String USER_SERVICE_HOST = "http://localhost:5001";
-    static final private String KEYCLOAK_HOST = "https://localhost:8443";
-    
+
     private String userServiceApiUrl;
     private String keycloakAuthServerUrl;
     private String keycloakRealm;
-    private String userSyncServiceAccountClientId;
-    private String userSyncServiceAccountClientSecret;
-    
+    private String serviceAccountClientId;
+    private String serviceAccountClientSecret;
+    // NEW: Configuration for SPI Truststore
+    private String spiTruststorePath;
+    private String spiTruststorePassword;
 
     @Override
     public EventListenerProvider create(KeycloakSession session) {
+        // Pass the configured values to the EventListenerProvider
         return new UserSyncEventListener(session,
                 userServiceApiUrl,
                 keycloakAuthServerUrl,
                 keycloakRealm,
-                userSyncServiceAccountClientId,
-                userSyncServiceAccountClientSecret);
+                serviceAccountClientId,
+                serviceAccountClientSecret,
+                // NEW: Pass truststore config
+                spiTruststorePath,
+                spiTruststorePassword);
     }
 
     @Override
     public void init(Config.Scope config) {
-        this.userServiceApiUrl = config.get("userServiceApiUrl", USER_SERVICE_HOST+USER_CONTROLLER_BASE);
-        this.keycloakAuthServerUrl = config.get("keycloakAuthServerUrl", KEYCLOAK_HOST);
-        this.keycloakRealm = config.get("keycloakRealm", "chuks-emaketplace-realm");
-        this.userSyncServiceAccountClientId = config.get("userSyncServiceAccountClientId", "user-sync-service-account");
-        this.userSyncServiceAccountClientSecret = config.get("userSyncServiceAccountClientSecret", "YOUR_GENERATED_LISTENER_CLIENT_SECRET"); // From Keycloak Admin Console for 'user-sync-service-account'
+        LOG.info("Initializing UserSyncEventListenerFactory...");
+
+        // Read configuration from Keycloak's config scope
+        this.userServiceApiUrl = config.get("user-service-api-url");
+        this.keycloakAuthServerUrl = config.get("keycloak-auth-server-url");
+        this.keycloakRealm = config.get("keycloak-realm");
+        this.serviceAccountClientId = config.get("user-sync-service-account-client-id");
+        this.serviceAccountClientSecret = config.get("user-sync-service-account-client-secret");
+
+        // NEW: Read SPI Truststore configuration
+        this.spiTruststorePath = config.get("spi-truststore-path");
+        this.spiTruststorePassword = config.get("spi-truststore-password");
 
         LOG.infof("UserSyncEventListener configured. User Service API URL: %s, Keycloak URL: %s, Realm: %s, Listener Client ID: %s",
-                userServiceApiUrl, keycloakAuthServerUrl, keycloakRealm, userSyncServiceAccountClientId);
-        LOG.warn("Listener Client Secret is configured. ENSURE THIS IS SECURELY MANAGED AND NOT DEFAULT!");
+                userServiceApiUrl, keycloakAuthServerUrl, keycloakRealm, serviceAccountClientId);
+
+        if (serviceAccountClientSecret != null && !serviceAccountClientSecret.isEmpty()) {
+            LOG.warn("Listener Client Secret is configured. ENSURE THIS IS SECURELY MANAGED AND NOT DEFAULT!");
+        }
+        // NEW: Log truststore paths for verification
+        LOG.infof("SPI Truststore Path: %s, SPI Truststore Password set: %s",
+                  spiTruststorePath, (spiTruststorePassword != null && !spiTruststorePassword.isEmpty()));
     }
 
     @Override
-    public void postInit(KeycloakSessionFactory factory) {}
-
-    @Override
-    public String getId() {
-        return PROVIDER_ID;
+    public void postInit(KeycloakSessionFactory factory) {
+        // Not used for this SPI
     }
 
     @Override
     public void close() {
-        //throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        // Not used for this SPI
+    }
+
+    @Override
+    public String getId() {
+        return PROVIDER_ID;
     }
 }

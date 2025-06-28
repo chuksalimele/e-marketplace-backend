@@ -14,6 +14,10 @@ logging:
     # org.springframework.security: DEBUG
     # org.springframework.cloud.gateway: DEBUG
 
+truststore:
+  path: classpath:backend_truststore.p12
+  password: microservicetrustpass@123+@+
+  
 spring: # ONLY ONE TOP-LEVEL 'spring' KEY
   main:
     web-application-type: REACTIVE # Crucial for Spring Cloud Gateway

@@ -9,9 +9,14 @@ logging:
  level:
   org.springframework.security: DEBUG
 
+truststore:
+  path: classpath:backend_truststore.p12
+  password: microservicetrustpass@123+@+
+  
 spring:
   application:
     name: notification-service # The unique name of this service, used by Eureka
+    
   security:
     oauth2:
       resourceserver:
