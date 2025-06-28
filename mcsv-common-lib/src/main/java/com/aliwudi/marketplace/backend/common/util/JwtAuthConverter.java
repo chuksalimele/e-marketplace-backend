@@ -9,39 +9,46 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import reactor.core.publisher.Mono; // NEW IMPORT: for Mono
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+/**
+ * Reactive JWT Authentication Converter for Spring WebFlux.
+ * This converter extracts authorities and principle name from a JWT and returns
+ * a Mono containing a JwtAuthenticationToken, as required by reactive security flows.
+ */
+public class JwtAuthConverter implements Converter<Jwt, Mono<? extends AbstractAuthenticationToken>> { // CHANGED return type
 
     private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter =
             new JwtGrantedAuthoritiesConverter();
 
-    
     private final String principleAttribute;
-    
+
     private final String resourceId;
 
     public JwtAuthConverter(String principleAttribute, String resourceId){
         this.principleAttribute = principleAttribute;
         this.resourceId = resourceId;
     }
-    
+
     @Override
-    public AbstractAuthenticationToken convert(@NonNull Jwt jwt) {
+    public Mono<? extends AbstractAuthenticationToken> convert(@NonNull Jwt jwt) { // CHANGED return type
         Collection<GrantedAuthority> authorities = Stream.concat(
                 jwtGrantedAuthoritiesConverter.convert(jwt).stream(),
                 extractResourceRoles(jwt).stream()
         ).collect(Collectors.toSet());
 
-        return new JwtAuthenticationToken(
+        // CRUCIAL CHANGE: Wrap the JwtAuthenticationToken in Mono.just()
+        return Mono.just(new JwtAuthenticationToken(
                 jwt,
                 authorities,
                 getPrincipleClaimName(jwt)
-        );
+        ));
     }
 
     private String getPrincipleClaimName(Jwt jwt) {
