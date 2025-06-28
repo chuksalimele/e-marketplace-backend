@@ -13,21 +13,21 @@ spring:
         jwt:
           # This issuer-uri is good for matching the 'iss' claim in the JWT.
           # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.
-          issuer-uri: http://localhost:8080 # Replace with your Auth Server's actual issuer URI
+          issuer-uri: https://localhost:8443 # Replace with your Auth Server's actual issuer URI
 
           # THIS IS CRUCIAL FOR SIGNATURE VERIFICATION.
           # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
           # This should point to the JWK Set endpoint of your Authorization Server.
-          jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+          jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 
 keycloak:
-  auth-server-url: http://localhost:8080 # Your Keycloak URL
+  auth-server-url: https://localhost:8443 # Your Keycloak URL
   realm: chuks-emaketplace-realm         # Your application realm
   admin-cli-client-id: admin-cli         # Default client for admin access
   admin-username: admin                  # Your Keycloak admin username
   admin-password: admin                  # Your Keycloak admin password (CHANGE FOR PRODUCTION!)
   
-  admin-auth-server-url: http://localhost:8080
+  admin-auth-server-url: https://localhost:8443
   admin-realm: chuks-emaketplace-realm
   admin-client-id: user-service-admin-client     # Client ID for user-service's admin client
   admin-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client

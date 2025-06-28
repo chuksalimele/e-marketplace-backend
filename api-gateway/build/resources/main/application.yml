@@ -185,7 +185,7 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
         jwt:
           # IMPORTANT: Replace with the actual JWK Set URI of your Authorization Server (e.g., Keycloak, Auth0)
           # Spring Security will use this to fetch public keys for JWT signature verification.
-          jwk-set-uri: http://localhost:8080/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+          jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 
 # Eureka Client Configuration
 eureka:

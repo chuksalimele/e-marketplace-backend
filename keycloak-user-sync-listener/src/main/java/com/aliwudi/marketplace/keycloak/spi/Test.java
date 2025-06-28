@@ -3,83 +3,73 @@ package com.aliwudi.marketplace.keycloak.spi;
 import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.*;
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import org.jboss.logging.Logger;
-import org.keycloak.events.Event;
-import org.keycloak.events.EventListenerProvider;
-import org.keycloak.events.EventType;
-import org.keycloak.events.admin.AdminEvent;
+// REMOVED: import org.keycloak.admin.client.Keycloak; // No longer using Admin Client SDK
+
 import org.keycloak.models.KeycloakSession;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonNode; // For easier JSON parsing without direct Map casting
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.net.URI;
-
+// REMOVED: import java.net.http.HttpClient;
+// REMOVED: import java.net.http.HttpClient.Version;
+// REMOVED: import java.net.http.HttpRequest;
+// REMOVED: import java.net.http.HttpResponse;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
-import java.time.Duration; // Still technically not used by OkHttp, but not harmful
-import java.util.Collections;
+import java.time.Duration; // Still relevant for timeout settings
 import java.util.HashMap;
-import java.util.List;
-import java.util.Arrays; // Needed for OkHttp ConnectionSpecs
-import java.util.concurrent.TimeUnit; // Needed for OkHttp timeouts
+import java.util.Map;
+import java.util.concurrent.TimeUnit; // For OkHttp's timeout units
 import java.util.stream.Collectors;
-
 import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import javax.net.ssl.KeyManagerFactory;
-import java.security.KeyStore;
 
-import okhttp3.ConnectionSpec;
+// NEW IMPORTS FOR OKHTTP3
+import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.FormBody;
-import okhttp3.TlsVersion; // Still needed for explicit TLS version in ConnectionSpec if you re-add it, but not for MODERN_TLS
+import okhttp3.FormBody; // For form-urlencoded body
 
 /**
- * Keycloak Event Listener with robust error handling and compensating transactions
- * for synchronizing new user registrations to an external user profile service.
- * This version uses direct HTTP calls to Keycloak Admin REST API to avoid
- * keycloak-admin-client SDK dependency issues.
- *
- * This version is configured to use OkHttpClient, including mTLS client
- * certificate presentation, and disables hostname verification for development.
- * It now uses OkHttp's default ConnectionSpec.MODERN_TLS for simplicity.
+ * Keycloak Event Listener with robust error handling and compensating
+ * transactions for synchronizing new user registrations to an external user
+ * profile service. This version uses direct HTTP calls to Keycloak Admin REST
+ * API to avoid keycloak-admin-client SDK dependency issues.
  */
-public class UserSyncEventListener implements EventListenerProvider {
+public class Test{
 
-    private static final Logger LOG = Logger.getLogger(UserSyncEventListener.class);
+    private static final Logger LOG = Logger.getLogger(Test.class);
     private final KeycloakSession session;
     private final String userServiceApiUrl;
-    private final String keycloakAuthServerUrl;
-    private final String keycloakRealm;
-    private final String serviceAccountClientId;
-    private final String serviceAccountClientSecret;
+    private final String keycloakAuthServerUrl; // Base URL for Keycloak
+    private final String keycloakRealm;          // Realm where the event occurred
+    private final String serviceAccountClientId; // Client ID for obtaining admin token
+    private final String serviceAccountClientSecret; // Secret for obtaining admin token
 
-    private final OkHttpClient okHttpClient;
+    private final OkHttpClient okHttpClient; // CHANGED: From HttpClient to OkHttpClient
     private final ObjectMapper objectMapper;
 
+    // MediaType constants for OkHttp
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final MediaType FORM_URLENCODED = MediaType.get("application/x-www-form-urlencoded; charset=utf-8");
 
-
-    public UserSyncEventListener(KeycloakSession session,
-                                 String userServiceApiUrl,
-                                 String keycloakAuthServerUrl,
-                                 String keycloakRealm,
-                                 String serviceAccountClientId,
-                                 String serviceAccountClientSecret) {
+    public Test(KeycloakSession session,
+            String userServiceApiUrl,
+            String keycloakAuthServerUrl,
+            String keycloakRealm,
+            String serviceAccountClientId,
+            String serviceAccountClientSecret) {
         this.session = session;
         this.userServiceApiUrl = userServiceApiUrl;
         this.keycloakAuthServerUrl = keycloakAuthServerUrl;
@@ -87,50 +77,59 @@ public class UserSyncEventListener implements EventListenerProvider {
         this.serviceAccountClientId = serviceAccountClientId;
         this.serviceAccountClientSecret = serviceAccountClientSecret;
 
-        // Trust manager that trusts all certificates (for development only, not recommended for production)
-        X509TrustManager trustAllCertsManager = new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-        };
+        SSLContext sslContext;
+        X509TrustManager trustAllCertsManager; // Hold the trust manager for OkHttp
 
         try {
-            // --- SSL Context Initialization with KeyManagers and TrustManagers ---
-            SSLContext sslContext = SSLContext.getInstance("TLS"); // Use "TLS" to get the latest protocol supported by the JVM
-            sslContext.init(null, new TrustManager[]{trustAllCertsManager}, new java.security.SecureRandom());
+            // Create a trust manager that does not validate certificate chains
+            trustAllCertsManager = new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() {
+                    return new X509Certificate[0];
+                } // Empty array for no specific accepted issuers
 
-            // HostnameVerifier that always returns true (disables verification for development)
-            HostnameVerifier trustAllHostnames = new HostnameVerifier() {
+                public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                }
+
+                public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                }
+            };
+
+            sslContext = SSLContext.getInstance("SSL"); // Specify TLS protocol
+            sslContext.init(null, new TrustManager[]{trustAllCertsManager}, new java.security.SecureRandom());
+            
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            LOG.errorf(e, "Failed to initialize SSL context for OkHttpClient. This will prevent HTTP client from working.");
+            throw new RuntimeException("Failed to initialize SSL context", e);
+        } catch (Exception e) {
+            LOG.errorf(e, "An unexpected error occurred during SSL context initialization.");
+            throw new RuntimeException("Unexpected error during SSL context initialization", e);
+        }
+
+          HostnameVerifier trustAllHostnames = new HostnameVerifier() {
                 @Override
                 public boolean verify(String hostname, SSLSession session) {
                     return true; // Trust all hostnames for development
                 }
             };
 
-            this.okHttpClient = new OkHttpClient.Builder()
-                    .sslSocketFactory(sslContext.getSocketFactory(), trustAllCertsManager)
-                    .hostnameVerifier(trustAllHostnames) // Apply the custom HostnameVerifier for OkHttp
-                    .connectTimeout(15, TimeUnit.SECONDS) // OkHttp uses TimeUnit
-                    .callTimeout(30, TimeUnit.SECONDS) // OkHttp uses TimeUnit                    
-                    .connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
-                    .build();
-            this.objectMapper = new ObjectMapper();
-
-        } catch (Exception e) {
-            LOG.errorf(e, "Failed to initialize OkHttpClient for mTLS/SSL. This will prevent HTTP client from working.");
-            throw new RuntimeException("Failed to initialize OkHttpClient", e);
-        }
+        // CHANGED: Initializing OkHttpClient
+        this.okHttpClient = new OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.getSocketFactory(), trustAllCertsManager) // Apply custom SSLContext and TrustManager
+                .hostnameVerifier(trustAllHostnames)
+                .connectTimeout(15, TimeUnit.SECONDS) // OkHttp uses TimeUnit
+                .callTimeout(30, TimeUnit.SECONDS) // Overall call timeout
+                .build();
+        this.objectMapper = new ObjectMapper();
     }
-
-    @Override
-    public void onEvent(Event event) {
-        if (EventType.REGISTER.equals(event.getType())) {
+    
+    public void onEvent() {
+        
             LOG.infof("New user registration event detected for userId: %s, username: %s, realm: %s",
-                    event.getUserId(), event.getDetails().get("username"), event.getRealmId());
+                    "test user id", "test username", "test realm id");
 
-            String keycloakUserId = event.getUserId();
-            String username = event.getDetails().get("username");
-            String email = event.getDetails().get("email");
+            String keycloakUserId = "test user id";
+            String username = "test username";
+            String email = "test email";
 
             try {
                 // 1. Prepare data for user-service profile creation
@@ -145,22 +144,23 @@ public class UserSyncEventListener implements EventListenerProvider {
                 String serviceAccountAccessToken = getServiceAccountAccessToken(serviceAccountClientId, serviceAccountClientSecret);
                 if (serviceAccountAccessToken == null) {
                     LOG.error("Failed to obtain service account access token for user-service call. User synchronization aborted. Initiating Keycloak user deletion.");
-                    deleteKeycloakUser(keycloakUserId, null);
+                    deleteKeycloakUser(keycloakUserId, null); // Cannot delete US profile yet, token failed
                     return;
                 }
 
-                // 3. Call user-service to create profile using OkHttp
+                // 3. Call user-service to create profile
+                // CHANGED: OkHttp Request creation
                 RequestBody requestBody = RequestBody.create(jsonPayload, JSON);
                 Request createProfileRequest = new Request.Builder()
                         .url(userServiceApiUrl + USER_PROFILES_CREATE)
-                        .addHeader(HEADER_CONTENT_TYPE, MEDIA_TYPE_APPLICATION_JSON)
                         .addHeader(HEADER_AUTHORIZATION, AUTH_SCHEME_BEARER + serviceAccountAccessToken)
                         .post(requestBody)
                         .build();
 
+                // CHANGED: OkHttp call execution
                 Response createProfileResponse = okHttpClient.newCall(createProfileRequest).execute();
 
-                if (createProfileResponse.isSuccessful()) {
+                if (createProfileResponse.isSuccessful()) { // OkHttp's isSuccessful() checks for 2xx status codes
                     String responseBody = createProfileResponse.body().string();
                     LOG.infof("Successfully created profile for user %s (Keycloak ID: %s) in user-service. Status: %d",
                             username, keycloakUserId, createProfileResponse.code());
@@ -175,8 +175,9 @@ public class UserSyncEventListener implements EventListenerProvider {
                                 username, keycloakUserId, internalAppId);
                     } catch (Exception updateEx) {
                         LOG.errorf(updateEx, "Failed to update Keycloak user '%s' with 'user_id'. Initiating rollback.", keycloakUserId);
+                        // Rollback: Delete both Keycloak user and user-service profile
                         deleteKeycloakUser(keycloakUserId, serviceAccountAccessToken);
-                        deleteUserServiceProfile(serviceAccountAccessToken, keycloakUserId);
+                        deleteUserServiceUserProfile(serviceAccountAccessToken, keycloakUserId);
                         return;
                     }
 
@@ -191,28 +192,21 @@ public class UserSyncEventListener implements EventListenerProvider {
 
             } catch (Exception e) {
                 LOG.errorf(e, "Unexpected error during user synchronization for Keycloak ID %s. Initiating rollback.", keycloakUserId);
-                deleteKeycloakUser(keycloakUserId, null);
+                // Cannot delete user-service profile here reliably as we don't know if it was created
+                deleteKeycloakUser(keycloakUserId, null); // Pass null if token might not be available
             }
-        } else {
-            LOG.debugf("Keycloak event: Type=%s, Realm=%s, Client=%s, UserId=%s",
-                    event.getType(), event.getRealmId(), event.getClientId(), event.getUserId());
-        }
+        
     }
 
-    @Override
-    public void onEvent(AdminEvent adminEvent, boolean includeRepresentation) {
-        // Not handling admin events for this scenario
-    }
-
-    @Override
     public void close() {
         // Cleanup resources if necessary. OkHttpClient manages its connection pool internally.
+        // For simpler shutdown if explicit close is needed: okHttpClient.dispatcher().executorService().shutdown();
     }
 
     // --- Helper Methods using direct HTTP calls to Keycloak Admin API ---
-
     /**
-     * Obtains an access token for a given service account client from Keycloak's token endpoint.
+     * Obtains an access token for a given service account client from
+     * Keycloak's token endpoint.
      *
      * @param clientId The client ID of the service account.
      * @param clientSecret The secret of the service account.
@@ -220,8 +214,10 @@ public class UserSyncEventListener implements EventListenerProvider {
      */
     private String getServiceAccountAccessToken(String clientId, String clientSecret) {
         try {
+            // Keycloak token endpoint URL
             String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakAuthServerUrl, keycloakRealm);
 
+            // CHANGED: OkHttp FormBody for token request
             RequestBody formBody = new FormBody.Builder()
                     .add("grant_type", "client_credentials")
                     .add("client_id", clientId)
@@ -233,9 +229,10 @@ public class UserSyncEventListener implements EventListenerProvider {
                     .post(formBody)
                     .build();
 
+            // CHANGED: OkHttp call execution
             Response tokenResponse = okHttpClient.newCall(tokenRequest).execute();
 
-            if (tokenResponse.isSuccessful()) {
+            if (tokenResponse.isSuccessful()) { // OkHttp's isSuccessful() checks for 2xx status codes
                 JsonNode jsonResponse = objectMapper.readTree(tokenResponse.body().string());
                 return jsonResponse.get("access_token").asText();
             } else {
@@ -258,14 +255,18 @@ public class UserSyncEventListener implements EventListenerProvider {
      * @param adminAccessToken The admin access token obtained from Keycloak.
      */
     private void updateKeycloakUserAttribute(String keycloakUserId, String internalAppId, String adminAccessToken) throws Exception {
+        // Keycloak Admin API endpoint for user
         String userUrl = String.format("%s/admin/realms/%s/users/%s", keycloakAuthServerUrl, keycloakRealm, keycloakUserId);
 
+        // First, get the current user representation to avoid overwriting other attributes
+        // CHANGED: OkHttp Request creation
         Request getRequest = new Request.Builder()
                 .url(userUrl)
                 .addHeader(HEADER_AUTHORIZATION, AUTH_SCHEME_BEARER + adminAccessToken)
                 .get()
                 .build();
 
+        // CHANGED: OkHttp call execution
         Response getResponse = okHttpClient.newCall(getRequest).execute();
 
         if (!getResponse.isSuccessful()) {
@@ -275,6 +276,7 @@ public class UserSyncEventListener implements EventListenerProvider {
 
         ObjectNode userRepJson = (ObjectNode) objectMapper.readTree(getResponse.body().string());
 
+        // Update attributes: 'user_id' should be a list of strings in Keycloak
         ObjectNode attributesNode = (ObjectNode) userRepJson.get("attributes");
         if (attributesNode == null) {
             attributesNode = objectMapper.createObjectNode();
@@ -286,6 +288,8 @@ public class UserSyncEventListener implements EventListenerProvider {
 
         String updatedUserPayload = objectMapper.writeValueAsString(userRepJson);
 
+        // Send PUT request to update user
+        // CHANGED: OkHttp Request creation
         RequestBody putRequestBody = RequestBody.create(updatedUserPayload, JSON);
         Request putRequest = new Request.Builder()
                 .url(userUrl)
@@ -293,6 +297,7 @@ public class UserSyncEventListener implements EventListenerProvider {
                 .put(putRequestBody)
                 .build();
 
+        // CHANGED: OkHttp call execution
         Response putResponse = okHttpClient.newCall(putRequest).execute();
 
         if (!putResponse.isSuccessful()) {
@@ -301,12 +306,13 @@ public class UserSyncEventListener implements EventListenerProvider {
         }
     }
 
-
     /**
-     * Deletes a user in Keycloak using direct Admin REST API call (compensating transaction).
+     * Deletes a user in Keycloak using direct Admin REST API call (compensating
+     * transaction).
      *
      * @param keycloakUserId The UUID of the user in Keycloak.
-     * @param adminAccessToken The admin access token obtained from Keycloak (can be null if token acquisition failed).
+     * @param adminAccessToken The admin access token obtained from Keycloak
+     * (can be null if token acquisition failed).
      */
     private void deleteKeycloakUser(String keycloakUserId, String adminAccessToken) {
         LOG.warnf("Attempting to delete Keycloak user '%s' as part of rollback.", keycloakUserId);
@@ -317,12 +323,14 @@ public class UserSyncEventListener implements EventListenerProvider {
         try {
             String userUrl = String.format("%s/admin/realms/%s/users/%s", keycloakAuthServerUrl, keycloakRealm, keycloakUserId);
 
+            // CHANGED: OkHttp Request creation
             Request deleteRequest = new Request.Builder()
                     .url(userUrl)
                     .addHeader(HEADER_AUTHORIZATION, AUTH_SCHEME_BEARER + adminAccessToken)
-                    .delete()
+                    .delete() // OkHttp has a dedicated delete() method
                     .build();
 
+            // CHANGED: OkHttp call execution
             Response response = okHttpClient.newCall(deleteRequest).execute();
             if (response.isSuccessful()) {
                 LOG.infof("Successfully deleted Keycloak user '%s' during rollback. Status: %d",
@@ -337,21 +345,23 @@ public class UserSyncEventListener implements EventListenerProvider {
     }
 
     /**
-     * Deletes a user profile in user-service (compensating transaction).
-     * This calls a specific internal DELETE endpoint on user-service.
+     * Deletes a user profile in user-service (compensating transaction). This
+     * calls a specific internal DELETE endpoint on user-service.
      *
      * @param serviceAccountAccessToken Token to authenticate with user-service.
      * @param keycloakUserId The Keycloak ID of the profile to delete.
      */
-    private void deleteUserServiceProfile(String serviceAccountAccessToken, String keycloakUserId) {
+    private void deleteUserServiceUserProfile(String serviceAccountAccessToken, String keycloakUserId) {
         LOG.warnf("Attempting to delete user-service profile for Keycloak ID '%s' as part of rollback.", keycloakUserId);
         try {
+            // CHANGED: OkHttp Request creation
             Request deleteRequest = new Request.Builder()
                     .url(userServiceApiUrl + USER_PROFILES_DELETE_ROLLBACK.replace("{authId}", keycloakUserId))
                     .addHeader(HEADER_AUTHORIZATION, AUTH_SCHEME_BEARER + serviceAccountAccessToken)
-                    .delete()
+                    .delete() // OkHttp has a dedicated delete() method
                     .build();
 
+            // CHANGED: OkHttp call execution
             Response response = okHttpClient.newCall(deleteRequest).execute();
             if (response.isSuccessful()) {
                 LOG.infof("Successfully deleted user-service profile for Keycloak ID '%s' during rollback. Status: %d",
@@ -363,5 +373,26 @@ public class UserSyncEventListener implements EventListenerProvider {
         } catch (Exception e) {
             LOG.errorf(e, "Error deleting user-service profile for Keycloak ID '%s' during rollback. Manual intervention may be required.", keycloakUserId);
         }
+    }
+
+    public static void main(String args[]) {
+        KeycloakSession session = null;
+        String userServiceApiUrl = "http://localhost:5001/api/users";
+        String keycloakAuthServerUrl = "https://localhost:8443";
+        String keycloakRealm = "chuks-emaketplace-realm";
+        String serviceAccountClientId = "user-sync-service-account";
+        String serviceAccountClientSecret = "mUcL4rSe1DutbOUmuRK34c3mpEBVdDi5";
+        
+        //System.setProperty("javax.net.debug", "all");
+        
+        Test test = new Test(session,
+                userServiceApiUrl,
+                keycloakAuthServerUrl,
+                keycloakRealm,
+                serviceAccountClientId,
+                serviceAccountClientSecret);
+        
+        test.onEvent();
+        
     }
 }

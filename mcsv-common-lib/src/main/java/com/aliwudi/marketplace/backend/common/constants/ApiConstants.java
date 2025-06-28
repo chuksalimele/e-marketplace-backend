@@ -258,6 +258,7 @@ public final class ApiConstants {
     // --- Common HTTP Headers and MIME Types ---
     public static final String HEADER_CONTENT_TYPE = "Content-Type";
     public static final String MEDIA_TYPE_APPLICATION_JSON = "application/json";
+    public static final String MEDIA_TYPE_APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded";    
     public static final String HEADER_AUTHORIZATION = "Authorization";
     public static final String AUTH_SCHEME_BEARER = "Bearer "; // Includes the space    
     

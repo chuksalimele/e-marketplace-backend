@@ -23,7 +23,9 @@ dependencies {
     compileOnly "org.keycloak:keycloak-services:${keycloakVersion}"
 
     // Keycloak Admin Client
-    compileOnly "org.keycloak:keycloak-admin-client:26.0.5" // Use compileOnly as Keycloak provides this
+    //compileOnly "org.keycloak:keycloak-admin-client:26.0.5" // Use compileOnly as Keycloak provides this
+
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0' 
 
     // Logging for Keycloak (JBoss Logging)
     compileOnly "org.jboss.logging:jboss-logging:${jbossLoggingVersion}"
@@ -44,7 +46,7 @@ dependencies {
 
 application {
     // Define the main class for the application.
-    mainClass = 'com.aliwudi.marketplace.backend.keycloak.user.sync.listener.App'
+    mainClass = 'com.aliwudi.marketplace.keycloak.spi.Test'
 }
 
 bootJar{

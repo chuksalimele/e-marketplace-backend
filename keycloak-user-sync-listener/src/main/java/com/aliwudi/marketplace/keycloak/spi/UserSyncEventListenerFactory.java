@@ -13,7 +13,7 @@ public class UserSyncEventListenerFactory implements EventListenerProviderFactor
     private static final Logger LOG = Logger.getLogger(UserSyncEventListenerFactory.class);
     public static final String PROVIDER_ID = "user-sync-listener";
     static final private String USER_SERVICE_HOST = "http://localhost:5001";
-    static final private String KEYCLOAK_HOST = "http://localhost:8080";
+    static final private String KEYCLOAK_HOST = "https://localhost:8443";
     
     private String userServiceApiUrl;
     private String keycloakAuthServerUrl;
