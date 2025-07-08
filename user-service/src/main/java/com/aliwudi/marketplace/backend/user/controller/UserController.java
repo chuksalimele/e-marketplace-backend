@@ -118,7 +118,7 @@ public class UserController {
         // Basic check for at least one field to update
         if (userRequest.getFirstName() == null && userRequest.getLastName() == null &&
             userRequest.getEmail() == null && userRequest.getUsername() == null &&
-            userRequest.getShippingAddress() == null && userRequest.getRoleNames() == null) {
+            userRequest.getShippingAddress() == null && userRequest.getRoles() == null) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_UPDATE_REQUEST);
         }
         return userService.updateUser(id, userRequest);

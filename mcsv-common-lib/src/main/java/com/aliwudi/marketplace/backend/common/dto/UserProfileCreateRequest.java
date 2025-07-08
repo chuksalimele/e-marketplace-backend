@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.common.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import java.util.Set;
 import lombok.Data;
 
 @Data
@@ -21,6 +22,7 @@ public class UserProfileCreateRequest {
     private String email;
 
     // Add other fields you expect from Authorization server (Keycloak) registration (e.g., firstName, lastName)
+    private Set<String> roles;
     private String phoneNumber;    
     private String firstName;
     private String lastName;

@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
+import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.auth.service.IAdminService; // MODIFIED: Import IAdminService
 import org.springframework.security.core.Authentication;
@@ -137,16 +138,25 @@ public class UserService {
             newUser.setCreatedAt(LocalDateTime.now());
             newUser.setUpdatedAt(LocalDateTime.now());
             newUser.setEnabled(true);
+            
+            if (request.getRoles() == null && request.getRoles().isEmpty()) {
+                log.warn("User creation failed in backend: No role assigned for new user");
+                return Mono.error(new InvalidUserDataException(ApiResponseMessages.NO_ROLE_ASSIGNED_FOR_USER));
+            }
+                        Set<Mono<Role>> roleMonos = request.getRoles().stream()
+                                .map(roleName -> roleRepository.findByName(roleName)
+                                        .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND+" : " + roleName))))
+                                .collect(Collectors.toSet());
 
-            // Default role assignment for new users (e.g., 'USER')
-            return roleRepository.findByName("USER")
-                    .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + "USER")))
-                    .flatMap(defaultRole -> {
-                        Set<Role> roles = new HashSet<>();
-                        roles.add(defaultRole);
-                        newUser.setRoles(roles);
-                        return userRepository.save(newUser); // Save to DB, ID will be generated
-                    })
+
+            
+            return Flux.fromIterable(roleMonos)
+                                .flatMap(mono -> mono)
+                                .collect(Collectors.toSet())
+                                .flatMap(newRoles -> {
+                                    newUser.setRoles(newRoles);
+                                    return userRepository.save(newUser);
+                                })
                     .flatMap(persistedUser -> {
                         Long userId = persistedUser.getId();
                         log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId); // Generic log
@@ -300,8 +310,8 @@ public class UserService {
                     existingUser.setUpdatedAt(LocalDateTime.now());
 
                     // Handle roles if provided in UserRequest, otherwise keep existing roles
-                    if (userRequest.getRoleNames() != null && !userRequest.getRoleNames().isEmpty()) {
-                        Set<Mono<Role>> roleMonos = userRequest.getRoleNames().stream()
+                    if (userRequest.getRoles() != null && !userRequest.getRoles().isEmpty()) {
+                        Set<Mono<Role>> roleMonos = userRequest.getRoles().stream()
                                 .map(roleName -> roleRepository.findByName(roleName)
                                         .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND+" : " + roleName))))
                                 .collect(Collectors.toSet());

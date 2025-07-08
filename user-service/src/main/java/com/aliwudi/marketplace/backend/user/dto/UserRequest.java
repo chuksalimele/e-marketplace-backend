@@ -49,5 +49,5 @@ public class UserRequest {
 
     // Role names to assign to the user during creation or update.
     // Assuming ERole enum names (e.g., "ROLE_USER", "ROLE_ADMIN")
-    private Set<String> roleNames;
+    private Set<String> roles;
 }

@@ -49,6 +49,7 @@ public interface ApiResponseMessages {
     String USER_REGISTERED_SUCCESS = "User registered successfully!";
     String ROLE_USER_NOT_FOUND = "Error: Default role 'ROLE_USER' is not found in the database. Please ensure it's configured";
     String ROLE_NOT_FOUND = "Error: Role is not found in the database"; // Append role name
+    String NO_ROLE_ASSIGNED_FOR_USER = "Error: No role assigned for user";
     String INVALID_ROLE_PROVIDED = "Error: Invalid role provided"; // Append role name
     String ERROR_REGISTERING_USER = "An error occurred during user registration";
     String LOGIN_SUCCESS = "Login successful!";
