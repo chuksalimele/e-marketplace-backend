@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.auth.service;
 
+import java.util.Set;
 import org.keycloak.representations.idm.UserRepresentation;
 import reactor.core.publisher.Mono;
 
@@ -20,9 +21,10 @@ public interface IAdminService {
      * @param internalUserId The internal ID from the backend database to store as a custom attribute.
      * @param firstName The first name of the user.
      * @param lastName The last name of the user.
+     * @param roles The roles of the user
      * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the newly created user.
      */
-    Mono<String> createUserInAuthServer(String username, String email, String password, Long internalUserId, String firstName, String lastName);
+    Mono<String> createUserInAuthServer(String username, String email, String password, Long internalUserId, String firstName, String lastName, Set<String> roles);
 
     /**
      * Retrieves a user from the Authorization Server by their Authorization Server ID.

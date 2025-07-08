@@ -21,6 +21,7 @@ import jakarta.ws.rs.NotFoundException; // jakarta.ws.rs.NotFoundException
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
+import java.util.Set;
 
 /**
  * Implementation of IAdminService for Keycloak Authorization Server.
@@ -74,7 +75,14 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @throws RuntimeException if user creation or password setting fails for other reasons.
      */
     @Override
-    public Mono<String> createUserInAuthServer(String username, String email, String password, Long internalUserId, String firstName, String lastName) { // Generic method name
+    public Mono<String> createUserInAuthServer(String username, 
+            String email, 
+            String password,
+            Long internalUserId,
+            String firstName, 
+            String lastName,
+            Set<String> roles) { // Generic method name
+        
         return Mono.fromCallable(() -> {
             Keycloak keycloak = getAuthServerClient(); // Generic method call
             UserRepresentation user = new UserRepresentation();

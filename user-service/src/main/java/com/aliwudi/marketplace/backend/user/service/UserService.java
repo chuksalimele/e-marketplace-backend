@@ -30,11 +30,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-
 /**
- * Service class for managing user-related business logic.
- * Handles operations like creating, retrieving, updating, and deleting users.
- * Now implements the "backend-first" hybrid registration flow with generic Authorization Server integration.
+ * Service class for managing user-related business logic. Handles operations
+ * like creating, retrieving, updating, and deleting users. Now implements the
+ * "backend-first" hybrid registration flow with generic Authorization Server
+ * integration.
  */
 @Service
 @RequiredArgsConstructor
@@ -98,15 +98,19 @@ public class UserService {
     }
 
     /**
-     * Creates a new user in the backend database and then registers them in the Authorization Server.
-     * This method implements the "backend-first" hybrid registration approach.
-     * If Authorization Server registration fails, the user is rolled back (deleted) from the backend database.
+     * Creates a new user in the backend database and then registers them in the
+     * Authorization Server. This method implements the "backend-first" hybrid
+     * registration approach. If Authorization Server registration fails, the
+     * user is rolled back (deleted) from the backend database.
      *
      * @param request The DTO containing user creation data, including password.
-     * @return A Mono emitting the created User object, updated with Authorization Server's authId.
-     * @throws DuplicateResourceException if a user with the same email or username already exists in backend DB or Authorization Server.
+     * @return A Mono emitting the created User object, updated with
+     * Authorization Server's authId.
+     * @throws DuplicateResourceException if a user with the same email or
+     * username already exists in backend DB or Authorization Server.
      * @throws RoleNotFoundException if a specified role does not exist.
-     * @throws RuntimeException if Authorization Server registration fails for other reasons.
+     * @throws RuntimeException if Authorization Server registration fails for
+     * other reasons.
      */
     @Transactional
     public Mono<User> createUser(UserProfileCreateRequest request) {
@@ -138,38 +142,37 @@ public class UserService {
             newUser.setCreatedAt(LocalDateTime.now());
             newUser.setUpdatedAt(LocalDateTime.now());
             newUser.setEnabled(true);
-            
+
             if (request.getRoles() == null && request.getRoles().isEmpty()) {
                 log.warn("User creation failed in backend: No role assigned for new user");
                 return Mono.error(new InvalidUserDataException(ApiResponseMessages.NO_ROLE_ASSIGNED_FOR_USER));
             }
-                        Set<Mono<Role>> roleMonos = request.getRoles().stream()
-                                .map(roleName -> roleRepository.findByName(roleName)
-                                        .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND+" : " + roleName))))
-                                .collect(Collectors.toSet());
+            Set<Mono<Role>> roleMonos = request.getRoles().stream()
+                    .map(roleName -> roleRepository.findByName(roleName)
+                    .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + " : " + roleName))))
+                    .collect(Collectors.toSet());
 
-
-            
             return Flux.fromIterable(roleMonos)
-                                .flatMap(mono -> mono)
-                                .collect(Collectors.toSet())
-                                .flatMap(newRoles -> {
-                                    newUser.setRoles(newRoles);
-                                    return userRepository.save(newUser);
-                                })
+                    .flatMap(mono -> mono)
+                    .collect(Collectors.toSet())
+                    .flatMap(newRoles -> {
+                        newUser.setRoles(newRoles);
+                        return userRepository.save(newUser);
+                    })
                     .flatMap(persistedUser -> {
                         Long userId = persistedUser.getId();
                         log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId); // Generic log
 
                         // 2. Register user in Authorization Server via Admin API
-                        return iAdminService.createUserInAuthServer( // MODIFIED: Call generic method
-                                        request.getUsername(),
-                                        request.getEmail(),
-                                        request.getPassword(),
-                                        userId,
-                                        request.getFirstName(),
-                                        request.getLastName()
-                                )
+                        return iAdminService.createUserInAuthServer(// MODIFIED: Call generic method
+                                request.getUsername(),
+                                request.getEmail(),
+                                request.getPassword(),
+                                userId,
+                                request.getFirstName(),
+                                request.getLastName(),
+                                request.getRoles()
+                        )
                                 .flatMap(authServerAuthId -> { // MODIFIED: Generic variable name
                                     // 3. Update backend user with Authorization Server's authId
                                     persistedUser.setAuthId(authServerAuthId); // MODIFIED: Generic variable name
@@ -187,10 +190,8 @@ public class UserService {
                     .flatMap(this::prepareDto)
                     .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                     .doOnError(e -> log.error("Error creating user {}: {}", request.getUsername(), e.getMessage(), e));
-    });
-                }            
-
-
+        });
+    }
 
     /**
      * Finds a user by their internal database ID.
@@ -202,8 +203,11 @@ public class UserService {
         log.debug("Finding user by ID: {}", id);
         return userRepository.findById(id)
                 .doOnSuccess(user -> {
-                    if (user != null) log.debug("Found user by ID: {}", id);
-                    else log.debug("User with ID {} not found.", id);
+                    if (user != null) {
+                        log.debug("Found user by ID: {}", id);
+                    } else {
+                        log.debug("User with ID {} not found.", id);
+                    }
                 })
                 .doOnError(e -> log.error("Error finding user by ID {}: {}", id, e.getMessage(), e));
     }
@@ -218,8 +222,11 @@ public class UserService {
         log.debug("Finding user by authorization ID: {}", authId);
         return userRepository.findByAuthId(authId)
                 .doOnSuccess(user -> {
-                    if (user != null) log.debug("Found user by authorization ID: {}", authId);
-                    else log.debug("User with authorization ID {} not found.", authId);
+                    if (user != null) {
+                        log.debug("Found user by authorization ID: {}", authId);
+                    } else {
+                        log.debug("User with authorization ID {} not found.", authId);
+                    }
                 })
                 .doOnError(e -> log.error("Error finding user by authorization ID {}: {}", authId, e.getMessage(), e));
     }
@@ -243,7 +250,8 @@ public class UserService {
      * @param userRequest The DTO containing updated user information.
      * @return A Mono emitting the updated User object.
      * @throws ResourceNotFoundException if the user is not found.
-     * @throws DuplicateResourceException if the updated email or username already exists for another user.
+     * @throws DuplicateResourceException if the updated email or username
+     * already exists for another user.
      */
     @Transactional
     public Mono<User> updateUser(Long id, UserRequest userRequest) {
@@ -313,7 +321,7 @@ public class UserService {
                     if (userRequest.getRoles() != null && !userRequest.getRoles().isEmpty()) {
                         Set<Mono<Role>> roleMonos = userRequest.getRoles().stream()
                                 .map(roleName -> roleRepository.findByName(roleName)
-                                        .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND+" : " + roleName))))
+                                .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + " : " + roleName))))
                                 .collect(Collectors.toSet());
 
                         return Flux.fromIterable(roleMonos)
@@ -333,10 +341,11 @@ public class UserService {
     }
 
     /**
-     * Updates an existing user's Authorization Server Auth ID.
-     * This method is used after successful Authorization Server registration.
+     * Updates an existing user's Authorization Server Auth ID. This method is
+     * used after successful Authorization Server registration.
      *
-     * @param user The User object with the Authorization Server Auth ID to update.
+     * @param user The User object with the Authorization Server Auth ID to
+     * update.
      * @return A Mono emitting the updated User object.
      * @throws ResourceNotFoundException if the user is not found.
      */
@@ -354,7 +363,6 @@ public class UserService {
                 .doOnError(e -> log.error("Error updating user {} Authorization Server Auth ID: {}", user.getId(), e.getMessage(), e)); // Generic log
     }
 
-
     /**
      * Deletes a user by their ID. This operation is transactional.
      *
@@ -371,11 +379,12 @@ public class UserService {
     }
 
     /**
-     * Deletes a user by their Authorization Server authorization ID from both backend DB and Authorization Server.
-     * This method is typically called by an admin or for cleanup purposes.
+     * Deletes a user by their Authorization Server authorization ID from both
+     * backend DB and Authorization Server. This method is typically called by
+     * an admin or for cleanup purposes.
      *
-     * @param authId The auth ID (ID at the authorization server e.g Authorization Server)
-     * of the user to delete.
+     * @param authId The auth ID (ID at the authorization server e.g
+     * Authorization Server) of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
@@ -383,7 +392,7 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUserByAuthId(String authId) {
         log.debug("Attempting to delete user with Auth ID: {}", authId);
-       return userRepository.deleteByAuthId(authId) // Delete from backend DB first
+        return userRepository.deleteByAuthId(authId) // Delete from backend DB first
                 .then(iAdminService.deleteUserFromAuthServer(authId)) // MODIFIED: Call generic method
                 .doOnSuccess(v -> log.debug("User deleted successfully with Auth ID: {}", authId))
                 .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
