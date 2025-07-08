@@ -148,15 +148,15 @@ public class UserService {
                         return userRepository.save(newUser); // Save to DB, ID will be generated
                     })
                     .flatMap(persistedUser -> {
-                        Long internalUserId = persistedUser.getId();
-                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), internalUserId); // Generic log
+                        Long userId = persistedUser.getId();
+                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId); // Generic log
 
                         // 2. Register user in Authorization Server via Admin API
                         return iAdminService.createUserInAuthServer( // MODIFIED: Call generic method
                                         request.getUsername(),
                                         request.getEmail(),
                                         request.getPassword(),
-                                        internalUserId,
+                                        userId,
                                         request.getFirstName(),
                                         request.getLastName()
                                 )
@@ -169,7 +169,7 @@ public class UserService {
                                 .onErrorResume(e -> {
                                     // 4. If Authorization Server registration fails, rollback (delete) user from backend DB
                                     log.error("Failed to register user in Authorization Server for internal ID {}. Initiating rollback of backend user. Error: {}", // Generic log
-                                            internalUserId, e.getMessage(), e);
+                                            userId, e.getMessage(), e);
                                     return userRepository.delete(persistedUser)
                                             .then(Mono.error(new RuntimeException(ApiResponseMessages.USER_REGISTRATION_FAILED + ": " + e.getMessage(), e)));
                                 });
@@ -239,7 +239,7 @@ public class UserService {
     public Mono<User> updateUser(Long id, UserRequest userRequest) {
         log.debug("Updating user with ID: {}", id);
         return userRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + id)))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id)))
                 .flatMap(existingUser -> {
                     // Check for duplicate username if changed
                     Mono<Void> usernameCheck = Mono.empty();
@@ -303,7 +303,7 @@ public class UserService {
                     if (userRequest.getRoleNames() != null && !userRequest.getRoleNames().isEmpty()) {
                         Set<Mono<Role>> roleMonos = userRequest.getRoleNames().stream()
                                 .map(roleName -> roleRepository.findByName(roleName)
-                                        .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + roleName))))
+                                        .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND+" : " + roleName))))
                                 .collect(Collectors.toSet());
 
                         return Flux.fromIterable(roleMonos)

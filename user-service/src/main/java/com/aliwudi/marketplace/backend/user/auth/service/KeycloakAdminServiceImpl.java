@@ -84,41 +84,46 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             user.setFirstName(firstName);
             user.setLastName(lastName);
 
-            // Set the internal_user_id as a custom attribute
+            // Set the user_id as a custom attribute
             Map<String, List<String>> attributes = new HashMap<>();
             attributes.put("user_id", Collections.singletonList(String.valueOf(internalUserId)));
             user.setAttributes(attributes);
 
-            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with internal_user_id: {}", username, userAuthRealm, internalUserId); // Generic log
+            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with user_id: {}", username, userAuthRealm, internalUserId); // Generic log
 
             try (Response response = keycloak.realm(userAuthRealm).users().create(user)) { // Use userAuthRealm
-                if (response.getStatus() == 201) { // 201 Created
-                    String authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1"); // Generic variable name
-                    log.info("Successfully created user '{}' in Authorization Server. Auth Server ID: {}", username, authServerUserId); // Generic log
-
-                    // Set password
-                    UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId); // Use userAuthRealm, generic variable
-                    CredentialRepresentation passwordCred = new CredentialRepresentation();
-                    passwordCred.setTemporary(false);
-                    passwordCred.setType(CredentialRepresentation.PASSWORD);
-                    passwordCred.setValue(password);
-
-                    userResource.resetPassword(passwordCred);
-                    log.info("Password set for Authorization Server user '{}' (Auth Server ID: {})", username, authServerUserId); // Generic log
-
-                    // Optionally assign default roles here if needed, e.g.:
-                    // RoleRepresentation defaultRole = keycloak.realm(userAuthRealm).roles().get("default-user-role").toRepresentation();
-                    // userResource.roles().realmLevel().add(Collections.singletonList(defaultRole));
-
-                    return authServerUserId;
-                } else if (response.getStatus() == 409) { // Conflict
-                    String errorBody = response.readEntity(String.class);
-                    log.warn("User '{}' already exists in Authorization Server (Status 409). Response: {}", username, errorBody); // Corrected log format
-                    throw new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER); // This message is still Keycloak specific, might need a generic one
-                } else {
-                    String errorBody = response.readEntity(String.class);
-                    log.error("Failed to create user '{}' in Authorization Server. Status: {}, Response: {}", username, response.getStatus(), errorBody); // Corrected log format
-                    throw new RuntimeException(String.format("Authorization Server user creation failed: Status %d, Response: %s", response.getStatus(), errorBody)); // Generic message
+                switch (response.getStatus()) {
+                    case 201 -> {
+                        // 201 Created
+                        String authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1"); // Generic variable name
+                        log.info("Successfully created user '{}' in Authorization Server. Auth Server ID: {}", username, authServerUserId); // Generic log
+                        
+                        // Set password
+                        UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId); // Use userAuthRealm, generic variable
+                        CredentialRepresentation passwordCred = new CredentialRepresentation();
+                        passwordCred.setTemporary(false);
+                        passwordCred.setType(CredentialRepresentation.PASSWORD);
+                        passwordCred.setValue(password);
+                        
+                        userResource.resetPassword(passwordCred);
+                        log.info("Password set for Authorization Server user '{}' (Auth Server ID: {})", username, authServerUserId); // Generic log
+                        
+                        // Optionally assign default roles here if needed, e.g.:
+                        // RoleRepresentation defaultRole = keycloak.realm(userAuthRealm).roles().get("default-user-role").toRepresentation();
+                        // userResource.roles().realmLevel().add(Collections.singletonList(defaultRole));
+                        
+                        return authServerUserId;
+                    }
+                    case 409 -> { // Conflict
+                        String errorBody = response.readEntity(String.class);
+                        log.warn("User '{}' already exists in Authorization Server (Status 409). Response: {}", username, errorBody); // Corrected log format
+                        throw new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER); // This message is still Keycloak specific, might need a generic one
+                    }
+                    default -> {
+                        String errorBody = response.readEntity(String.class);
+                        log.error("Failed to create user '{}' in Authorization Server. Status: {}, Response: {}", username, response.getStatus(), errorBody); // Corrected log format
+                        throw new RuntimeException(String.format("Authorization Server user creation failed: Status %d, Response: %s", response.getStatus(), errorBody)); // Generic message
+                    }
                 }
             }
         }).subscribeOn(Schedulers.boundedElastic());

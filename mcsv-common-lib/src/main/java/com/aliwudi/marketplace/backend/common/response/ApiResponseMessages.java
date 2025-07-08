@@ -70,6 +70,7 @@ public interface ApiResponseMessages {
 
     // Error
     String USER_NOT_FOUND = "User not found";
+    String USER_NOT_FOUND_ID = "User not found with id - ";
     String USER_NOT_FOUND_AUTH_CONTEXT = "User not found in authentication context"; // Specific for /me endpoint
     String ERROR_RETRIEVING_USER_DETAILS = "An error occurred while retrieving user details";
     String ERROR_UPDATING_USER_DETAILS = "An error occurred while updating user details";

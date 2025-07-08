@@ -43,7 +43,6 @@ NOTE: In order to align with industry best practices we have removed
 public class UserController {
 
     private final UserService userService;
-    // Removed: private final AdminService adminService; // No longer directly injected here for registration
 
     /**
      * Creates a new user profile in the backend database and registers the user in Keycloak.
@@ -73,9 +72,8 @@ public class UserController {
 
         // The UserService.createUser now handles the entire backend DB save, Keycloak registration,
         // and rollback logic.
-        return userService.createUser(request)
-                .doOnSuccess(user -> log.info("User registration process completed successfully for username: {}", user.getUsername()))
-                .doOnError(e -> log.error("Error during user registration for username {}: {}", request.getUsername(), e.getMessage(), e));
+        return userService.createUser(request);
+                // Exceptions are handled by GlobalExceptionHandler.
     }
 
 
@@ -96,9 +94,8 @@ public class UserController {
             return Mono.error(new IllegalArgumentException(ApiResponseMessages.INVALID_AUTH_ID));
         }
         return userService.findByAuthId(authId)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)))
-                .doOnSuccess(user -> log.debug("Found user with Auth ID: {}", authId))
-                .doOnError(e -> log.error("Error fetching user by Auth ID {}: {}", authId, e.getMessage(), e));
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)));
+                // Exceptions are handled by GlobalExceptionHandler.        
     }
 
     /**
