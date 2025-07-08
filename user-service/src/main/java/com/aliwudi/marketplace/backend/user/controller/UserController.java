@@ -13,6 +13,7 @@ import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 
+import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -35,13 +36,100 @@ NOTE: In order to align with industry best practices we have removed
       by authorization server (e.g keycloak)
 */
 
+@Slf4j
 @RestController
 @RequestMapping(USER_CONTROLLER_BASE) // MODIFIED: Using constant for base path
 @RequiredArgsConstructor // Generates a constructor for final fields
 public class UserController {
 
     private final UserService userService;
+    // Removed: private final AdminService adminService; // No longer directly injected here for registration
 
+    /**
+     * Creates a new user profile in the backend database and registers the user in Keycloak.
+     * This method now implements the "backend-first" hybrid registration approach.
+     * This endpoint is typically called by the frontend (mobile/web) for user self-registration.
+     *
+     * @param request The UserProfileCreateRequest containing user details including password.
+     * @return A Mono emitting the created User object.
+     * @throws DuplicateResourceException if a user with the given email or username already exists.
+     * @throws RoleNotFoundException if a specified role does not exist.
+     * @throws IllegalArgumentException if input is invalid.
+     */
+    @PostMapping(USER_PROFILES_CREATE)
+    @ResponseStatus(HttpStatus.CREATED)
+    // IMPORTANT: For public registration, this endpoint should NOT have @PreAuthorize.
+    // If it's an internal service-to-service endpoint, secure it with client_credentials.
+    // Assuming this is the public registration entry point for now.
+    public Mono<User> createUserProfile(@Valid @RequestBody UserProfileCreateRequest request) {
+        log.info("Received request to create user profile for username: {}", request.getUsername());
+
+        // Basic validation for critical fields (can be enhanced with @Validated groups if desired)
+        if (request.getUsername() == null || request.getUsername().isBlank() ||
+            request.getEmail() == null || request.getEmail().isBlank() ||
+            request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST);
+        }
+
+        // The UserService.createUser now handles the entire backend DB save, Keycloak registration,
+        // and rollback logic.
+        return userService.createUser(request)
+                .doOnSuccess(user -> log.info("User registration process completed successfully for username: {}", user.getUsername()))
+                .doOnError(e -> log.error("Error during user registration for username {}: {}", request.getUsername(), e.getMessage(), e));
+    }
+
+
+    /**
+     * Retrieves a user by their Keycloak authorization ID.
+     *
+     * @param authId The Keycloak authorization ID of the user to retrieve.
+     * @return A Mono emitting the User object.
+     * @throws ResourceNotFoundException if the user is not found.
+     * @throws IllegalArgumentException if authId is invalid.
+     */
+    @GetMapping(USER_BY_AUTH_ID)
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // Example authorization
+    public Mono<User> getUserByAuthId(@PathVariable String authId) {
+        log.info("Fetching user with Auth ID: {}", authId);
+        if (authId == null || authId.isBlank()) {
+            return Mono.error(new IllegalArgumentException(ApiResponseMessages.INVALID_AUTH_ID));
+        }
+        return userService.findByAuthId(authId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)))
+                .doOnSuccess(user -> log.debug("Found user with Auth ID: {}", authId))
+                .doOnError(e -> log.error("Error fetching user by Auth ID {}: {}", authId, e.getMessage(), e));
+    }
+
+    /**
+     * Updates an existing user profile.
+     *
+     * @param id The ID of the user to update.
+     * @param userRequest The UserRequest containing updated user details.
+     * @return A Mono emitting the updated User object.
+     * @throws ResourceNotFoundException if the user is not found.
+     * @throws DuplicateResourceException if the updated email or username already exists.
+     * @throws IllegalArgumentException if input is invalid.
+     */
+    @PutMapping(USER_PROFILES_UPDATE)
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER') and #id == authentication.principal.claims['sub']") // User can update own profile, Admin can update any
+    public Mono<User> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) { // Changed to String
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+        }
+        // Basic check for at least one field to update
+        if (userRequest.getFirstName() == null && userRequest.getLastName() == null &&
+            userRequest.getEmail() == null && userRequest.getUsername() == null &&
+            userRequest.getShippingAddress() == null && userRequest.getRoleNames() == null) {
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_UPDATE_REQUEST);
+        }
+        return userService.updateUser(id, userRequest);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+
+
+    
     /**
      * Endpoint to create a new user.
      * Accessible by 'admin' or can be exposed for public registration.
@@ -76,38 +164,6 @@ public class UserController {
         // are handled by GlobalExceptionHandler.
     }
 
-    /**
-     * Endpoint to update an existing user's information.
-     * Accessible by 'admin' or the 'user' themselves.
-     *
-     * @param id The ID of the user to update.
-     * @param userRequest The DTO containing updated user data.
-     * @return A Mono emitting the updated User.
-     * @throws IllegalArgumentException if user ID is invalid or update data is insufficient.
-     * @throws ResourceNotFoundException if the user is not found.
-     * @throws DuplicateResourceException if updated username or email already exist.
-     * @throws RoleNotFoundException if any specified role does not exist during role update.
-     */
-    @PostMapping(USER_PROFILES_UPDATE) // MODIFIED: Using constant for endpoint
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('" + ROLE_USER_PROFILE_SYNC + "')") // MODIFIED: Using constant for role
-    // Here, we use just @Valid (or @Validated without a group).
-    // This means only default validation constraints (those without a 'groups' attribute, or with 'groups=Default.class')
-    // will be applied. The @Size constraint on 'password' in UserRequest will NOT be active here,
-    // allowing you to update other user fields without providing a password.
-    public Mono<User> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
-        }
-        // Basic check for at least one field to update
-        if (userRequest.getFirstName() == null && userRequest.getLastName() == null &&
-            userRequest.getEmail() == null && userRequest.getUsername() == null &&
-            userRequest.getShippingAddress() == null && userRequest.getRoleNames() == null) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_UPDATE_REQUEST);
-        }
-        return userService.updateUser(id, userRequest);
-        // Exceptions are handled by GlobalExceptionHandler.
-    }
 
 
     /**

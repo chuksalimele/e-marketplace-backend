@@ -32,7 +32,8 @@ public final class ApiConstants {
     public static final String USER_PROFILES_UPDATE = "/profiles/update/{id}";
     public static final String USER_PROFILES_DELETE = "/profiles/delete/{id}";
     public static final String USER_PROFILES_DELETE_ROLLBACK = "/profiles/delete-to-rollback/{authId}";
-    public static final String USER_GET_BY_ID = "/{id}";
+    public static final String USER_GET_BY_ID = "userId/{id}";
+    public static final String USER_BY_AUTH_ID = "/authId/{id}";    
     public static final String USER_GET_BY_USERNAME = "/byUsername/{username}";
     public static final String USER_GET_BY_EMAIL = "/byEmail/{email}";
     public static final String USER_ADMIN_ALL = "/admin/all";

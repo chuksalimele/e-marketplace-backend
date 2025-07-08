@@ -7,16 +7,20 @@ public interface ApiResponseMessages {
     public String INVALID_FIRST_NAME = "Invalid first name";
     public String INVALID_LAST_NAME = "Invalid last name";
     public String INVALID_EMAIL = "Invalid email";
+    public String INVALID_AUTH_ID = "Invalid authorization id";        
     public String NOTIFICATION_NOT_FOUND = "Notification not found";
     public String INVALID_NOTIFICATION_CREATION_REQUEST = " Invalid notification creation request";
     public String INVALID_NOTIFICATION_STATUS = "Invalid notification status";
     public String INVALID_NOTIFICATION_TYPE = "Invalid notification type";
     public String INVALID_NOTIFICATION_ID = "Invalid notification id";
     public String NOTIFICATION_NOT_FOUND_FOR_USER = "Notification not found for user";
+    
 
     String INVALID_USER_CREATION_REQUEST = "Invalid user creation request";
 
     String USER_NOT_FOUND_EMAIL ="User not found with email - ";
+    String USER_NOT_FOUND_AUTH_ID ="User not found with authorization id - ";
+    
 
     String USER_NOT_FOUND_USERNAME ="User not found with username - ";
 
@@ -40,6 +44,7 @@ public interface ApiResponseMessages {
     String INVALID_AUTHORIZATION_ID = "Invalid authorization ID"; 
     String SECURITY_CONTEXT_NOT_FOUND = "Security context not found";
     String USERNAME_ALREADY_EXISTS = "Error: Username already exists!";
+    String USERNAME_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER = "Error: Username already exists in authorization server!";
     String EMAIL_ALREADY_EXISTS = "Error: Email already exists!";
     String USER_REGISTERED_SUCCESS = "User registered successfully!";
     String ROLE_USER_NOT_FOUND = "Error: Default role 'ROLE_USER' is not found in the database. Please ensure it's configured";
@@ -61,6 +66,7 @@ public interface ApiResponseMessages {
     String USER_UPDATED_SUCCESS = "User updated successfully";
     String CURRENT_USER_RETRIEVED_SUCCESS = "Current user details retrieved successfully";
     String USER_COUNT_RETRIEVED_SUCCESS = "User count retrieved successfully";
+    String USER_REGISTRATION_FAILED = "User registration failed";
 
     // Error
     String USER_NOT_FOUND = "User not found";

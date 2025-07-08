@@ -26,17 +26,32 @@ spring:
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 
-keycloak:
-  auth-server-url: https://localhost:8443 # Your Keycloak URL
-  realm: chuks-emaketplace-realm         # Your application realm
+# NEW: Generic Authorization Server Configuration
+auth-server:
+  url: https://localhost:8443 # Your Authorization Server URL (e.g., Keycloak URL)
+  realm: chuks-emaketplace-realm         # The realm where your application users reside
+
+  # Configuration for the backend service to call Authorization Server Admin API
+  admin:
+    url: https://localhost:8443 # Authorization Server Admin URL (e.g., Keycloak Admin URL)
+    realm: master               # Realm where your admin client (e.g., admin-cli or a custom client for this service) resides
+    client-id: admin-cli        # The client ID this service will use to get an admin token
+    client-secret: YOUR_KEYCLOAK_ADMIN_CLI_SECRET # The secret for the admin-cli or your custom admin client.
+                                                  # IMPORTANT: For 'admin-cli', it might not have a secret by default.
+                                                  # If you create a new confidential client for this purpose, generate a secret.
+                                                  # If using 'admin-cli', ensure it's configured to allow direct access grants or client credentials.
+                                                  # For production, create a dedicated confidential client for this service.
+
+  # Existing Keycloak specific properties, renamed to be generic for clarity
   admin-cli-client-id: admin-cli         # Default client for admin access
-  admin-username: admin                  # Your Keycloak admin username
-  admin-password: admin                  # Your Keycloak admin password (CHANGE FOR PRODUCTION!)
+  admin-username: admin                  # Your Authorization Server admin username
+  admin-password: admin                  # Your Authorization Server admin password (CHANGE FOR PRODUCTION!)
   
-  admin-auth-server-url: https://localhost:8443
-  admin-realm: chuks-emaketplace-realm
-  admin-client-id: user-service-admin-client     # Client ID for user-service's admin client
-  admin-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client
+  admin-auth-server-url: https://localhost:8443 # Redundant with auth-server.admin.url, consider consolidating
+  admin-realm: chuks-emaketplace-realm # Redundant with auth-server.realm, consider consolidating
+  admin-service-client-id: user-service-admin-client     # Client ID for user-service's admin client
+  admin-service-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client
+
 
 # ... other configurations ...
 

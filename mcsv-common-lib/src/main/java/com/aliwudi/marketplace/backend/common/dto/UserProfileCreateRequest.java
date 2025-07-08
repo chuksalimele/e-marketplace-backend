@@ -14,6 +14,9 @@ public class UserProfileCreateRequest {
     private String username;
     
     @NotBlank
+    private String password;    
+    
+    @NotBlank
     @Email
     private String email;
 
