@@ -3,6 +3,8 @@ description = 'notification-service'
 
 dependencies {
         implementation project(':mcsv-common-lib')
+        
+        implementation 'org.springframework.boot:spring-boot-starter-thymeleaf' // HTML email templating
 
         implementation 'org.springframework.boot:spring-boot-starter-security'
 

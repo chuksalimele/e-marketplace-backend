@@ -33,7 +33,7 @@ subprojects {
 
     dependencies {
         implementation fileTree(dir: "${rootProject.projectDir}/lib", include: ["**/*.jar"])
-
+        implementation 'org.springframework.boot:spring-boot-starter-amqp'
     }
 
     dependencyManagement {

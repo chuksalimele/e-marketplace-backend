@@ -10,6 +10,7 @@ import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
 import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
 import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
+import com.aliwudi.marketplace.backend.user.service.NotificationEventPublisherService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
-import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService; // New import
+import java.time.Duration;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.keycloak.representations.idm.UserRepresentation; // New import for Keycloak user representation
@@ -49,9 +50,43 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final IAdminService iAdminService;
-    private final EmailVerificationService emailVerificationService; // NEW: Inject EmailVerificationService
+    private final IAdminService iAdminService; // For Keycloak Admin API interactions
+    private final OtpService otpService; // NEW: Inject OtpService
+    private final NotificationEventPublisherService notificationEventPublisherService; // Already injected
 
+    // OTP validity for email verification (e.g., 5 minutes)
+    private static final Duration EMAIL_OTP_VALIDITY = Duration.ofMinutes(5);
+
+
+    /**
+     * Initiates the password reset process by publishing an event to the notification service.
+     * This method generates a temporary token and publishes an event for email delivery.
+     *
+     * @param email The email address of the user requesting password reset.
+     * @return Mono<Void> indicating the event has been published.
+     * @throws ResourceNotFoundException if no user found with the given email.
+     */
+    public Mono<Void> initiatePasswordReset(String email) {
+        log.info("Initiating password reset for email: {}", email);
+        return userRepository.findByEmail(email)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND)))
+                .flatMap(user -> {
+                    // In a real application, you would generate a secure, time-limited password reset token here.
+                    // This token would be stored in your database/cache associated with the user.
+                    String resetToken = "TEMP_RESET_TOKEN_" + user.getId() + "_" + System.currentTimeMillis(); // Placeholder
+                    String resetLink = "https://your-app.com/reset-password?token=" + resetToken; // Replace with your actual frontend reset URL
+
+                    // MODIFIED: Publish password reset requested event
+                    return notificationEventPublisherService.publishPasswordResetRequestedEvent(
+                            String.valueOf(user.getId()),
+                            user.getEmail(),
+                            user.getUsername(),
+                            resetLink
+                    );
+                })
+                .doOnError(e -> log.error("Error initiating password reset for {}: {}", email, e.getMessage(), e));
+    }
+    
     /**
      * Helper method to map User entity to User DTO for public exposure. This
      * method enriches the User object with its associated Role details. Assumes
@@ -190,11 +225,29 @@ public class UserService {
                                     return userRepository.save(persistedUser); // Update the user in backend DB with Auth Server Auth ID
                                 })
                                 .flatMap(updatedUserAfterAuthId -> {
-                                    // 4. Initiate Email Verification
-                                    log.info("Initiating email verification for user {} (Auth ID: {}).", updatedUserAfterAuthId.getId(), updatedUserAfterAuthId.getAuthId());
-                                    return emailVerificationService.initiateEmailVerification(updatedUserAfterAuthId.getAuthId(), updatedUserAfterAuthId.getEmail())
-                                        .thenReturn(updatedUserAfterAuthId); // Return the updated user after initiating email verification
+                                    // 4. Generate OTP, store it, and publish email verification event
+                                    log.info("Generating OTP and publishing email verification event for user {} (Auth ID: {}).", updatedUserAfterAuthId.getId(), updatedUserAfterAuthId.getAuthId());
+                                    return otpService.generateAndStoreOtp(updatedUserAfterAuthId.getAuthId(), EMAIL_OTP_VALIDITY)
+                                            .flatMap(otpCode ->
+                                                notificationEventPublisherService.publishEmailVerificationRequestedEvent(
+                                                        updatedUserAfterAuthId.getAuthId(),
+                                                        updatedUserAfterAuthId.getEmail(),
+                                                        updatedUserAfterAuthId.getUsername(),
+                                                        otpCode // Pass the actual OTP code
+                                                ).thenReturn(updatedUserAfterAuthId) // Return the user after event is published
+                                            );
                                 })
+                                .flatMap(updatedUserAfterOtp -> {
+                                    // 5. Publish User Registered (onboarding) event
+                                    String loginUrl = "https://your-app.com/login"; // Replace with your actual login URL
+                                    log.info("Publishing user registered (onboarding) event for user {}.", updatedUserAfterOtp.getId());
+                                    return notificationEventPublisherService.publishUserRegisteredEvent(
+                                            String.valueOf(updatedUserAfterOtp.getId()),
+                                            updatedUserAfterOtp.getEmail(),
+                                            updatedUserAfterOtp.getUsername(),
+                                            loginUrl
+                                    ).thenReturn(updatedUserAfterOtp); // Return the user after event is published
+                                })                         
                                 .onErrorResume(e -> {
                                     // 5. If Authorization Server registration OR Email Verification initiation fails,
                                     //    rollback (delete) user from backend DB and Authorization Server.
@@ -222,8 +275,9 @@ public class UserService {
         });
     }
 
+    
     /**
-     * Delegates to EmailVerificationService to verify an OTP and then updates user status in Keycloak.
+     * Validates the provided OTP for email verification and, if valid, marks the user's email as verified in Keycloak.
      *
      * @param authServerUserId The Keycloak user ID.
      * @param providedOtp The OTP code provided by the user.
@@ -233,33 +287,56 @@ public class UserService {
      * @throws RuntimeException for other internal errors.
      */
     public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp) {
-        return emailVerificationService.verifyEmailOtp(authServerUserId, providedOtp);
+        log.info("Attempting to verify email OTP for user: {}", authServerUserId);
+        return otpService.validateOtp(authServerUserId, providedOtp)
+                .flatMap(isValid -> {
+                    if (isValid) {
+                        log.info("OTP valid for user {}. Updating email verified status in Keycloak.", authServerUserId);
+                        return iAdminService.updateEmailVerifiedStatus(authServerUserId, true)
+                                .thenReturn(true);
+                    }
+                    return Mono.just(false); // Should not be reached if validateOtp throws exception
+                })
+                .doOnSuccess(v -> log.debug("Email OTP verification process completed for user {}. Status: {}", authServerUserId, v))
+                .doOnError(e -> log.error("Error during email OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
     }
 
     /**
      * Resends an email verification code (OTP) for a given user.
-     * Fetches the user's email from Keycloak before initiating the send.
+     * Fetches the user's email from Keycloak, generates a new OTP, stores it,
+     * and publishes a new email verification event.
      *
      * @param authServerUserId The Keycloak user ID.
      * @return Mono<Void> indicating completion.
      * @throws UserNotFoundException if the user is not found in Keycloak.
-     * @throws EmailSendingException if the email fails to send.
      * @throws IllegalArgumentException if user's email is missing or already verified.
      */
     public Mono<Void> resendVerificationCode(String authServerUserId) {
+        log.info("Resending verification code for user: {}", authServerUserId);
         return iAdminService.getUserFromAuthServerById(authServerUserId)
             .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
             .flatMap(userRepresentation -> {
                 String email = userRepresentation.getEmail();
+                String username = userRepresentation.getUsername(); // Get username for template
                 if (email == null || email.isBlank()) {
                     return Mono.error(new IllegalArgumentException("User does not have an email address to send a code to."));
                 }
                 if (userRepresentation.isEmailVerified() != null && userRepresentation.isEmailVerified()) {
                     return Mono.error(new IllegalArgumentException("Email is already verified for this user."));
                 }
-                log.info("Resending verification code to email '{}' for user '{}'.", email, authServerUserId);
-                return emailVerificationService.initiateEmailVerification(authServerUserId, email);
-            });
+                
+                log.info("Generating new OTP and publishing resend event for email '{}' for user '{}'.", email, authServerUserId);
+                return otpService.generateAndStoreOtp(authServerUserId, EMAIL_OTP_VALIDITY)
+                        .flatMap(otpCode ->
+                            notificationEventPublisherService.publishEmailVerificationRequestedEvent(
+                                    authServerUserId,
+                                    email,
+                                    username,
+                                    otpCode // Pass the newly generated OTP
+                            )
+                        );
+            })
+            .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
     }
 
     /**

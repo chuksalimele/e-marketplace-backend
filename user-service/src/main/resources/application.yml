@@ -26,6 +26,18 @@ spring:
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 
+
+  # RabbitMQ Connection Details for user-service
+  rabbitmq:
+    host: localhost # Change if RabbitMQ is on a different host
+  rabbitmq:
+    port: 5672
+  rabbitmq:
+    username: guest # TODO
+  rabbitmq:
+    password: guest #TODO
+
+# spring.rabbitmq.virtual-host=/ # Uncomment if using a specific virtual host
   # Spring Mail SMTP Configuration (REQUIRED for SmtpEmailSenderService)
   # Replace with your actual SMTP server details. For production, use a dedicated email service.
   mail:

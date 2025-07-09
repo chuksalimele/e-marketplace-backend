@@ -1,4 +1,4 @@
-package com.aliwudi.marketplace.backend.user.auth.service;
+package com.aliwudi.marketplace.backend.notification.service;
 
 import reactor.core.publisher.Mono;
 
