@@ -8,8 +8,13 @@ import com.aliwudi.marketplace.backend.common.model.User;
 import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
+import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
+import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
+import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
+// REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService;
+// REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 
@@ -20,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity; // New import for ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize; // For role-based authorization
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -28,11 +34,14 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException; // For date parsing from request params
 import org.springframework.validation.annotation.Validated;
+import lombok.Data; // New import for DTOs
+import lombok.Builder; // New import for DTOs
+
 
 /*
 NOTE: In order to align with industry best practices we have removed
       authentication service implementation (jwt encoding, decoding e.t.c)
-      from user-service microservice. Authentication is now solely done 
+      from user-service microservice. Authentication is now solely done
       by authorization server (e.g keycloak)
 */
 
@@ -44,38 +53,240 @@ public class UserController {
 
     private final UserService userService;
 
+    // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
+    @Data
+    public static class EmailVerificationRequest {
+        private String authServerUserId; // Keycloak ID of the user
+        private String code;
+    }
+
+    @Data
+    public static class ResendVerificationCodeRequest {
+        private String authServerUserId;
+    }
+
+    @Data
+    @Builder
+    public static class ApiResponse<T> {
+        private boolean success;
+        private String message;
+        private T data;
+    }
+    // --- END NEW DTOs ---
+
     /**
      * Creates a new user profile in the backend database and registers the user in Keycloak.
      * This method now implements the "backend-first" hybrid registration approach.
      * This endpoint is typically called by the frontend (mobile/web) for user self-registration.
+     * It now also initiates email verification immediately after successful user creation.
      *
      * @param request The UserProfileCreateRequest containing user details including password.
      * @return A Mono emitting the created User object.
      * @throws DuplicateResourceException if a user with the given email or username already exists.
      * @throws RoleNotFoundException if a specified role does not exist.
      * @throws IllegalArgumentException if input is invalid.
+     * @throws EmailSendingException if the initial verification email fails to send.
      */
     @PostMapping(USER_PROFILES_CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     // IMPORTANT: For public registration, this endpoint should NOT have @PreAuthorize.
     // If it's an internal service-to-service endpoint, secure it with client_credentials.
     // Assuming this is the public registration entry point for now.
-    public Mono<User> createUserProfile(@Valid @RequestBody UserProfileCreateRequest request) {
+    public Mono<ResponseEntity<ApiResponse<User>>> createUserProfile(@Valid @RequestBody UserProfileCreateRequest request) {
         log.info("Received request to create user profile for username: {}", request.getUsername());
 
         // Basic validation for critical fields (can be enhanced with @Validated groups if desired)
         if (request.getUsername() == null || request.getUsername().isBlank() ||
             request.getEmail() == null || request.getEmail().isBlank() ||
             request.getPassword() == null || request.getPassword().isBlank()) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST);
+            return Mono.just(ResponseEntity.badRequest().body(
+                ApiResponse.<User>builder()
+                    .success(false)
+                    .message(ApiResponseMessages.INVALID_USER_CREATION_REQUEST)
+                    .build()
+            ));
         }
 
         // The UserService.createUser now handles the entire backend DB save, Keycloak registration,
-        // and rollback logic.
-        return userService.createUser(request);
-                // Exceptions are handled by GlobalExceptionHandler.
+        // email verification initiation, and rollback logic.
+        return userService.createUser(request)
+                .map(createdUser -> ResponseEntity.status(HttpStatus.CREATED).body(
+                    ApiResponse.<User>builder()
+                        .success(true)
+                        .message("User registered successfully. Verification code sent to your email.")
+                        .data(createdUser)
+                        .build()
+                ))
+                .onErrorResume(DuplicateResourceException.class, e -> {
+                    log.warn("Registration failed: Duplicate user. {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(
+                        ApiResponse.<User>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build()
+                    ));
+                })
+                .onErrorResume(RoleNotFoundException.class, e -> {
+                    log.warn("Registration failed: Role not found. {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                        ApiResponse.<User>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build()
+                    ));
+                })
+                .onErrorResume(EmailSendingException.class, e -> {
+                    log.error("Registration successful, but email sending failed: {}", e.getMessage(), e);
+                    // User is created in Keycloak and local DB, but email not sent.
+                    // The UserService should have rolled back the Keycloak part if email sending fails,
+                    // but the local user might still exist. Decide strategy.
+                    // For now, we assume UserService's rollback handles Keycloak, but local DB user remains
+                    // if email sending fails (to allow resend).
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                        ApiResponse.<User>builder()
+                            .success(false)
+                            .message("User registered, but failed to send verification email. Please try resending the code.")
+                            .build()
+                    ));
+                })
+                .onErrorResume(IllegalArgumentException.class, e -> {
+                    log.warn("Registration failed: Invalid argument. {}", e.getMessage());
+                    return Mono.just(ResponseEntity.badRequest().body(
+                        ApiResponse.<User>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build()
+                    ));
+                })
+                .onErrorResume(e -> {
+                    log.error("Registration failed due to unexpected error: {}", e.getMessage(), e);
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                        ApiResponse.<User>builder()
+                            .success(false)
+                            .message("User registration failed: An unexpected error occurred.")
+                            .build()
+                    ));
+                });
     }
 
+    /**
+     * Endpoint to verify an email using an OTP.
+     * This endpoint is typically called by the frontend after the user enters the OTP.
+     *
+     * @param request The EmailVerificationRequest containing authServerUserId and the OTP code.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(EMAIL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<ResponseEntity<ApiResponse<Void>>> verifyEmail(@RequestBody EmailVerificationRequest request) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank() ||
+            request.getCode() == null || request.getCode().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(
+                ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Auth Server User ID and Code are required.")
+                    .build()
+            ));
+        }
+        return userService.verifyEmailOtp(request.getAuthServerUserId(), request.getCode())
+            .thenReturn(ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                    .success(true)
+                    .message("Email successfully verified.")
+                    .build()
+            ))
+            .onErrorResume(OtpValidationException.class, e -> {
+                log.warn("Email verification failed for user {}: {}", request.getAuthServerUserId(), e.getMessage());
+                return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(e.getMessage())
+                        .build()
+                ));
+            })
+            .onErrorResume(UserNotFoundException.class, e -> { // From KeycloakAdminService finding user
+                log.warn("Email verification failed: {}", e.getMessage());
+                return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(e.getMessage())
+                        .build()
+                ));
+            })
+            .onErrorResume(e -> {
+                log.error("Email verification failed for user {}: {}", request.getAuthServerUserId(), e.getMessage(), e);
+                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message("Email verification failed due to an internal error.")
+                        .build()
+                ));
+            });
+    }
+
+    /**
+     * Endpoint to resend an email verification code (OTP).
+     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     *
+     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(EMAIL_VERIFICATION_RESEND_CODE) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<ResponseEntity<ApiResponse<Void>>> resendVerificationCode(@RequestBody ResendVerificationCodeRequest request) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(
+                ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Auth Server User ID is required.")
+                    .build()
+            ));
+        }
+
+        return userService.resendVerificationCode(request.getAuthServerUserId())
+            .thenReturn(ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                    .success(true)
+                    .message("New verification code sent to your email.")
+                    .build()
+            ))
+            .onErrorResume(UserNotFoundException.class, e -> {
+                log.warn("Resend verification code failed: {}", e.getMessage());
+                return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(e.getMessage())
+                        .build()
+                ));
+            })
+            .onErrorResume(EmailSendingException.class, e -> {
+                log.error("Failed to resend verification code for user {}: {}", request.getAuthServerUserId(), e.getMessage(), e);
+                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message("Failed to send new verification code. Please try again later.")
+                        .build()
+                ));
+            })
+            .onErrorResume(IllegalArgumentException.class, e -> { // Catch cases like "email already verified" or "no email for user"
+                log.warn("Resend verification code failed due to invalid request: {}", e.getMessage());
+                return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(e.getMessage())
+                        .build()
+                ));
+            })
+            .onErrorResume(e -> {
+                log.error("Failed to resend verification code for user {}: {}", request.getAuthServerUserId(), e.getMessage(), e);
+                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<Void>builder()
+                        .success(false)
+                        .message("Failed to resend verification code due to an internal error.")
+                        .build()
+                ));
+            });
+    }
 
     /**
      * Retrieves a user by their Keycloak authorization ID.
@@ -95,7 +306,7 @@ public class UserController {
         }
         return userService.findByAuthId(authId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)));
-                // Exceptions are handled by GlobalExceptionHandler.        
+                // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -126,7 +337,6 @@ public class UserController {
     }
 
 
-    
     /**
      * Endpoint to create a new user.
      * Accessible by 'admin' or can be exposed for public registration.
@@ -142,6 +352,9 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     // Here is where it's used: We tell Spring to validate using the 'CreateUserValidation' group.
     // This will activate the @Size constraint on the 'password' field that belongs to this group.
+    // NOTE: This endpoint now duplicates the functionality of `createUserProfile` but with an admin role.
+    // It's usually better to have one public registration endpoint and separate internal admin endpoints.
+    // I'm keeping it as per your original file, but be aware of the redundancy.
     public Mono<User> createUser(@Validated(CreateUserValidation.class) @RequestBody UserProfileCreateRequest request) {
         // Basic validation at controller level for required fields
         // Note: With @Validated(CreateUserValidation.class) and @NotBlank on username/email
@@ -182,14 +395,14 @@ public class UserController {
         return userService.deleteUser(id);
         // Exceptions are handled by GlobalExceptionHandler.
     }
-    
+
     /**
      * Endpoint to delete a user by their Auth ID. Accessible
-     * only by 'admin' The method is typically called by 
+     * only by 'admin' The method is typically called by
      * the authorization server (e.g Keycloak) for the purpose
      * of rollback in the case where an error occurred during
      * user creation to avoid data inconsistency arising when
-     * an error occurs while creating the corresponding user on 
+     * an error occurs while creating the corresponding user on
      * the micro service after creation in the authorization server
      * or any such related errors that can cause inconsistency
      * *
@@ -209,7 +422,7 @@ public class UserController {
         return userService.deleteUserByAuthId(authId);
         // Exceptions are handled by GlobalExceptionHandler.
     }
-    
+
 
     /**
      * Endpoint to retrieve a user by their ID.
@@ -596,7 +809,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByUserId(@RequestParam Long userId) {
         if (userId == null || userId < 0) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL);
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID); // Changed from INVALID_EMAIL
         }
         return userService.existsByUserId(userId);
         // Errors are handled by GlobalExceptionHandler.
@@ -614,7 +827,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> existsByEmail(@RequestParam String email) {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_EMAIL); // Changed from INVALID_USER_ID
         }
         return userService.existsByEmail(email);
         // Errors are handled by GlobalExceptionHandler.

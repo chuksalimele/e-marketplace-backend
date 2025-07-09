@@ -7,6 +7,9 @@ import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
+import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
+import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
+import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,16 +28,18 @@ import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
-import com.aliwudi.marketplace.backend.user.auth.service.IAdminService; // MODIFIED: Import IAdminService
+import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
+import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService; // New import
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
+import org.keycloak.representations.idm.UserRepresentation; // New import for Keycloak user representation
+
 
 /**
  * Service class for managing user-related business logic. Handles operations
  * like creating, retrieving, updating, and deleting users. Now implements the
  * "backend-first" hybrid registration flow with generic Authorization Server
- * integration.
+ * integration and integrated email verification.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,7 +49,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final IAdminService iAdminService; // MODIFIED: Inject IAdminService
+    private final IAdminService iAdminService;
+    private final EmailVerificationService emailVerificationService; // NEW: Inject EmailVerificationService
 
     /**
      * Helper method to map User entity to User DTO for public exposure. This
@@ -101,7 +107,8 @@ public class UserService {
      * Creates a new user in the backend database and then registers them in the
      * Authorization Server. This method implements the "backend-first" hybrid
      * registration approach. If Authorization Server registration fails, the
-     * user is rolled back (deleted) from the backend database.
+     * user is rolled back (deleted) from the backend database. After successful
+     * registration, it initiates the email verification process by sending an OTP.
      *
      * @param request The DTO containing user creation data, including password.
      * @return A Mono emitting the created User object, updated with
@@ -111,6 +118,7 @@ public class UserService {
      * @throws RoleNotFoundException if a specified role does not exist.
      * @throws RuntimeException if Authorization Server registration fails for
      * other reasons.
+     * @throws EmailSendingException if the initial verification email fails to send.
      */
     @Transactional
     public Mono<User> createUser(UserProfileCreateRequest request) {
@@ -143,10 +151,12 @@ public class UserService {
             newUser.setUpdatedAt(LocalDateTime.now());
             newUser.setEnabled(true);
 
-            if (request.getRoles() == null && request.getRoles().isEmpty()) {
-                log.warn("User creation failed in backend: No role assigned for new user");
+            // Ensure roles are provided and valid
+            if (request.getRoles() == null || request.getRoles().isEmpty()) {
+                log.warn("User creation failed in backend: No role assigned for new user.");
                 return Mono.error(new InvalidUserDataException(ApiResponseMessages.NO_ROLE_ASSIGNED_FOR_USER));
             }
+
             Set<Mono<Role>> roleMonos = request.getRoles().stream()
                     .map(roleName -> roleRepository.findByName(roleName)
                     .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + " : " + roleName))))
@@ -161,10 +171,10 @@ public class UserService {
                     })
                     .flatMap(persistedUser -> {
                         Long userId = persistedUser.getId();
-                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId); // Generic log
+                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId);
 
                         // 2. Register user in Authorization Server via Admin API
-                        return iAdminService.createUserInAuthServer(// MODIFIED: Call generic method
+                        return iAdminService.createUserInAuthServer(
                                 request.getUsername(),
                                 request.getEmail(),
                                 request.getPassword(),
@@ -173,17 +183,36 @@ public class UserService {
                                 request.getLastName(),
                                 request.getRoles()
                         )
-                                .flatMap(authServerAuthId -> { // MODIFIED: Generic variable name
+                                .flatMap(authServerAuthId -> {
                                     // 3. Update backend user with Authorization Server's authId
-                                    persistedUser.setAuthId(authServerAuthId); // MODIFIED: Generic variable name
-                                    log.info("User registered in Authorization Server with Auth ID: {}. Updating backend user.", authServerAuthId); // Generic log
+                                    persistedUser.setAuthId(authServerAuthId);
+                                    log.info("User registered in Authorization Server with Auth ID: {}. Updating backend user.", authServerAuthId);
                                     return userRepository.save(persistedUser); // Update the user in backend DB with Auth Server Auth ID
                                 })
+                                .flatMap(updatedUserAfterAuthId -> {
+                                    // 4. Initiate Email Verification
+                                    log.info("Initiating email verification for user {} (Auth ID: {}).", updatedUserAfterAuthId.getId(), updatedUserAfterAuthId.getAuthId());
+                                    return emailVerificationService.initiateEmailVerification(updatedUserAfterAuthId.getAuthId(), updatedUserAfterAuthId.getEmail())
+                                        .thenReturn(updatedUserAfterAuthId); // Return the updated user after initiating email verification
+                                })
                                 .onErrorResume(e -> {
-                                    // 4. If Authorization Server registration fails, rollback (delete) user from backend DB
-                                    log.error("Failed to register user in Authorization Server for internal ID {}. Initiating rollback of backend user. Error: {}", // Generic log
+                                    // 5. If Authorization Server registration OR Email Verification initiation fails,
+                                    //    rollback (delete) user from backend DB and Authorization Server.
+                                    log.error("Failed to register user in Authorization Server or send verification email for internal ID {}. Initiating rollback. Error: {}",
                                             userId, e.getMessage(), e);
-                                    return userRepository.delete(persistedUser)
+
+                                    // Attempt to delete from Auth Server first if an AuthId was assigned, then local DB
+                                    Mono<Void> authServerDelete = Mono.empty();
+                                    if (persistedUser.getAuthId() != null) {
+                                        authServerDelete = iAdminService.deleteUserFromAuthServer(persistedUser.getAuthId())
+                                            .onErrorResume(authDeleteError -> {
+                                                log.error("Error during Auth Server rollback for user {}: {}", persistedUser.getAuthId(), authDeleteError.getMessage());
+                                                return Mono.empty(); // Continue with local delete even if Auth Server delete fails
+                                            });
+                                    }
+
+                                    return authServerDelete
+                                            .then(userRepository.delete(persistedUser))
                                             .then(Mono.error(new RuntimeException(ApiResponseMessages.USER_REGISTRATION_FAILED + ": " + e.getMessage(), e)));
                                 });
                     })
@@ -191,6 +220,46 @@ public class UserService {
                     .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
                     .doOnError(e -> log.error("Error creating user {}: {}", request.getUsername(), e.getMessage(), e));
         });
+    }
+
+    /**
+     * Delegates to EmailVerificationService to verify an OTP and then updates user status in Keycloak.
+     *
+     * @param authServerUserId The Keycloak user ID.
+     * @param providedOtp The OTP code provided by the user.
+     * @return Mono<Boolean> true if verification successful, false otherwise.
+     * @throws OtpValidationException if the OTP is invalid or expired.
+     * @throws UserNotFoundException if the user is not found in Keycloak.
+     * @throws RuntimeException for other internal errors.
+     */
+    public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp) {
+        return emailVerificationService.verifyEmailOtp(authServerUserId, providedOtp);
+    }
+
+    /**
+     * Resends an email verification code (OTP) for a given user.
+     * Fetches the user's email from Keycloak before initiating the send.
+     *
+     * @param authServerUserId The Keycloak user ID.
+     * @return Mono<Void> indicating completion.
+     * @throws UserNotFoundException if the user is not found in Keycloak.
+     * @throws EmailSendingException if the email fails to send.
+     * @throws IllegalArgumentException if user's email is missing or already verified.
+     */
+    public Mono<Void> resendVerificationCode(String authServerUserId) {
+        return iAdminService.getUserFromAuthServerById(authServerUserId)
+            .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
+            .flatMap(userRepresentation -> {
+                String email = userRepresentation.getEmail();
+                if (email == null || email.isBlank()) {
+                    return Mono.error(new IllegalArgumentException("User does not have an email address to send a code to."));
+                }
+                if (userRepresentation.isEmailVerified() != null && userRepresentation.isEmailVerified()) {
+                    return Mono.error(new IllegalArgumentException("Email is already verified for this user."));
+                }
+                log.info("Resending verification code to email '{}' for user '{}'.", email, authServerUserId);
+                return emailVerificationService.initiateEmailVerification(authServerUserId, email);
+            });
     }
 
     /**
@@ -392,8 +461,9 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUserByAuthId(String authId) {
         log.debug("Attempting to delete user with Auth ID: {}", authId);
-        return userRepository.deleteByAuthId(authId) // Delete from backend DB first
-                .then(iAdminService.deleteUserFromAuthServer(authId)) // MODIFIED: Call generic method
+        // Delete from backend DB first
+        return userRepository.deleteByAuthId(authId)
+                .then(iAdminService.deleteUserFromAuthServer(authId)) // Call generic method to delete from Auth Server
                 .doOnSuccess(v -> log.debug("User deleted successfully with Auth ID: {}", authId))
                 .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
     }
@@ -584,7 +654,7 @@ public class UserService {
         log.debug("Counting users created after {}", date);
         return userRepository.countByCreatedAtAfter(date)
                 .doOnSuccess(count -> log.debug("Total count for users created after {}: {}", date, count))
-                .doOnError(e -> log.error("Error counting users created after {}: {}", date, e.getMessage(), e));
+                .doOnError(e -> log.error("Error counting users by created after {}: {}", date, e.getMessage(), e));
     }
 
     /**

@@ -51,4 +51,15 @@ public interface IAdminService {
      * @return A Mono<Void> indicating completion.
      */
     Mono<Void> deleteUserFromAuthServer(String authServerUserId);
+    
+    
+    /**
+     * Update email verification status
+     * 
+     * @param authServerUserId
+     * @param isVerified
+     * @return 
+     */    
+    Mono<Void> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified); // New method to be used by OTP service
+
 }

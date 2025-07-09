@@ -1,17 +1,17 @@
 ## YAML Template.
 ---
-# src/main/resources/application.yml for Product Service
+# src/main/resources/application.yml for User Service
+
 server:
-  port: 5001 # A unique port for this microservice 
+  port: 5001 # A unique port for this microservice
 
 truststore:
   path: classpath:backend_truststore.p12
   password: microservicetrustpass@123+@+
-  
+
 spring:
   application:
     name: user-service # The unique name of this service, used by Eureka
-
 
   security:
     oauth2:
@@ -26,34 +26,54 @@ spring:
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
 
-# NEW: Generic Authorization Server Configuration
+  # Spring Mail SMTP Configuration (REQUIRED for SmtpEmailSenderService)
+  # Replace with your actual SMTP server details. For production, use a dedicated email service.
+  mail:
+    host: smtp.gmail.com # Example: smtp.sendgrid.net, email-smtp.us-east-1.amazonaws.com
+    port: 587 # Standard for TLS. Use 465 for SSL.
+    username: your-email@gmail.com # Your email address for sending
+    password: YOUR_EMAIL_APP_PASSWORD # IMPORTANT: Use an app password for Gmail, not your main password. For other providers, use the generated SMTP password.
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true # Enable STARTTLS
+      mail.smtp.starttls.required: true # Require STARTTLS
+    test-connection: true # Test connection on application startup
+
+  # Redis Configuration (REQUIRED for EmailVerificationService for OTP storage)
+  # Ensure your Redis instance is running and accessible.
+  data:
+    redis:
+      host: localhost # Your Redis server host
+      port: 6379 # Your Redis server port
+      password: # Leave empty if no password, or provide your Redis password
+      timeout: 5s # Connection timeout
+      database: 0 # Redis database index (default is 0)
+
+# Keycloak/Authorization Server Configuration
 auth-server:
   url: https://localhost:8443 # Your Authorization Server URL (e.g., Keycloak URL)
-  realm: chuks-emaketplace-realm         # The realm where your application users reside
+  realm: chuks-emaketplace-realm # The realm where your application users reside
 
   # Configuration for the backend service to call Authorization Server Admin API
   admin:
     url: https://localhost:8443 # Authorization Server Admin URL (e.g., Keycloak Admin URL)
-    realm: master               # Realm where your admin client (e.g., admin-cli or a custom client for this service) resides
-    client-id: admin-cli        # The client ID this service will use to get an admin token
+    realm: master # Realm where your admin client (e.g., admin-cli or a custom client for this service) resides
+    client-id: admin-cli # The client ID this service will use to get an admin token
     client-secret: YOUR_KEYCLOAK_ADMIN_CLI_SECRET # The secret for the admin-cli or your custom admin client.
-                                                  # IMPORTANT: For 'admin-cli', it might not have a secret by default.
-                                                  # If you create a new confidential client for this purpose, generate a secret.
-                                                  # If using 'admin-cli', ensure it's configured to allow direct access grants or client credentials.
-                                                  # For production, create a dedicated confidential client for this service.
+                                                  # IMPORTANT: For 'admin-cli', you might need to enable 'Service Accounts Enabled'
+                                                  # and get the secret from the 'Credentials' tab.
+                                                  # For production, create a dedicated confidential client for this service
+                                                  # with 'Service Accounts Enabled' and appropriate realm-management roles.
 
-  # Existing Keycloak specific properties, renamed to be generic for clarity
-  admin-cli-client-id: admin-cli         # Default client for admin access
-  admin-username: admin                  # Your Authorization Server admin username
-  admin-password: admin                  # Your Authorization Server admin password (CHANGE FOR PRODUCTION!)
-  
-  admin-auth-server-url: https://localhost:8443 # Redundant with auth-server.admin.url, consider consolidating
-  admin-realm: chuks-emaketplace-realm # Redundant with auth-server.realm, consider consolidating
-  admin-service-client-id: user-service-admin-client     # Client ID for user-service's admin client
-  admin-service-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client
+# Removed redundant Keycloak admin properties for clarity and consolidation:
+# admin-cli-client-id: admin-cli
+# admin-username: admin
+# admin-password: admin
+# admin-auth-server-url: https://localhost:8443
+# admin-realm: chuks-emaketplace-realm
+# admin-service-client-id: user-service-admin-client
+# admin-service-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET
 
-
-# ... other configurations ...
 
 eureka:
   client:
@@ -67,4 +87,4 @@ jwt:
   auth:
     converter:
       resource-id: emaketplace-app
-      principle-attribute: preferred_username    
+      principle-attribute: preferred_username

@@ -21,13 +21,15 @@ import jakarta.ws.rs.NotFoundException; // jakarta.ws.rs.NotFoundException
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
+import com.aliwudi.marketplace.backend.common.exception.ServiceException;
+import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException;
 import java.util.Set;
 
 /**
- * Implementation of IAdminService for Keycloak Authorization Server.
- * Handles interactions with Keycloak Admin API.
- * Now includes enhanced methods for user creation and password setting,
- * supporting the "backend-first" hybrid registration flow, with generic naming.
+ * Implementation of IAdminService for Keycloak Authorization Server. Handles
+ * interactions with Keycloak Admin API. Now includes enhanced methods for user
+ * creation and password setting, supporting the "backend-first" hybrid
+ * registration flow, with generic naming.
  */
 @Service
 @Slf4j
@@ -61,28 +63,33 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
     }
 
     /**
-     * Creates a user in the Authorization Server (Keycloak) and sets their password.
-     * This method is part of the "backend-first" hybrid registration.
+     * Creates a user in the Authorization Server (Keycloak) and sets their
+     * password. This method is part of the "backend-first" hybrid registration.
      *
      * @param username The username for the Authorization Server user.
      * @param email The email for the Authorization Server user.
-     * @param password The plain-text password for the Authorization Server user.
-     * @param internalUserId The internal ID from the backend database to store as a custom attribute.
+     * @param password The plain-text password for the Authorization Server
+     * user.
+     * @param internalUserId The internal ID from the backend database to store
+     * as a custom attribute.
      * @param firstName The first name of the user.
      * @param lastName The last name of the user.
-     * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the newly created user.
-     * @throws DuplicateResourceException if user with the given username/email already exists in Authorization Server.
-     * @throws RuntimeException if user creation or password setting fails for other reasons.
+     * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the
+     * newly created user.
+     * @throws DuplicateResourceException if user with the given username/email
+     * already exists in Authorization Server.
+     * @throws RuntimeException if user creation or password setting fails for
+     * other reasons.
      */
     @Override
-    public Mono<String> createUserInAuthServer(String username, 
-            String email, 
+    public Mono<String> createUserInAuthServer(String username,
+            String email,
             String password,
             Long internalUserId,
-            String firstName, 
+            String firstName,
             String lastName,
             Set<String> roles) { // Generic method name
-        
+
         return Mono.fromCallable(() -> {
             Keycloak keycloak = getAuthServerClient(); // Generic method call
             UserRepresentation user = new UserRepresentation();
@@ -91,36 +98,40 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             user.setEmail(email);
             user.setFirstName(firstName);
             user.setLastName(lastName);
+            user.setEmailVerified(false);// Crucially, mark email as NOT verified initially.
 
             // Set the user_id as a custom attribute
             Map<String, List<String>> attributes = new HashMap<>();
             attributes.put("user_id", Collections.singletonList(String.valueOf(internalUserId)));
             user.setAttributes(attributes);
 
-            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with user_id: {}", username, userAuthRealm, internalUserId); // Generic log
+            // DO NOT set "VERIFY_EMAIL" as a required action if you're not using Keycloak UI for login.
+            // If set, the user would be redirected to Keycloak UI to verify email upon login attempt.
+            // If you're managing login externally, this would create an unusable state.
+            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with user_id: {}. Preparing to send email verification.", username, userAuthRealm, internalUserId); // Generic log
+
+            String authServerUserId; // Declare outside try-with-resources to use later
 
             try (Response response = keycloak.realm(userAuthRealm).users().create(user)) { // Use userAuthRealm
                 switch (response.getStatus()) {
                     case 201 -> {
                         // 201 Created
-                        String authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1"); // Generic variable name
+                        authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1"); // Generic variable name
                         log.info("Successfully created user '{}' in Authorization Server. Auth Server ID: {}", username, authServerUserId); // Generic log
-                        
+
                         // Set password
                         UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId); // Use userAuthRealm, generic variable
                         CredentialRepresentation passwordCred = new CredentialRepresentation();
                         passwordCred.setTemporary(false);
                         passwordCred.setType(CredentialRepresentation.PASSWORD);
                         passwordCred.setValue(password);
-                        
+
                         userResource.resetPassword(passwordCred);
                         log.info("Password set for Authorization Server user '{}' (Auth Server ID: {})", username, authServerUserId); // Generic log
-                        
+
                         // Optionally assign default roles here if needed, e.g.:
                         // RoleRepresentation defaultRole = keycloak.realm(userAuthRealm).roles().get("default-user-role").toRepresentation();
                         // userResource.roles().realmLevel().add(Collections.singletonList(defaultRole));
-                        
-                        return authServerUserId;
                     }
                     case 409 -> { // Conflict
                         String errorBody = response.readEntity(String.class);
@@ -133,12 +144,48 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                         throw new RuntimeException(String.format("Authorization Server user creation failed: Status %d, Response: %s", response.getStatus(), errorBody)); // Generic message
                     }
                 }
+
+                return authServerUserId;
+
             }
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
-     * Retrieves a user from the Authorization Server (Keycloak) by their Authorization Server ID.
+     * Updates a user's email verified status in Keycloak. This method is
+     * specifically called by the EmailVerificationService after OTP validation.
+     *
+     * @param authServerUserId The Keycloak user ID.
+     * @param isVerified The status to set (true for verified, false for
+     * unverified).
+     * @return Mono<Void> indicating completion.
+     */
+    @Override
+    public Mono<Void> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified) {
+        return Mono.fromCallable(() -> {
+            Keycloak keycloak = getAuthServerClient();
+            try {
+                UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId);
+                UserRepresentation user = userResource.toRepresentation();
+                user.setEmailVerified(isVerified);
+                userResource.update(user);
+                log.info("Keycloak user '{}' email verification status updated to {}", authServerUserId, isVerified);
+                return null;
+            } catch (NotFoundException e) {
+                log.warn("Keycloak user '{}' not found when trying to update email verification status. It might have been deleted.", authServerUserId);
+                throw new UserNotFoundException("User not found in Keycloak: " + authServerUserId, e);
+            } catch (Exception e) {
+                log.error("Failed to update email verification status for user '{}': {}", authServerUserId, e.getMessage(), e);
+                throw new ServiceException("Failed to update email verification status in Keycloak.", e);
+            }
+        })
+                .then()
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Retrieves a user from the Authorization Server (Keycloak) by their
+     * Authorization Server ID.
      *
      * @param authServerUserId The Authorization Server ID of the user.
      * @return A Mono emitting the UserRepresentation, or empty if not found.
@@ -196,7 +243,8 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
     /**
      * Deletes a user from the Authorization Server (Keycloak).
      *
-     * @param authServerUserId The Authorization Server ID of the user to delete.
+     * @param authServerUserId The Authorization Server ID of the user to
+     * delete.
      * @return A Mono<Void> indicating completion.
      */
     @Override

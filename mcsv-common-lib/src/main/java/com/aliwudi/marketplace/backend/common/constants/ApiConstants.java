@@ -27,6 +27,11 @@ public final class ApiConstants {
     public static final String DELIVERY_CONTROLLER_BASE = "/api/deliveries";     // Added for DeliveryController
     public static final String MEDIA_CONTROLLER_BASE = "/api/media";        // Added for MediaController
 
+    //--- Email verification Endpoints
+    public static final String EMAIL_VERIFICATION_INITIATE = "/email/initiateVerification";
+    public static final String EMAIL_VERIFICATION_VERIFY_OTP = "/email/verifyOTP";
+    public static final String EMAIL_VERIFICATION_RESEND_CODE= "/email/resendVerificationCode";
+    
     // --- User Endpoints (from previous modification) ---
     public static final String USER_PROFILES_CREATE = "/profiles/create";
     public static final String USER_PROFILES_UPDATE = "/profiles/update/{id}";
