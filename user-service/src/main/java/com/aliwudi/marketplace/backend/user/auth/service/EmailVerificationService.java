@@ -15,9 +15,14 @@ import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; 
 import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // Import new exception
 import com.aliwudi.marketplace.backend.common.exception.ServiceException; // Import general exception
 
+import org.thymeleaf.TemplateEngine; // NEW: Import Thymeleaf TemplateEngine
+import org.thymeleaf.context.Context; // NEW: Import Thymeleaf Context
+import org.springframework.context.i18n.LocaleContextHolder; // NEW: For resolving locale
+
 /**
  * Service for managing email verification using One-Time Passwords (OTPs).
  * Handles OTP generation, storage in Redis, sending via SMTP, and validation.
+ * Now uses Thymeleaf for email templating.
  */
 @Service
 @Slf4j
@@ -26,6 +31,7 @@ public class EmailVerificationService {
     private final KeycloakAdminServiceImpl keycloakAdminService;
     private final EmailSenderService emailSenderService;
     private final ReactiveRedisTemplate<String, String> reactiveRedisTemplate; // For Redis operations
+    private final TemplateEngine templateEngine; // NEW: Inject TemplateEngine
 
     // OTP validity period (e.g., 5 minutes)
     private static final Duration OTP_VALIDITY = Duration.ofMinutes(5);
@@ -37,15 +43,18 @@ public class EmailVerificationService {
     public EmailVerificationService(
             KeycloakAdminServiceImpl keycloakAdminService,
             EmailSenderService emailSenderService,
-            ReactiveRedisTemplate<String, String> reactiveRedisTemplate) {
+            ReactiveRedisTemplate<String, String> reactiveRedisTemplate,
+            TemplateEngine templateEngine) { // NEW: Add TemplateEngine to constructor
         this.keycloakAdminService = keycloakAdminService;
         this.emailSenderService = emailSenderService;
         this.reactiveRedisTemplate = reactiveRedisTemplate;
+        this.templateEngine = templateEngine; // NEW: Assign TemplateEngine
     }
 
     /**
      * Initiates the email verification process by generating and sending an OTP.
      * The OTP is stored in Redis with an expiration.
+     * The email body is generated using a Thymeleaf template.
      *
      * @param authServerUserId The Keycloak user ID for whom to send the OTP.
      * @param email The user's email address.
@@ -61,21 +70,45 @@ public class EmailVerificationService {
         return reactiveRedisTemplate.opsForValue().set(redisKey, otpCode, OTP_VALIDITY)
                 .then(Mono.fromCallable(() -> {
                     String subject = "Your Email Verification Code";
-                    String body = String.format("Hi there,\n\nYour verification code is: %s\n\nThis code is valid for %d minutes. Please enter this code in your application to verify your email.\n\nThank you,\nYour App Team", otpCode, OTP_VALIDITY.toMinutes());
+                    // OLD: String body = String.format("Hi there,\n\nYour verification code is: %s\n\nThis code is valid for %d minutes. Please enter this code in your application to verify your email.\n\nThank you,\nYour App Team", otpCode, OTP_VALIDITY.toMinutes());
+
+                    // NEW: Build the HTML email body using Thymeleaf
+                    String htmlBody = buildVerificationEmailHtml(otpCode, OTP_VALIDITY.toMinutes());
 
                     log.info("Generated OTP for user {}: {}. Stored in Redis.", authServerUserId, otpCode);
-                    return emailSenderService.sendEmail(email, subject, body);
+                    // NEW: Pass the HTML body to the email sender service
+                    return emailSenderService.sendEmail(email, subject, htmlBody);
                 }).flatMap(m -> m) // Flatten the Mono<Mono<Void>>
                 .onErrorResume(EmailSendingException.class, e -> {
                     log.error("Failed to send OTP email to {}: {}", email, e.getMessage(), e);
                     // Optionally remove OTP from Redis if email sending fails consistently
-                    // reactiveRedisTemplate.delete(redisKey).subscribe();
+                    // reactiveRedisTemplate.delete(redisKey).subscribe(); // Consider if you want to delete OTP on email send failure
                     return Mono.error(new EmailSendingException("Failed to send verification email.", e));
                 })
                 .onErrorResume(e -> {
                     log.error("Unexpected error during OTP initiation for user {}: {}", authServerUserId, e.getMessage(), e);
                     return Mono.error(new ServiceException("Failed to initiate email verification.", e));
                 }));
+    }
+
+    /**
+     * NEW: Helper method to build the HTML content for the email verification using a Thymeleaf template.
+     *
+     * @param otpCode The generated OTP code.
+     * @param otpValidityMinutes The duration in minutes for which the OTP is valid.
+     * @return The rendered HTML string for the email body.
+     */
+    private String buildVerificationEmailHtml(String otpCode, long otpValidityMinutes) {
+        // Create a Thymeleaf context to pass variables to the template
+        Context context = new Context(LocaleContextHolder.getLocale()); // Use current locale for i18n
+        context.setVariable("otpCode", otpCode);
+        context.setVariable("otpValidityMinutes", otpValidityMinutes);
+        // Add other variables if your template uses them, e.g., user's name
+        // context.setVariable("userName", "Valued Customer");
+
+        // Process the HTML template named "email/verification-code"
+        // This assumes your template is in src/main/resources/templates/email/verification-code.html
+        return templateEngine.process("email/verification-code", context);
     }
 
     /**
