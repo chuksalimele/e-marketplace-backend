@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.notification.config;
 
+import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
+import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,9 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    // --- Exchange Definitions ---
-    // This exchange will receive events from other services (e.g., user-service)
-    public static final String USER_EVENTS_EXCHANGE = "user.events.exchange";
+
 
     @Bean
     public TopicExchange userEventsExchange() {
@@ -40,11 +40,6 @@ public class RabbitMQConfig {
         return new Queue(PASSWORD_RESET_QUEUE, true); // Durable
     }
 
-    // --- Binding Definitions ---
-    // Routing keys should match what the producer service publishes
-    public static final String EMAIL_VERIFICATION_ROUTING_KEY = "email.verification.requested";
-    public static final String USER_REGISTERED_ROUTING_KEY = "user.registered";
-    public static final String PASSWORD_RESET_ROUTING_KEY = "password.reset.requested";
 
     @Bean
     public Binding emailVerificationBinding(Queue emailVerificationQueue, TopicExchange userEventsExchange) {

@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.user.service; // Adjust package as appropriate for your user-service
 
+import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
+import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
 import com.aliwudi.marketplace.notificationservice.dto.event.EmailVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.UserRegisteredEvent;
@@ -22,11 +24,6 @@ public class NotificationEventPublisherService {
 
     private final AmqpTemplate rabbitTemplate;
 
-    // Routing keys should match what the notification-service is listening for
-    public static final String EMAIL_VERIFICATION_ROUTING_KEY = "email.verification.requested";
-    public static final String USER_REGISTERED_ROUTING_KEY = "user.registered";
-    public static final String PASSWORD_RESET_ROUTING_KEY = "password.reset.requested";
-
     /**
      * Publishes an event to request an email verification OTP after user registration.
      *
@@ -38,11 +35,11 @@ public class NotificationEventPublisherService {
     public Mono<Void> publishEmailVerificationRequestedEvent(String authServerUserId, String email, String username, String otpCode) {
         EmailVerificationRequestedEvent event = new EmailVerificationRequestedEvent(authServerUserId, email, username, otpCode);
         log.info("Publishing EmailVerificationRequestedEvent for user: {} to exchange {} with routing key {}",
-                 email, RabbitMQConfig.USER_EVENTS_EXCHANGE, EMAIL_VERIFICATION_ROUTING_KEY);
+                 email, USER_EVENTS_EXCHANGE, EMAIL_VERIFICATION_ROUTING_KEY);
 
         return Mono.fromRunnable(() ->
             rabbitTemplate.convertAndSend(
-                RabbitMQConfig.USER_EVENTS_EXCHANGE,
+                USER_EVENTS_EXCHANGE,
                 EMAIL_VERIFICATION_ROUTING_KEY,
                 event
             )
@@ -64,11 +61,11 @@ public class NotificationEventPublisherService {
     public Mono<Void> publishUserRegisteredEvent(String userId, String email, String username, String loginUrl) {
         UserRegisteredEvent event = new UserRegisteredEvent(userId, email, username, loginUrl);
         log.info("Publishing UserRegisteredEvent for user: {} to exchange {} with routing key {}",
-                 email, RabbitMQConfig.USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY);
+                 email, USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY);
 
         return Mono.fromRunnable(() ->
             rabbitTemplate.convertAndSend(
-                RabbitMQConfig.USER_EVENTS_EXCHANGE,
+                USER_EVENTS_EXCHANGE,
                 USER_REGISTERED_ROUTING_KEY,
                 event
             )
@@ -90,11 +87,11 @@ public class NotificationEventPublisherService {
     public Mono<Void> publishPasswordResetRequestedEvent(String userId, String email, String username, String resetLink) {
         PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(userId, email, username, resetLink);
         log.info("Publishing PasswordResetRequestedEvent for user: {} to exchange {} with routing key {}",
-                 email, RabbitMQConfig.USER_EVENTS_EXCHANGE, PASSWORD_RESET_ROUTING_KEY);
+                 email, USER_EVENTS_EXCHANGE, PASSWORD_RESET_ROUTING_KEY);
 
         return Mono.fromRunnable(() ->
             rabbitTemplate.convertAndSend(
-                RabbitMQConfig.USER_EVENTS_EXCHANGE,
+                USER_EVENTS_EXCHANGE,
                 PASSWORD_RESET_ROUTING_KEY,
                 event
             )

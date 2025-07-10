@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.config; 
 
+import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -13,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     // Define the exchange name. This must match the exchange defined in notification-service.
-    public static final String USER_EVENTS_EXCHANGE = "user.events.exchange";
+    
 
     @Bean
     public TopicExchange userEventsExchange() {

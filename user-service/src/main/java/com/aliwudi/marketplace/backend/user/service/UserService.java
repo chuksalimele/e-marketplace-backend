@@ -249,7 +249,7 @@ public class UserService {
                                     ).thenReturn(updatedUserAfterOtp); // Return the user after event is published
                                 })                         
                                 .onErrorResume(e -> {
-                                    // 5. If Authorization Server registration OR Email Verification initiation fails,
+                                    // 6. If Authorization Server registration OR Email Verification initiation fails,
                                     //    rollback (delete) user from backend DB and Authorization Server.
                                     log.error("Failed to register user in Authorization Server or send verification email for internal ID {}. Initiating rollback. Error: {}",
                                             userId, e.getMessage(), e);
