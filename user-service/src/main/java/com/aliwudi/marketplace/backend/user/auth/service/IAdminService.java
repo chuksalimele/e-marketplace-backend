@@ -60,6 +60,6 @@ public interface IAdminService {
      * @param isVerified
      * @return 
      */    
-    Mono<Void> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified); // New method to be used by OTP service
+    Mono<Boolean> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified); // New method to be used by OTP service
 
 }

@@ -8,9 +8,8 @@ package com.aliwudi.marketplace.backend.common.constants;
  *
  * @author user
  */
-public class EventType {
-    public static final String USER_EVENTS_EXCHANGE = "user.events.exchange";
-    
-    public static final String USER_REGISTER = "USER_REGISTER";
+public class RedisConstants {
+        
+    public static final String OTP_PREFIX = "user_otp:"; // Key prefix for Redis
 
 }

@@ -161,7 +161,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @return Mono<Void> indicating completion.
      */
     @Override
-    public Mono<Void> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified) {
+    public Mono<Boolean> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified) {
         return Mono.fromCallable(() -> {
             Keycloak keycloak = getAuthServerClient();
             try {
@@ -170,7 +170,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 user.setEmailVerified(isVerified);
                 userResource.update(user);
                 log.info("Keycloak user '{}' email verification status updated to {}", authServerUserId, isVerified);
-                return null;
+                return true;
             } catch (NotFoundException e) {
                 log.warn("Keycloak user '{}' not found when trying to update email verification status. It might have been deleted.", authServerUserId);
                 throw new UserNotFoundException("User not found in Keycloak: " + authServerUserId, e);
@@ -179,7 +179,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 throw new ServiceException("Failed to update email verification status in Keycloak.", e);
             }
         })
-                .then()
+                .thenReturn(true)
                 .subscribeOn(Schedulers.boundedElastic());
     }
 

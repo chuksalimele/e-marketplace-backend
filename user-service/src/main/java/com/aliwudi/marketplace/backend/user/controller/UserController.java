@@ -56,13 +56,15 @@ public class UserController {
     // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
     @Data
     public static class EmailVerificationRequest {
-        private String authServerUserId; // Keycloak ID of the user
+        private String authServerUserId; // Authorization Server ID of the user
+        private String purpose; 
         private String code;
     }
 
     @Data
-    public static class ResendVerificationCodeRequest {
+    public static class ResendVerificationCodeRequest {        
         private String authServerUserId;
+        private String purpose;
     }
 
     @Data
@@ -179,22 +181,37 @@ public class UserController {
     @PostMapping(EMAIL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
     public Mono<ResponseEntity<ApiResponse<Void>>> verifyEmail(@RequestBody EmailVerificationRequest request) {
-        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank() ||
-            request.getCode() == null || request.getCode().isBlank()) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
             return Mono.just(ResponseEntity.badRequest().body(
                 ApiResponse.<Void>builder()
                     .success(false)
-                    .message("Auth Server User ID and Code are required.")
+                    .message("Auth Server User ID is required.")
                     .build()
             ));
         }
-        return userService.verifyEmailOtp(request.getAuthServerUserId(), request.getCode())
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(
+                ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Verification Code is required.")
+                    .build()
+            ));
+        }
+        if (request.getPurpose()== null || request.getPurpose().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(
+                ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Verification purpose is required.")
+                    .build()
+            ));
+        }        
+        return userService.verifyEmailOtp(request.getAuthServerUserId(), request.getCode(), request.getPurpose())
             .thenReturn(ResponseEntity.ok(
                 ApiResponse.<Void>builder()
                     .success(true)
                     .message("Email successfully verified.")
                     .build()
-            ))
+            ))            
             .onErrorResume(OtpValidationException.class, e -> {
                 log.warn("Email verification failed for user {}: {}", request.getAuthServerUserId(), e.getMessage());
                 return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(

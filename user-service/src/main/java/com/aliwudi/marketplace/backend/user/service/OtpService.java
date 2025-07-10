@@ -1,6 +1,7 @@
 package com.aliwudi.marketplace.backend.user.service;
 
 import com.aliwudi.marketplace.backend.common.exception.OtpValidationException;
+import static com.aliwudi.marketplace.backend.common.constants.RedisConstants.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -23,7 +24,6 @@ public class OtpService {
 
     private static final int OTP_LENGTH = 6;
     private static final SecureRandom secureRandom = new SecureRandom();
-    private static final String OTP_PREFIX = "user_otp:"; // Key prefix for Redis
 
     /**
      * Generates a new OTP, stores it in Redis with a TTL, and returns the OTP.

@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.service;
 
+import static com.aliwudi.marketplace.backend.common.constants.EventType.USER_REGISTER;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.common.model.User;
@@ -236,20 +237,9 @@ public class UserService {
                                                         otpCode // Pass the actual OTP code
                                                 ).thenReturn(updatedUserAfterAuthId) // Return the user after event is published
                                             );
-                                })
-                                .flatMap(updatedUserAfterOtp -> {
-                                    // 5. Publish User Registered (onboarding) event
-                                    String loginUrl = "https://your-app.com/login"; // Replace with your actual login URL
-                                    log.info("Publishing user registered (onboarding) event for user {}.", updatedUserAfterOtp.getId());
-                                    return notificationEventPublisherService.publishUserRegisteredEvent(
-                                            String.valueOf(updatedUserAfterOtp.getId()),
-                                            updatedUserAfterOtp.getEmail(),
-                                            updatedUserAfterOtp.getUsername(),
-                                            loginUrl
-                                    ).thenReturn(updatedUserAfterOtp); // Return the user after event is published
                                 })                         
                                 .onErrorResume(e -> {
-                                    // 6. If Authorization Server registration OR Email Verification initiation fails,
+                                    // 5. If Authorization Server registration OR Email Verification initiation fails,
                                     //    rollback (delete) user from backend DB and Authorization Server.
                                     log.error("Failed to register user in Authorization Server or send verification email for internal ID {}. Initiating rollback. Error: {}",
                                             userId, e.getMessage(), e);
@@ -275,31 +265,51 @@ public class UserService {
         });
     }
 
-    
+ 
     /**
      * Validates the provided OTP for email verification and, if valid, marks the user's email as verified in Keycloak.
+     * If the purpose is 'USER_REGISTER', it also sends the onboarding email.
      *
      * @param authServerUserId The Keycloak user ID.
      * @param providedOtp The OTP code provided by the user.
+     * @param purpose The purpose of the OTP verification (e.g., "USER_REGISTER"). // NEW PARAM
      * @return Mono<Boolean> true if verification successful, false otherwise.
      * @throws OtpValidationException if the OTP is invalid or expired.
      * @throws UserNotFoundException if the user is not found in Keycloak.
      * @throws RuntimeException for other internal errors.
      */
-    public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp) {
-        log.info("Attempting to verify email OTP for user: {}", authServerUserId);
+    public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp, String purpose) { // NEW PARAM
+        log.info("Attempting to verify email OTP for user: {} with purpose: {}", authServerUserId, purpose);
         return otpService.validateOtp(authServerUserId, providedOtp)
                 .flatMap(isValid -> {
                     if (isValid) {
-                        log.info("OTP valid for user {}. Updating email verified status in Keycloak.", authServerUserId);
+                        log.info("OTP valid for user {}. Updating email verified status in authorization server.", authServerUserId);
                         return iAdminService.updateEmailVerifiedStatus(authServerUserId, true)
-                                .thenReturn(true);
+                                .flatMap(isUpdated -> {
+                                    if (isUpdated && USER_REGISTER.equals(purpose)) {
+                                        log.info("Email verification purpose is USER_REGISTER for user {}. Sending onboarding email.", authServerUserId);
+                                        // Fetch user details to send onboarding email
+                                        return userRepository.findByAuthId(authServerUserId)
+                                                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
+                                                .flatMap(user -> {
+                                                    String loginUrl = "https://your-app.com/login"; // Replace with your actual login URL
+                                                    return notificationEventPublisherService.publishUserRegisteredEvent(
+                                                            String.valueOf(user.getId()),
+                                                            user.getEmail(),
+                                                            user.getUsername(),
+                                                            loginUrl
+                                                    );
+                                                })
+                                                .thenReturn(true); // Return true after onboarding email is sent
+                                    }
+                                    return Mono.just(true); // Return true if OTP valid but no onboarding needed
+                                });
                     }
                     return Mono.just(false); // Should not be reached if validateOtp throws exception
                 })
                 .doOnSuccess(v -> log.debug("Email OTP verification process completed for user {}. Status: {}", authServerUserId, v))
                 .doOnError(e -> log.error("Error during email OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
-    }
+    }   
 
     /**
      * Resends an email verification code (OTP) for a given user.
