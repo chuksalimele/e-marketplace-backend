@@ -1,7 +1,8 @@
 package com.aliwudi.marketplace.backend.notification.config;
 
-import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
+import static com.aliwudi.marketplace.backend.common.constants.ExchangeType.*;
 import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
+import static com.aliwudi.marketplace.backend.common.constants.QueueType.*;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -20,10 +21,6 @@ public class RabbitMQConfig {
         return new TopicExchange(USER_EVENTS_EXCHANGE, true, false); // Durable, not auto-delete
     }
 
-    // --- Queue Definitions ---
-    public static final String EMAIL_VERIFICATION_QUEUE = "email.verification.queue";
-    public static final String REGISTRATION_ONBOARDING_QUEUE = "registration.onboarding.queue";
-    public static final String PASSWORD_RESET_QUEUE = "password.reset.queue";
 
     @Bean
     public Queue emailVerificationQueue() {

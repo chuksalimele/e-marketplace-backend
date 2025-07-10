@@ -1,9 +1,9 @@
 package com.aliwudi.marketplace.backend.notification.listener;
 
+import static com.aliwudi.marketplace.backend.common.constants.QueueType.*;
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.UserRegisteredEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.EmailVerificationRequestedEvent;
-import com.aliwudi.marketplace.backend.notification.config.RabbitMQConfig;
 import com.aliwudi.marketplace.backend.notification.service.EmailNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +34,7 @@ public class UserEventListener {
      *
      * @param event The EmailVerificationRequestedEvent message received from the queue.
      */
-    @RabbitListener(queues = RabbitMQConfig.EMAIL_VERIFICATION_QUEUE)
+    @RabbitListener(queues = EMAIL_VERIFICATION_QUEUE)
     public void handleEmailVerificationRequest(EmailVerificationRequestedEvent event) {
         log.info("Received EmailVerificationRequestedEvent for user: {} ({})", event.getName(), event.getEmail());
 
@@ -63,7 +63,7 @@ public class UserEventListener {
      *
      * @param event The UserRegisteredEvent message received from the queue.
      */
-    @RabbitListener(queues = RabbitMQConfig.REGISTRATION_ONBOARDING_QUEUE)
+    @RabbitListener(queues = REGISTRATION_ONBOARDING_QUEUE)
     public void handleUserRegistration(UserRegisteredEvent event) {
         log.info("Received UserRegisteredEvent for user: {} ({})", event.getName(), event.getEmail());
 
@@ -91,7 +91,7 @@ public class UserEventListener {
      *
      * @param event The PasswordResetRequestedEvent message received from the queue.
      */
-    @RabbitListener(queues = RabbitMQConfig.PASSWORD_RESET_QUEUE)
+    @RabbitListener(queues = PASSWORD_RESET_QUEUE)
     public void handlePasswordResetRequest(PasswordResetRequestedEvent event) {
         log.info("Received PasswordResetRequestedEvent for user: {} ({})", event.getName(), event.getEmail());
 

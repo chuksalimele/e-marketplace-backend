@@ -8,9 +8,7 @@ package com.aliwudi.marketplace.backend.common.constants;
  *
  * @author user
  */
-public class EventType {
-        
-    public static final String USER_REGISTER = "USER_REGISTER";
-    public static final String PASSWORD_RESET = "PASSWORD_RESET";
+public class ExchangeType {
+    public static final String USER_EVENTS_EXCHANGE = "user.events.exchange";
     
 }

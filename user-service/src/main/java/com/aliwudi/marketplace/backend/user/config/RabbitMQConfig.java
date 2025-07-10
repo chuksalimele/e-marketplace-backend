@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.user.config; 
 
-import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
+import static com.aliwudi.marketplace.backend.common.constants.ExchangeType.*;
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;

@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.user.service; // Adjust package as appropriate for your user-service
 
-import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
+import static com.aliwudi.marketplace.backend.common.constants.ExchangeType.*;
 import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
 import com.aliwudi.marketplace.backend.common.dto.event.EmailVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
