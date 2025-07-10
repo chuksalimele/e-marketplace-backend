@@ -5,6 +5,9 @@
 server:
   port: 5001 # A unique port for this microservice
 
+app:
+  host: https://localhost
+
 truststore:
   path: classpath:backend_truststore.p12
   password: microservicetrustpass@123+@+

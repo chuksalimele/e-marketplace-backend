@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.user.service;
 
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.LOGIN;
 import static com.aliwudi.marketplace.backend.common.constants.EventType.USER_REGISTER;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
@@ -11,7 +12,6 @@ import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
 import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
 import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
-import com.aliwudi.marketplace.backend.user.service.NotificationEventPublisherService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,9 +32,9 @@ import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.keycloak.representations.idm.UserRepresentation; // New import for Keycloak user representation
 
 
 /**
@@ -58,7 +58,8 @@ public class UserService {
     // OTP validity for email verification (e.g., 5 minutes)
     private static final Duration EMAIL_OTP_VALIDITY = Duration.ofMinutes(5);
 
-
+    @Value("${app.host}")
+    private String appHost;
     /**
      * Initiates the password reset process by publishing an event to the notification service.
      * This method generates a temporary token and publishes an event for email delivery.
@@ -292,7 +293,7 @@ public class UserService {
                                         return userRepository.findByAuthId(authServerUserId)
                                                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
                                                 .flatMap(user -> {
-                                                    String loginUrl = "https://your-app.com/login"; // Replace with your actual login URL
+                                                    String loginUrl = appHost+LOGIN; // Replace with your actual login URL
                                                     return notificationEventPublisherService.publishUserRegisteredEvent(
                                                             String.valueOf(user.getId()),
                                                             user.getEmail(),

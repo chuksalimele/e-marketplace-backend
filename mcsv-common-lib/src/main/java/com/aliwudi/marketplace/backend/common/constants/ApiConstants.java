@@ -27,6 +27,10 @@ public final class ApiConstants {
     public static final String DELIVERY_CONTROLLER_BASE = "/api/deliveries";     // Added for DeliveryController
     public static final String MEDIA_CONTROLLER_BASE = "/api/media";        // Added for MediaController
 
+    //--- Login and logout Endpoints
+    public static final String LOGIN = "/login";
+    public static final String LOGOUT = "/logout";
+    
     //--- Email verification Endpoints
     public static final String EMAIL_VERIFICATION_INITIATE = "/email/initiateVerification";
     public static final String EMAIL_VERIFICATION_VERIFY_OTP = "/email/verifyOTP";
