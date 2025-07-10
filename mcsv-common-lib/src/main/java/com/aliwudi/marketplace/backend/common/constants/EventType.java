@@ -11,6 +11,8 @@ package com.aliwudi.marketplace.backend.common.constants;
 public class EventType {
     public static final String USER_EVENTS_EXCHANGE = "user.events.exchange";
     
+    
     public static final String USER_REGISTER = "USER_REGISTER";
-
+    public static final String PASSWORD_RESET = "PASSWORD_RESET";
+    
 }
