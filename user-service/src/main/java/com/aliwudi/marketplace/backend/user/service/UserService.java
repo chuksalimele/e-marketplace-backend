@@ -82,7 +82,7 @@ public class UserService {
                     return notificationEventPublisherService.publishPasswordResetRequestedEvent(
                             String.valueOf(user.getId()),
                             user.getEmail(),
-                            user.getUsername(),
+                            user.getFirstName(),
                             resetLink
                     );
                 })
@@ -234,7 +234,7 @@ public class UserService {
                                                 notificationEventPublisherService.publishEmailVerificationRequestedEvent(
                                                         updatedUserAfterAuthId.getAuthId(),
                                                         updatedUserAfterAuthId.getEmail(),
-                                                        updatedUserAfterAuthId.getUsername(),
+                                                        updatedUserAfterAuthId.getFirstName(),
                                                         otpCode // Pass the actual OTP code
                                                 ).thenReturn(updatedUserAfterAuthId) // Return the user after event is published
                                             );
@@ -297,7 +297,7 @@ public class UserService {
                                                     return notificationEventPublisherService.publishUserRegisteredEvent(
                                                             String.valueOf(user.getId()),
                                                             user.getEmail(),
-                                                            user.getUsername(),
+                                                            user.getFirstName(),
                                                             loginUrl
                                                     );
                                                 })
@@ -328,7 +328,7 @@ public class UserService {
             .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
             .flatMap(userRepresentation -> {
                 String email = userRepresentation.getEmail();
-                String username = userRepresentation.getUsername(); // Get username for template
+                String name = userRepresentation.getFirstName(); // Get username for template
                 if (email == null || email.isBlank()) {
                     return Mono.error(new IllegalArgumentException("User does not have an email address to send a code to."));
                 }
@@ -342,7 +342,7 @@ public class UserService {
                             notificationEventPublisherService.publishEmailVerificationRequestedEvent(
                                     authServerUserId,
                                     email,
-                                    username,
+                                    name,
                                     otpCode // Pass the newly generated OTP
                             )
                         );

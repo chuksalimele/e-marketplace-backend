@@ -2,10 +2,9 @@ package com.aliwudi.marketplace.backend.user.service; // Adjust package as appro
 
 import static com.aliwudi.marketplace.backend.common.constants.EventType.*;
 import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
-import com.aliwudi.marketplace.notificationservice.dto.event.EmailVerificationRequestedEvent;
+import com.aliwudi.marketplace.backend.common.dto.event.EmailVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.UserRegisteredEvent;
-import com.aliwudi.marketplace.backend.user.config.RabbitMQConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.AmqpTemplate;
@@ -32,8 +31,8 @@ public class NotificationEventPublisherService {
      * @param username The user's username.
      * @return Mono<Void> indicating the event has been published.
      */
-    public Mono<Void> publishEmailVerificationRequestedEvent(String authServerUserId, String email, String username, String otpCode) {
-        EmailVerificationRequestedEvent event = new EmailVerificationRequestedEvent(authServerUserId, email, username, otpCode);
+    public Mono<Void> publishEmailVerificationRequestedEvent(String authServerUserId, String email, String name, String otpCode) {
+        EmailVerificationRequestedEvent event = new EmailVerificationRequestedEvent(authServerUserId, email, name, otpCode);
         log.info("Publishing EmailVerificationRequestedEvent for user: {} to exchange {} with routing key {}",
                  email, USER_EVENTS_EXCHANGE, EMAIL_VERIFICATION_ROUTING_KEY);
 
@@ -58,8 +57,8 @@ public class NotificationEventPublisherService {
      * @param loginUrl The URL for the user to log in.
      * @return Mono<Void> indicating the event has been published.
      */
-    public Mono<Void> publishUserRegisteredEvent(String userId, String email, String username, String loginUrl) {
-        UserRegisteredEvent event = new UserRegisteredEvent(userId, email, username, loginUrl);
+    public Mono<Void> publishUserRegisteredEvent(String userId, String email, String name, String loginUrl) {
+        UserRegisteredEvent event = new UserRegisteredEvent(userId, email, name, loginUrl);
         log.info("Publishing UserRegisteredEvent for user: {} to exchange {} with routing key {}",
                  email, USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY);
 
@@ -84,8 +83,8 @@ public class NotificationEventPublisherService {
      * @param resetLink The full URL for password reset (with token).
      * @return Mono<Void> indicating the event has been published.
      */
-    public Mono<Void> publishPasswordResetRequestedEvent(String userId, String email, String username, String resetLink) {
-        PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(userId, email, username, resetLink);
+    public Mono<Void> publishPasswordResetRequestedEvent(String userId, String email, String name, String resetLink) {
+        PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(userId, email, name, resetLink);
         log.info("Publishing PasswordResetRequestedEvent for user: {} to exchange {} with routing key {}",
                  email, USER_EVENTS_EXCHANGE, PASSWORD_RESET_ROUTING_KEY);
 

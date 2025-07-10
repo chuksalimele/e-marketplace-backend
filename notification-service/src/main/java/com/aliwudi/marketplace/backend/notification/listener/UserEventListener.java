@@ -2,9 +2,9 @@ package com.aliwudi.marketplace.backend.notification.listener;
 
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.UserRegisteredEvent;
+import com.aliwudi.marketplace.backend.common.dto.event.EmailVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.notification.config.RabbitMQConfig;
 import com.aliwudi.marketplace.backend.notification.service.EmailNotificationService;
-import com.aliwudi.marketplace.notificationservice.dto.event.EmailVerificationRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -36,7 +36,7 @@ public class UserEventListener {
      */
     @RabbitListener(queues = RabbitMQConfig.EMAIL_VERIFICATION_QUEUE)
     public void handleEmailVerificationRequest(EmailVerificationRequestedEvent event) {
-        log.info("Received EmailVerificationRequestedEvent for user: {} ({})", event.getUsername(), event.getEmail());
+        log.info("Received EmailVerificationRequestedEvent for user: {} ({})", event.getName(), event.getEmail());
 
         String subject = "Your Email Verification Code"; // Can be externalized in messages.properties
         String templateName = "email/verification-code"; // Path to your Thymeleaf template
@@ -44,7 +44,7 @@ public class UserEventListener {
         Map<String, Object> templateVariables = new HashMap<>();
         templateVariables.put("otpCode", event.getAuthServerUserId()); // Assuming authServerUserId is the OTP for demo
         templateVariables.put("otpValidityMinutes", OTP_VALIDITY.toMinutes());
-        templateVariables.put("username", event.getUsername()); // For personalization
+        templateVariables.put("name", event.getName()); // For personalization
         // Add other common variables if needed, e.g., app name, current year, etc.
 
         emailNotificationService.sendTemplatedEmail(
@@ -65,13 +65,13 @@ public class UserEventListener {
      */
     @RabbitListener(queues = RabbitMQConfig.REGISTRATION_ONBOARDING_QUEUE)
     public void handleUserRegistration(UserRegisteredEvent event) {
-        log.info("Received UserRegisteredEvent for user: {} ({})", event.getUsername(), event.getEmail());
+        log.info("Received UserRegisteredEvent for user: {} ({})", event.getName(), event.getEmail());
 
         String subject = "Welcome to Our Application!"; // Can be externalized
         String templateName = "email/registration-success"; // Path to your Thymeleaf template
 
         Map<String, Object> templateVariables = new HashMap<>();
-        templateVariables.put("username", event.getUsername());
+        templateVariables.put("name", event.getName());
         templateVariables.put("loginUrl", event.getLoginUrl());
         // Add other common variables if needed
 
@@ -93,13 +93,13 @@ public class UserEventListener {
      */
     @RabbitListener(queues = RabbitMQConfig.PASSWORD_RESET_QUEUE)
     public void handlePasswordResetRequest(PasswordResetRequestedEvent event) {
-        log.info("Received PasswordResetRequestedEvent for user: {} ({})", event.getUsername(), event.getEmail());
+        log.info("Received PasswordResetRequestedEvent for user: {} ({})", event.getName(), event.getEmail());
 
         String subject = "Password Reset Request"; // Can be externalized
         String templateName = "email/password-reset"; // Path to your Thymeleaf template
 
         Map<String, Object> templateVariables = new HashMap<>();
-        templateVariables.put("username", event.getUsername());
+        templateVariables.put("name", event.getName());
         templateVariables.put("resetLink", event.getResetLink());
         templateVariables.put("tokenValidityHours", PASSWORD_RESET_TOKEN_VALIDITY.toHours());
         // Add other common variables if needed

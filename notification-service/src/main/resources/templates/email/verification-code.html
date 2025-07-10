@@ -21,7 +21,7 @@
             <h1 th:text="#{email.verification.greeting}">Email Verification</h1>
         </div>
         <div class="content">
-            <p>Hi <span th:text="${username ?: 'there'}">there</span>,</p>
+            <p>Hi <span th:text="${name ?: 'there'}">there</span>,</p>
             <p>Thank you for registering with <strong th:text="${appName}">Our App</strong>. To complete your registration and verify your email address, please use the following One-Time Password (OTP):</p>
 
             <div class="code-box">

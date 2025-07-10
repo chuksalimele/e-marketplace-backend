@@ -14,6 +14,6 @@ import lombok.NoArgsConstructor;
 public class PasswordResetRequestedEvent {
     private String userId; // Internal ID of the user in your database
     private String email;
-    private String username;
+    private String name;
     private String resetLink; // The full URL with the reset token
 }
