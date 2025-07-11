@@ -81,23 +81,16 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
     public Mono<String> createUserInAuthServer(User user) { // MODIFIED: Removed password parameter to match interface
         return Mono.fromCallable(() -> {
 
-            String primaryIdentifierValue; // Store the actual value of the primary identifier
-            if (IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(user.getPrimaryIdentifierType())) {
-                primaryIdentifierValue = user.getEmail();
-            } else if (IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(user.getPrimaryIdentifierType())) {
-                primaryIdentifierValue = user.getPhoneNumber();
-            } else {
-                throw new IllegalArgumentException("Invalid primaryIdentifierType for Keycloak user creation.");
-            }
 
-            String keycloakUsername = primaryIdentifierValue;
+
+            String keycloakUsername = user.getPrimaryIdentifier();
             log.info("Attempting to create user '{}' in Keycloak for internal ID: {}", keycloakUsername, user.getId());
 
             Keycloak keycloak = getAuthServerClient();
 
             // Check if user already exists by email in Keycloak (Keycloak's native search)
             if (IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(user.getPrimaryIdentifierType())) {
-                 List<UserRepresentation> existingUsersByEmail = keycloak.realm(userAuthRealm).users().searchByEmail(primaryIdentifierValue, true);
+                 List<UserRepresentation> existingUsersByEmail = keycloak.realm(userAuthRealm).users().searchByEmail(user.getEmail(), true);
                  if (!existingUsersByEmail.isEmpty()) {
                      throw new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS);
                  }
@@ -109,7 +102,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                     null, null, null, null, 0, 100 // Fetch a small batch, consider pagination or more robust search for large data
                 ).stream()
                 .filter(u -> u.getAttributes() != null && u.getAttributes().containsKey("phoneNumber") &&
-                             u.getAttributes().get("phoneNumber").contains(primaryIdentifierValue))
+                             u.getAttributes().get("phoneNumber").contains(user.getPhoneNumber()))
                 .collect(Collectors.toList());
 
                 if (!existingUsersByPhoneAttribute.isEmpty()) {
@@ -162,9 +155,9 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                     }
                     case 409 -> { // Conflict
                         String errorBody = response.readEntity(String.class);
-                        log.warn("User with identifier '{}' already exists in Authorization Server (Status 409). Response: {}", primaryIdentifierValue, errorBody);
+                        log.warn("User with identifier '{}' already exists in Authorization Server (Status 409). Response: {}", user.getPrimaryIdentifier(), errorBody);
                         throw new DuplicateResourceException(
-                            String.format(ApiResponseMessages.IDENTIFIER_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER, primaryIdentifierValue)
+                            String.format(ApiResponseMessages.IDENTIFIER_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER, user.getPrimaryIdentifier())
                         );
                     }
                     default -> {

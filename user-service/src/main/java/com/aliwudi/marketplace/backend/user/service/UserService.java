@@ -187,7 +187,7 @@ public class UserService {
             default -> throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
         }
         
-        final String userIdentifier = primaryIdentifier;
+        final String userPrimaryIdentifier = primaryIdentifier;
         
         return Mono.zip(
                 emailExistsMono, phoneNumberExistsMono
@@ -204,6 +204,7 @@ public class UserService {
 
             // Create User entity for backend DB
             User newUser = new User();
+            newUser.setPrimaryIdentifier(userPrimaryIdentifier);
             newUser.setEmail(request.getEmail());
             newUser.setFirstName(request.getFirstName());
             newUser.setLastName(request.getLastName());
@@ -235,7 +236,7 @@ public class UserService {
                     })
                     .flatMap(persistedUser -> {
                         Long userId = persistedUser.getId();
-                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", userIdentifier, userId);
+                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", userPrimaryIdentifier, userId);
                         // 2. Register user in Authorization Server via Admin API
                         return iAdminService.createUserInAuthServer(persistedUser)
                                 .flatMap(authServerAuthId -> {
@@ -280,7 +281,7 @@ public class UserService {
                     })
                     .flatMap(this::prepareDto)
                     .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
-                    .doOnError(e -> log.error("Error creating user {}: {}", userIdentifier, e.getMessage(), e));
+                    .doOnError(e -> log.error("Error creating user {}: {}", userPrimaryIdentifier, e.getMessage(), e));
         });
     }
 
@@ -315,8 +316,9 @@ public class UserService {
                                                 .flatMap(user -> {
                                                     String loginUrl = appHost + LOGIN; // Replace with your actual login URL
                                                     return notificationEventPublisherService.publishUserRegisteredEvent(
+                                                            user.getPrimaryIdentifierType(),
                                                             String.valueOf(user.getId()),
-                                                            user.getEmail(),
+                                                            user.getPrimaryIdentifier(),
                                                             user.getFirstName(),
                                                             loginUrl
                                                     );
