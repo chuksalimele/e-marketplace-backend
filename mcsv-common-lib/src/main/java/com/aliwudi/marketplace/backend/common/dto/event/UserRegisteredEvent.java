@@ -12,8 +12,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRegisteredEvent {
+    private String primaryIdentifierType;
     private String userId; // Internal ID of the user in your database
-    private String email;
+    private String primaryIdenter; //email or phone number
     private String name;
     private String loginUrl; // URL for the user to log in to the application
 }

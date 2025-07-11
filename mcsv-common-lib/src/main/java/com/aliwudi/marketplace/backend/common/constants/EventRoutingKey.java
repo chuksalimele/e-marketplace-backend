@@ -12,6 +12,8 @@ public class EventRoutingKey {
     // --- Binding Definitions ---
     // Routing keys should match what the producer service publishes
     public static final String EMAIL_VERIFICATION_ROUTING_KEY = "email.verification.requested";
+    public static final String SMS_VERIFICATION_ROUTING_KEY = "sms.verification.requested";    
+    public static final String PHONE_CALL_VERIFICATION_ROUTING_KEY = "phonecall.verification.requested";
     public static final String USER_REGISTERED_ROUTING_KEY = "user.registered";
     public static final String PASSWORD_RESET_ROUTING_KEY = "password.reset.requested";
     

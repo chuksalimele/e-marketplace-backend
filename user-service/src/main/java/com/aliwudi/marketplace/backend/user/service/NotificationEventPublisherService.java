@@ -4,6 +4,8 @@ import static com.aliwudi.marketplace.backend.common.constants.ExchangeType.*;
 import static com.aliwudi.marketplace.backend.common.constants.EventRoutingKey.*;
 import com.aliwudi.marketplace.backend.common.dto.event.EmailVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.PasswordResetRequestedEvent;
+import com.aliwudi.marketplace.backend.common.dto.event.PhoneCallVerificationRequestedEvent;
+import com.aliwudi.marketplace.backend.common.dto.event.SmsVerificationRequestedEvent;
 import com.aliwudi.marketplace.backend.common.dto.event.UserRegisteredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,8 @@ public class NotificationEventPublisherService {
      *
      * @param authServerUserId The ID from the authentication server (e.g., Authorization Server ID).
      * @param email The user's email address.
+     * @param name
+     * @param otpCode
      * @return Mono<Void> indicating the event has been published.
      */
     public Mono<Void> publishEmailVerificationRequestedEvent(String authServerUserId, String email, String name, String otpCode) {
@@ -46,20 +50,73 @@ public class NotificationEventPublisherService {
          .then()
          .subscribeOn(Schedulers.boundedElastic()); // Use a separate scheduler for blocking RabbitMQ send
     }
+    
+    /**
+     * Publishes an event to request an SMS verification OTP after user registration.
+     *
+     * @param authServerUserId The ID from the authentication server (e.g., Authorization Server ID).
+     * @param PhoneNumber The user's PhoneNumber.
+     * @param name
+     * @param otpCode
+     * @return Mono<Void> indicating the event has been published.
+     */
+    public Mono<Void> publishSmsVerificationRequestedEvent(String authServerUserId, String PhoneNumber, String name, String otpCode) {
+        SmsVerificationRequestedEvent event = new SmsVerificationRequestedEvent(authServerUserId, PhoneNumber, name, otpCode);
+        log.info("Publishing SmsVerificationRequestedEvent for user: {} to exchange {} with routing key {}",
+                 PhoneNumber, USER_EVENTS_EXCHANGE, SMS_VERIFICATION_ROUTING_KEY);
 
+        return Mono.fromRunnable(() ->
+            rabbitTemplate.convertAndSend(
+                USER_EVENTS_EXCHANGE,
+                SMS_VERIFICATION_ROUTING_KEY,
+                event
+            )
+        ).doOnSuccess(v -> log.debug("SmsVerificationRequestedEvent for {} published.", PhoneNumber))
+         .doOnError(e -> log.error("Failed to publish SmsVerificationRequestedEvent for {}: {}", PhoneNumber, e.getMessage(), e))
+         .then()
+         .subscribeOn(Schedulers.boundedElastic()); // Use a separate scheduler for blocking RabbitMQ send
+    }
+    
+    /**
+     * Publishes an event to request an PHONE_CALL verification OTP after user registration.
+     *
+     * @param authServerUserId The ID from the authentication server (e.g., Authorization Server ID).
+     * @param PhoneNumber The user's PhoneNumber.
+     * @param name
+     * @param otpCode
+     * @return Mono<Void> indicating the event has been published.
+     */
+    public Mono<Void> publishPhoneCallVerificationRequestedEvent(String authServerUserId, String PhoneNumber, String name, String otpCode) {
+        PhoneCallVerificationRequestedEvent event = new PhoneCallVerificationRequestedEvent(authServerUserId, PhoneNumber, name, otpCode);
+        log.info("Publishing PhoneCallVerificationRequestedEvent for user: {} to exchange {} with routing key {}",
+                 PhoneNumber, USER_EVENTS_EXCHANGE, PHONE_CALL_VERIFICATION_ROUTING_KEY);
+
+        return Mono.fromRunnable(() ->
+            rabbitTemplate.convertAndSend(
+                USER_EVENTS_EXCHANGE,
+                PHONE_CALL_VERIFICATION_ROUTING_KEY,
+                event
+            )
+        ).doOnSuccess(v -> log.debug("PhoneCallVerificationRequestedEvent for {} published.", PhoneNumber))
+         .doOnError(e -> log.error("Failed to publish PhoneCallVerificationRequestedEvent for {}: {}", PhoneNumber, e.getMessage(), e))
+         .then()
+         .subscribeOn(Schedulers.boundedElastic()); // Use a separate scheduler for blocking RabbitMQ send
+    }
+    
     /**
      * Publishes an event after successful user registration (for onboarding email).
      *
+     * @param identifierType
      * @param userId The internal user ID from your database.
-     * @param email The user's email address.
-     * @param username The user's username.
+     * @param identifier The user's email address.
+     * @param name
      * @param loginUrl The URL for the user to log in.
      * @return Mono<Void> indicating the event has been published.
      */
-    public Mono<Void> publishUserRegisteredEvent(String userId, String email, String name, String loginUrl) {
-        UserRegisteredEvent event = new UserRegisteredEvent(userId, email, name, loginUrl);
+    public Mono<Void> publishUserRegisteredEvent(String identifierType, String userId, String identifier, String name, String loginUrl) {
+        UserRegisteredEvent event = new UserRegisteredEvent(identifierType, userId, identifier, name, loginUrl);
         log.info("Publishing UserRegisteredEvent for user: {} to exchange {} with routing key {}",
-                 email, USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY);
+                 identifier, USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY);
 
         return Mono.fromRunnable(() ->
             rabbitTemplate.convertAndSend(
@@ -67,8 +124,8 @@ public class NotificationEventPublisherService {
                 USER_REGISTERED_ROUTING_KEY,
                 event
             )
-        ).doOnSuccess(v -> log.debug("UserRegisteredEvent for {} published.", email))
-         .doOnError(e -> log.error("Failed to publish UserRegisteredEvent for {}: {}", email, e.getMessage(), e))
+        ).doOnSuccess(v -> log.debug("UserRegisteredEvent for {} published.", identifier))
+         .doOnError(e -> log.error("Failed to publish UserRegisteredEvent for {}: {}", identifier, e.getMessage(), e))
          .then()
          .subscribeOn(Schedulers.boundedElastic());
     }
