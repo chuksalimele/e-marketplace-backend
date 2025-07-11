@@ -20,8 +20,8 @@ public class AuthServiceConfig {
      *
      * Note: If KeycloakAdminServiceImpl is already @Service, Spring will find it.
      * We just need to ensure it's the one injected for AdminService.
-     * @param keycloakAdminServiceImpl The automatically wired instance of KeycloakAdminServiceImpl.
-     * @return The IAdminService implementation for Keycloak.
+     * @param keycloakAdminServiceImpl The automatically wired instance of Authorization ServerAdminServiceImpl.
+     * @return The IAdminService implementation for Authorization Server.
      */
     @Bean
     @ConditionalOnProperty(name = "auth.server.type", havingValue = "keycloak")

@@ -26,9 +26,8 @@ public class NotificationEventPublisherService {
     /**
      * Publishes an event to request an email verification OTP after user registration.
      *
-     * @param authServerUserId The ID from the authentication server (e.g., Keycloak ID).
+     * @param authServerUserId The ID from the authentication server (e.g., Authorization Server ID).
      * @param email The user's email address.
-     * @param username The user's username.
      * @return Mono<Void> indicating the event has been published.
      */
     public Mono<Void> publishEmailVerificationRequestedEvent(String authServerUserId, String email, String name, String otpCode) {

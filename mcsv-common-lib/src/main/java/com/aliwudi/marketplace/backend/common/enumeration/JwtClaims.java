@@ -16,6 +16,9 @@ public enum JwtClaims {
     phone("phone"),
     firstName("firstName"),
     lastName("lastName"),
+    emailVerified("emailVerified"),
+    phoneVerified("phoneVerified"),
+    primaryIdentifierType("primaryIdentifierType"),
     roles("roles");
 
     // 1. Private field to hold the custom string value

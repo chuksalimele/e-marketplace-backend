@@ -1,8 +1,9 @@
 package com.aliwudi.marketplace.backend.user.auth.service;
 
+import com.aliwudi.marketplace.backend.common.constants.IdentifierType;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.CredentialRepresentation; // Keep for potential future password reset method
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,16 +15,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 // Using jakarta.ws.rs instead of javax.ws.rs
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.NotFoundException; // jakarta.ws.rs.NotFoundException
+import jakarta.ws.rs.NotFoundException;
 
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages;
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.common.exception.ServiceException;
 import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException;
-import java.util.Set;
+import com.aliwudi.marketplace.backend.common.model.User;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of IAdminService for Keycloak Authorization Server. Handles
@@ -63,90 +66,114 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
     }
 
     /**
-     * Creates a user in the Authorization Server (Keycloak) and sets their
-     * password. This method is part of the "backend-first" hybrid registration.
+     * Creates a user in the Authorization Server and sets their password.
+     * This method is part of the "backend-first" hybrid registration.
      *
-     * @param username The username for the Authorization Server user.
-     * @param email The email for the Authorization Server user.
-     * @param password The plain-text password for the Authorization Server
-     * user.
-     * @param internalUserId The internal ID from the backend database to store
-     * as a custom attribute.
-     * @param firstName The first name of the user.
-     * @param lastName The last name of the user.
-     * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the
-     * newly created user.
-     * @throws DuplicateResourceException if user with the given username/email
-     * already exists in Authorization Server.
-     * @throws RuntimeException if user creation or password setting fails for
-     * other reasons.
+     * @param user the user model containing user details (email, phone, names, primaryIdentifierType, roles, etc.).
+     * NOTE: This method DOES NOT set the password as per the IAdminService interface.
+     * A separate password setting mechanism or method call is required.
+     * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the newly created user.
+     * @throws DuplicateResourceException if user with the given identifier
+     * (email/phone) already exists in Authorization Server.
+     * @throws RuntimeException if user creation fails for other reasons.
      */
     @Override
-    public Mono<String> createUserInAuthServer(String username,
-            String email,
-            String password,
-            Long internalUserId,
-            String firstName,
-            String lastName,
-            Set<String> roles) { // Generic method name
-
+    public Mono<String> createUserInAuthServer(User user) { // MODIFIED: Removed password parameter to match interface
         return Mono.fromCallable(() -> {
-            Keycloak keycloak = getAuthServerClient(); // Generic method call
-            UserRepresentation user = new UserRepresentation();
-            user.setEnabled(true);
-            user.setUsername(username);
-            user.setEmail(email);
-            user.setFirstName(firstName);
-            user.setLastName(lastName);
-            user.setEmailVerified(false);// Crucially, mark email as NOT verified initially.
 
-            // Set the user_id as a custom attribute
-            Map<String, List<String>> attributes = new HashMap<>();
-            attributes.put("user_id", Collections.singletonList(String.valueOf(internalUserId)));
-            user.setAttributes(attributes);
+            String primaryIdentifierValue; // Store the actual value of the primary identifier
+            if (IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(user.getPrimaryIdentifierType())) {
+                primaryIdentifierValue = user.getEmail();
+            } else if (IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(user.getPrimaryIdentifierType())) {
+                primaryIdentifierValue = user.getPhoneNumber();
+            } else {
+                throw new IllegalArgumentException("Invalid primaryIdentifierType for Keycloak user creation.");
+            }
 
-            // DO NOT set "VERIFY_EMAIL" as a required action if you're not using Keycloak UI for login.
-            // If set, the user would be redirected to Keycloak UI to verify email upon login attempt.
-            // If you're managing login externally, this would create an unusable state.
-            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with user_id: {}. Preparing to send email verification.", username, userAuthRealm, internalUserId); // Generic log
+            String keycloakUsername = primaryIdentifierValue;
+            log.info("Attempting to create user '{}' in Keycloak for internal ID: {}", keycloakUsername, user.getId());
 
-            String authServerUserId; // Declare outside try-with-resources to use later
+            Keycloak keycloak = getAuthServerClient();
 
-            try (Response response = keycloak.realm(userAuthRealm).users().create(user)) { // Use userAuthRealm
+            // Check if user already exists by email in Keycloak (Keycloak's native search)
+            if (IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(user.getPrimaryIdentifierType())) {
+                 List<UserRepresentation> existingUsersByEmail = keycloak.realm(userAuthRealm).users().searchByEmail(primaryIdentifierValue, true);
+                 if (!existingUsersByEmail.isEmpty()) {
+                     throw new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS);
+                 }
+            } else if (IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(user.getPrimaryIdentifierType())) {
+                // Keycloak's search doesn't natively support phone number as a primary field for exact search.
+                // We'll search by the custom attribute "phoneNumber".
+                // This approach can be inefficient for very large user bases.
+                List<UserRepresentation> existingUsersByPhoneAttribute = keycloak.realm(userAuthRealm).users().search(
+                    null, null, null, null, 0, 100 // Fetch a small batch, consider pagination or more robust search for large data
+                ).stream()
+                .filter(u -> u.getAttributes() != null && u.getAttributes().containsKey("phoneNumber") &&
+                             u.getAttributes().get("phoneNumber").contains(primaryIdentifierValue))
+                .collect(Collectors.toList());
+
+                if (!existingUsersByPhoneAttribute.isEmpty()) {
+                    throw new DuplicateResourceException(ApiResponseMessages.PHONE_NUMBER_ALREADY_EXISTS);
+                }
+            }
+
+
+            UserRepresentation keycloakUser = new UserRepresentation();
+            keycloakUser.setEnabled(true);
+            keycloakUser.setUsername(keycloakUsername); // Set the dynamic username
+            keycloakUser.setEmail(user.getEmail()); // Always set email if available
+            keycloakUser.setFirstName(user.getFirstName());
+            keycloakUser.setLastName(user.getLastName());
+            keycloakUser.setEmailVerified(false);
+
+            // Set password
+            CredentialRepresentation passwordCred = new CredentialRepresentation();
+            passwordCred.setTemporary(false);
+            passwordCred.setType(CredentialRepresentation.PASSWORD);
+            passwordCred.setValue(user.getPassword());
+            keycloakUser.setCredentials(Collections.singletonList(passwordCred));            
+            
+            // Set custom attributes
+            String roleNames = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.joining(","));
+
+            Map<String, List<String>> customAttributes = new HashMap<>();
+            customAttributes.put("userId", Collections.singletonList(String.valueOf(user.getId())));
+            customAttributes.put("primaryIdentifierType", Collections.singletonList(user.getPrimaryIdentifierType()));
+            customAttributes.put("phoneVerified", Collections.singletonList(String.valueOf(user.isPhoneVerified())));
+            customAttributes.put("roles", Collections.singletonList(roleNames));
+
+            // Add phone number as an attribute if available
+            if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
+                customAttributes.put("phoneNumber", Collections.singletonList(user.getPhoneNumber()));
+            }
+            keycloakUser.setAttributes(customAttributes);
+
+            log.info("Attempting to create user '{}' in Authorization Server realm '{}' with user_id: {}.", keycloakUsername, userAuthRealm, user.getId());
+
+            String authServerUserId;
+
+            try (Response response = keycloak.realm(userAuthRealm).users().create(keycloakUser)) {
                 switch (response.getStatus()) {
                     case 201 -> {
-                        // 201 Created
-                        authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1"); // Generic variable name
-                        log.info("Successfully created user '{}' in Authorization Server. Auth Server ID: {}", username, authServerUserId); // Generic log
-
-                        // Set password
-                        UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId); // Use userAuthRealm, generic variable
-                        CredentialRepresentation passwordCred = new CredentialRepresentation();
-                        passwordCred.setTemporary(false);
-                        passwordCred.setType(CredentialRepresentation.PASSWORD);
-                        passwordCred.setValue(password);
-
-                        userResource.resetPassword(passwordCred);
-                        log.info("Password set for Authorization Server user '{}' (Auth Server ID: {})", username, authServerUserId); // Generic log
-
-                        // Optionally assign default roles here if needed, e.g.:
-                        // RoleRepresentation defaultRole = keycloak.realm(userAuthRealm).roles().get("default-user-role").toRepresentation();
-                        // userResource.roles().realmLevel().add(Collections.singletonList(defaultRole));
+                        authServerUserId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
+                        log.info("Successfully created user '{}' in Authorization Server. Auth Server ID: {}", keycloakUsername, authServerUserId);                        
                     }
                     case 409 -> { // Conflict
                         String errorBody = response.readEntity(String.class);
-                        log.warn("User '{}' already exists in Authorization Server (Status 409). Response: {}", username, errorBody); // Corrected log format
-                        throw new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER); // This message is still Keycloak specific, might need a generic one
+                        log.warn("User with identifier '{}' already exists in Authorization Server (Status 409). Response: {}", primaryIdentifierValue, errorBody);
+                        throw new DuplicateResourceException(
+                            String.format(ApiResponseMessages.IDENTIFIER_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER, primaryIdentifierValue)
+                        );
                     }
                     default -> {
                         String errorBody = response.readEntity(String.class);
-                        log.error("Failed to create user '{}' in Authorization Server. Status: {}, Response: {}", username, response.getStatus(), errorBody); // Corrected log format
-                        throw new RuntimeException(String.format("Authorization Server user creation failed: Status %d, Response: %s", response.getStatus(), errorBody)); // Generic message
+                        log.error("Failed to create user '{}' in Authorization Server. Status: {}, Response: {}", keycloakUsername, response.getStatus(), errorBody);
+                        throw new RuntimeException(String.format("Authorization Server user creation failed: Status %d, Response: %s", response.getStatus(), errorBody));
                     }
                 }
-
                 return authServerUserId;
-
             }
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -158,7 +185,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @param authServerUserId The Keycloak user ID.
      * @param isVerified The status to set (true for verified, false for
      * unverified).
-     * @return Mono<Void> indicating completion.
+     * @return Mono<Boolean> indicating completion.
      */
     @Override
     public Mono<Boolean> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified) {
@@ -184,6 +211,41 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
     }
 
     /**
+     * Updates a user's phone verified status in Keycloak.
+     * This method updates the custom attribute "phoneVerified".
+     *
+     * @param authServerUserId The Keycloak user ID.
+     * @param verified The status to set (true for verified, false for unverified).
+     * @return Mono<Boolean> indicating completion.
+     */
+    @Override
+    public Mono<Boolean> updatePhoneVerifiedStatus(String authServerUserId, boolean verified) {
+        return Mono.fromCallable(() -> {
+            Keycloak keycloak = getAuthServerClient();
+            try {
+                UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId);
+                UserRepresentation user = userResource.toRepresentation();
+
+                Map<String, List<String>> attributes = user.getAttributes();
+                if (attributes == null) {
+                    attributes = new HashMap<>();
+                }
+                attributes.put("phoneVerified", Collections.singletonList(String.valueOf(verified)));
+                user.setAttributes(attributes);
+                userResource.update(user);
+                log.info("Keycloak user '{}' phone verification status updated to {}", authServerUserId, verified);
+                return true;
+            } catch (NotFoundException e) {
+                log.warn("Keycloak user '{}' not found when trying to update phone verification status. It might have been deleted.", authServerUserId);
+                throw new UserNotFoundException("User not found in Keycloak: " + authServerUserId, e);
+            } catch (Exception e) {
+                log.error("Failed to update phone verification status for user '{}': {}", authServerUserId, e.getMessage(), e);
+                throw new ServiceException("Failed to update phone verification status in Keycloak.", e);
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
      * Retrieves a user from the Authorization Server (Keycloak) by their
      * Authorization Server ID.
      *
@@ -191,19 +253,70 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @return A Mono emitting the UserRepresentation, or empty if not found.
      */
     @Override
-    public Mono<UserRepresentation> getUserFromAuthServerById(String authServerUserId) { // Generic method name
+    public Mono<UserRepresentation> getUserFromAuthServerById(String authServerUserId) {
         return Mono.fromCallable(() -> {
-            Keycloak keycloak = getAuthServerClient(); // Generic method call
+            Keycloak keycloak = getAuthServerClient();
             try {
-                UserRepresentation user = keycloak.realm(userAuthRealm).users().get(authServerUserId).toRepresentation(); // Use userAuthRealm, generic variable
-                log.debug("Found Authorization Server user '{}' in realm '{}'", authServerUserId, userAuthRealm); // Corrected log format
+                UserRepresentation user = keycloak.realm(userAuthRealm).users().get(authServerUserId).toRepresentation();
+                log.debug("Found Authorization Server user '{}' in realm '{}'", authServerUserId, userAuthRealm);
                 return user;
-            } catch (NotFoundException e) { // Catching jakarta.ws.rs.NotFoundException
-                log.warn("Authorization Server user '{}' not found in realm '{}'.", authServerUserId, userAuthRealm); // Corrected log format
+            } catch (NotFoundException e) {
+                log.warn("Authorization Server user '{}' not found in realm '{}'.", authServerUserId, userAuthRealm);
                 return null;
             } catch (Exception e) {
-                log.error("Failed to get Authorization Server user '{}' from realm '{}': {}", authServerUserId, userAuthRealm, e.getMessage(), e); // Corrected log format with Throwable
+                log.error("Failed to get Authorization Server user '{}' from realm '{}': {}", authServerUserId, userAuthRealm, e.getMessage(), e);
                 throw e;
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Retrieves a user from the Authorization Server (Keycloak) by their email.
+     *
+     * @param email The email of the user.
+     * @return A Mono emitting the UserRepresentation, or empty if not found.
+     */
+    @Override
+    public Mono<UserRepresentation> getUserFromAuthServerByEmail(String email) {
+        return Mono.fromCallable(() -> {
+            Keycloak keycloak = getAuthServerClient();
+            List<UserRepresentation> users = keycloak.realm(userAuthRealm).users().searchByEmail(email, true);
+            if (!users.isEmpty()) {
+                log.debug("Found user by email '{}' in realm '{}'.", email, userAuthRealm);
+                return users.get(0);
+            } else {
+                log.warn("User with email '{}' not found in realm '{}'.", email, userAuthRealm);
+                return null;
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Retrieves a user from the Authorization Server (Keycloak) by their phone number.
+     * This method searches users by a custom attribute "phoneNumber".
+     *
+     * @param phoneNumber The phone number of the user.
+     * @return A Mono emitting the UserRepresentation, or empty if not found.
+     */
+    @Override
+    public Mono<UserRepresentation> getUserFromAuthServerByPhoneNumber(String phoneNumber) {
+        return Mono.fromCallable(() -> {
+            Keycloak keycloak = getAuthServerClient();
+            // Keycloak's search method does not directly support searching by custom attributes.
+            // We fetch a limited batch of users and filter client-side.
+            // For very large user bases, this approach might be inefficient.
+            Optional<UserRepresentation> user = keycloak.realm(userAuthRealm).users().search(null, 0, 1000) // Fetch up to 1000 users
+                    .stream()
+                    .filter(u -> u.getAttributes() != null && u.getAttributes().containsKey("phoneNumber") &&
+                                 u.getAttributes().get("phoneNumber").contains(phoneNumber))
+                    .findFirst();
+
+            if (user.isPresent()) {
+                log.debug("Found user by phone number '{}' in realm '{}'.", phoneNumber, userAuthRealm);
+                return user.get();
+            } else {
+                log.warn("User with phone number '{}' not found in realm '{}'.", phoneNumber, userAuthRealm);
+                return null;
             }
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -217,11 +330,11 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @return A Mono<Void> indicating completion.
      */
     @Override
-    public Mono<Void> updateUserAttributeInAuthServer(String authServerUserId, String attributeName, String attributeValue) { // Generic method name
+    public Mono<Void> updateUserAttribute(String authServerUserId, String attributeName, String attributeValue) {
         return Mono.fromCallable(() -> {
-            Keycloak keycloak = getAuthServerClient(); // Generic method call
+            Keycloak keycloak = getAuthServerClient();
             try {
-                UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId); // Use userAuthRealm, generic variable
+                UserResource userResource = keycloak.realm(userAuthRealm).users().get(authServerUserId);
                 UserRepresentation user = userResource.toRepresentation();
 
                 Map<String, List<String>> attributes = user.getAttributes();
@@ -231,10 +344,10 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 attributes.put(attributeName, Collections.singletonList(attributeValue));
                 user.setAttributes(attributes);
                 userResource.update(user);
-                log.debug("Updated Authorization Server user '{}' in realm '{}' with attribute '{}' = '{}'", authServerUserId, userAuthRealm, attributeName, attributeValue); // Corrected log format
+                log.debug("Updated Authorization Server user '{}' in realm '{}' with attribute '{}' = '{}'", authServerUserId, userAuthRealm, attributeName, attributeValue);
                 return (Void) null;
             } catch (Exception e) {
-                log.error("Failed to update user '{}' attribute '{}' in Authorization Server realm '{}': {}", authServerUserId, attributeName, userAuthRealm, e.getMessage(), e); // Corrected log format with Throwable
+                log.error("Failed to update user '{}' attribute '{}' in Authorization Server realm '{}': {}", authServerUserId, attributeName, userAuthRealm, e.getMessage(), e);
                 throw e;
             }
         }).subscribeOn(Schedulers.boundedElastic());
@@ -248,18 +361,18 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
      * @return A Mono<Void> indicating completion.
      */
     @Override
-    public Mono<Void> deleteUserFromAuthServer(String authServerUserId) { // Generic method name
+    public Mono<Void> deleteUserFromAuthServer(String authServerUserId) {
         return Mono.fromCallable(() -> {
-            Keycloak keycloak = getAuthServerClient(); // Generic method call
+            Keycloak keycloak = getAuthServerClient();
             try {
-                keycloak.realm(userAuthRealm).users().delete(authServerUserId); // Use userAuthRealm, generic variable
-                log.info("Successfully deleted user '{}' from Authorization Server realm '{}'.", authServerUserId, userAuthRealm); // Corrected log format
+                keycloak.realm(userAuthRealm).users().delete(authServerUserId);
+                log.info("Successfully deleted user '{}' from Authorization Server realm '{}'.", authServerUserId, userAuthRealm);
                 return (Void) null;
-            } catch (NotFoundException e) { // Catching jakarta.ws.rs.NotFoundException
-                log.warn("Authorization Server user '{}' not found in realm '{}' during deletion attempt. It might have been deleted already.", authServerUserId, userAuthRealm); // Corrected log format
+            } catch (NotFoundException e) {
+                log.warn("Authorization Server user '{}' not found in realm '{}' during deletion attempt. It might have been deleted already.", authServerUserId, userAuthRealm);
                 return (Void) null;
             } catch (Exception e) {
-                log.error("Failed to delete user '{}' from Authorization Server realm '{}': {}", authServerUserId, userAuthRealm, e.getMessage(), e); // Corrected log format with Throwable
+                log.error("Failed to delete user '{}' from Authorization Server realm '{}': {}", authServerUserId, userAuthRealm, e.getMessage(), e);
                 throw e;
             }
         }).subscribeOn(Schedulers.boundedElastic());

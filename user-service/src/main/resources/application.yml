@@ -40,19 +40,6 @@ spring:
   rabbitmq:
     password: guest #TODO
 
-# spring.rabbitmq.virtual-host=/ # Uncomment if using a specific virtual host
-  # Spring Mail SMTP Configuration (REQUIRED for SmtpEmailSenderService)
-  # Replace with your actual SMTP server details. For production, use a dedicated email service.
-  mail:
-    host: smtp.gmail.com # Example: smtp.sendgrid.net, email-smtp.us-east-1.amazonaws.com
-    port: 587 # Standard for TLS. Use 465 for SSL.
-    username: your-email@gmail.com # Your email address for sending
-    password: YOUR_EMAIL_APP_PASSWORD # IMPORTANT: Use an app password for Gmail, not your main password. For other providers, use the generated SMTP password.
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true # Enable STARTTLS
-      mail.smtp.starttls.required: true # Require STARTTLS
-    test-connection: true # Test connection on application startup
 
   # Redis Configuration (REQUIRED for EmailVerificationService for OTP storage)
   # Ensure your Redis instance is running and accessible.

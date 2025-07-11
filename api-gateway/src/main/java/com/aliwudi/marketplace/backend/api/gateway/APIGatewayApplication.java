@@ -206,14 +206,21 @@ public class APIGatewayApplication {
                         String firstName = null; // Corrected
                         String lastName = null;  // Corrected
                         String rolesStr = null;
+                        String emailVerified = null;
+                        String phoneVerified = null;
+                        String primaryIdentifierType = null;
+                                
                         // Extract user ID from JWT principal
                         if (authentication.getPrincipal() instanceof Jwt jwt) {
                             authId = jwt.getClaimAsString(JwtClaims.sub.getClaimName()); // Assuming 'sub' claim holds the user auth ID
                             userId = jwt.getClaimAsString(JwtClaims.userId.getClaimName());
                             email = jwt.getClaimAsString(JwtClaims.email.getClaimName());
                             phone = jwt.getClaimAsString(JwtClaims.phone.getClaimName());
-                            firstName = jwt.getClaimAsString(JwtClaims.firstName.getClaimName()); // Corrected
-                            lastName = jwt.getClaimAsString(JwtClaims.lastName.getClaimName());   // Corrected
+                            firstName = jwt.getClaimAsString(JwtClaims.firstName.getClaimName()); 
+                            lastName = jwt.getClaimAsString(JwtClaims.lastName.getClaimName());   
+                            emailVerified = jwt.getClaimAsString(JwtClaims.emailVerified.getClaimName());   
+                            phoneVerified = jwt.getClaimAsString(JwtClaims.phoneVerified.getClaimName());   
+                            primaryIdentifierType = jwt.getClaimAsString(JwtClaims.primaryIdentifierType.getClaimName());   
                             
                             rolesStr = authentication.getAuthorities().stream()
                                     .map(a -> a.getAuthority())
@@ -226,8 +233,11 @@ public class APIGatewayApplication {
                                 .header(BasicAuthHeaders.X_USER_ID.getHeaderName(), userId) // Propagate user ID - registration id on the database
                                 .header(BasicAuthHeaders.X_USER_EMAIL.getHeaderName(), email) // Propagate user email
                                 .header(BasicAuthHeaders.X_USER_PHONE.getHeaderName(), phone) // Propagate user phone number
-                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), firstName) // MODIFIED: Corrected to use firstName
-                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), lastName)   // MODIFIED: Corrected to use lastName
+                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), firstName) 
+                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), lastName)   
+                                .header(BasicAuthHeaders.X_USER_EMAIL_VERIFIED.getHeaderName(), emailVerified)   
+                                .header(BasicAuthHeaders.X_USER_PHONE_VERIFIED.getHeaderName(), phoneVerified)   
+                                .header(BasicAuthHeaders.X_USER_PRIMARY_IDENTIFIER_TYPE.getHeaderName(), primaryIdentifierType)   
                                 .header(BasicAuthHeaders.X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user roles
                                 .build();
                             return exchange.mutate().request(request).build();

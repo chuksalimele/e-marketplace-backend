@@ -36,6 +36,11 @@ public final class ApiConstants {
     public static final String EMAIL_VERIFICATION_VERIFY_OTP = "/email/verifyOTP";
     public static final String EMAIL_VERIFICATION_RESEND_CODE= "/email/resendVerificationCode";
     
+    //--- Phone verification Endpoints
+    public static final String PHONE_VERIFICATION_INITIATE = "/phone/initiateVerification";    
+    public static final String PHONE_VERIFICATION_VERIFY_OTP = "/phone/verifyOTP";
+    public static final String PHONE_VERIFICATION_RESEND_CODE = "/phone/resendVerificationCode";
+    
     // --- User Endpoints (from previous modification) ---
     public static final String USER_PROFILES_CREATE = "/profiles/create";
     public static final String USER_PROFILES_UPDATE = "/profiles/update/{id}";
@@ -43,16 +48,16 @@ public final class ApiConstants {
     public static final String USER_PROFILES_DELETE_ROLLBACK = "/profiles/delete-to-rollback/{authId}";
     public static final String USER_GET_BY_ID = "userId/{id}";
     public static final String USER_BY_AUTH_ID = "/authId/{id}";    
-    public static final String USER_GET_BY_USERNAME = "/byUsername/{username}";
     public static final String USER_GET_BY_EMAIL = "/byEmail/{email}";
+    public static final String USER_GET_BY_PHONE_NUMBER = "/byPhoneNumber/{phoneNumber}"; // NEW
     public static final String USER_ADMIN_ALL = "/admin/all";
     public static final String USER_ADMIN_COUNT = "/admin/count";
     public static final String USER_ADMIN_BY_FIRST_NAME = "/admin/byFirstName";
     public static final String USER_ADMIN_COUNT_BY_FIRST_NAME = "/admin/countByFirstName";
     public static final String USER_ADMIN_BY_LAST_NAME = "/admin/byLastName";
     public static final String USER_ADMIN_COUNT_BY_LAST_NAME = "/admin/countByLastName";
-    public static final String USER_ADMIN_BY_USERNAME_OR_EMAIL = "/admin/byUsernameOrEmail";
-    public static final String USER_ADMIN_COUNT_BY_USERNAME_OR_EMAIL = "/admin/countByUsernameOrEmail";
+    public static final String USER_ADMIN_BY_PHONE_NUMBER_OR_EMAIL = "/admin/byPhoneNumberOrEmail";
+    public static final String USER_ADMIN_COUNT_BY_PHONE_NUMBER_OR_EMAIL = "/admin/countByPhoneNumberOrEmail";    
     public static final String USER_ADMIN_BY_CREATED_AT_AFTER = "/admin/byCreatedAtAfter";
     public static final String USER_ADMIN_COUNT_BY_CREATED_AT_AFTER = "/admin/countByCreatedAtAfter";
     public static final String USER_ADMIN_BY_SHIPPING_ADDRESS = "/admin/byShippingAddress";
@@ -60,7 +65,7 @@ public final class ApiConstants {
     public static final String USER_EXISTS_BY_USER_ID = "/exists/user-id/{userId}";
     public static final String USER_EXISTS_BY_AUTH_ID = "/exists/auth-id/{authId}";
     public static final String USER_EXISTS_BY_EMAIL = "/exists/email/{email}";
-    public static final String USER_EXISTS_BY_USERNAME = "/exists/username/{username}";
+    public static final String USER_EXISTS_BY_PHONE_NUMBER = "/exists/phoneNumber/{phoneNumber}"; // NEW
 
     // --- Product Endpoints (from previous modification) ---
     public static final String PRODUCT_CREATE = "/create";

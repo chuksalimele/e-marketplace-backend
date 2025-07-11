@@ -28,7 +28,7 @@ public class OtpService {
     /**
      * Generates a new OTP, stores it in Redis with a TTL, and returns the OTP.
      *
-     * @param userId The ID of the user (e.g., internal DB ID or Keycloak authId) to associate with the OTP.
+     * @param userId The ID of the user (e.g., internal DB ID or Authorization Server authId) to associate with the OTP.
      * @param validityDuration The duration for which the OTP is valid.
      * @return Mono<String> emitting the generated OTP code.
      */

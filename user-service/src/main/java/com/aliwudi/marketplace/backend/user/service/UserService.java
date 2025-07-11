@@ -2,6 +2,7 @@ package com.aliwudi.marketplace.backend.user.service;
 
 import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.LOGIN;
 import static com.aliwudi.marketplace.backend.common.constants.EventType.USER_REGISTER;
+import com.aliwudi.marketplace.backend.common.constants.IdentifierType;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
 import com.aliwudi.marketplace.backend.user.repository.RoleRepository;
 import com.aliwudi.marketplace.backend.common.model.User;
@@ -32,10 +33,11 @@ import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-
 
 /**
  * Service class for managing user-related business logic. Handles operations
@@ -51,7 +53,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final IAdminService iAdminService; // For Keycloak Admin API interactions
+    private final IAdminService iAdminService; // For Authorization Server Admin API interactions
     private final OtpService otpService; // NEW: Inject OtpService
     private final NotificationEventPublisherService notificationEventPublisherService; // Already injected
 
@@ -60,9 +62,11 @@ public class UserService {
 
     @Value("${app.host}")
     private String appHost;
+
     /**
-     * Initiates the password reset process by publishing an event to the notification service.
-     * This method generates a temporary token and publishes an event for email delivery.
+     * Initiates the password reset process by publishing an event to the
+     * notification service. This method generates a temporary token and
+     * publishes an event for email delivery.
      *
      * @param email The email address of the user requesting password reset.
      * @return Mono<Void> indicating the event has been published.
@@ -88,7 +92,7 @@ public class UserService {
                 })
                 .doOnError(e -> log.error("Error initiating password reset for {}: {}", email, e.getMessage(), e));
     }
-    
+
     /**
      * Helper method to map User entity to User DTO for public exposure. This
      * method enriches the User object with its associated Role details. Assumes
@@ -145,41 +149,61 @@ public class UserService {
      * Authorization Server. This method implements the "backend-first" hybrid
      * registration approach. If Authorization Server registration fails, the
      * user is rolled back (deleted) from the backend database. After successful
-     * registration, it initiates the email verification process by sending an OTP.
+     * registration, it initiates the email verification process by sending an
+     * OTP.
      *
      * @param request The DTO containing user creation data, including password.
      * @return A Mono emitting the created User object, updated with
      * Authorization Server's authId.
      * @throws DuplicateResourceException if a user with the same email or
-     * username already exists in backend DB or Authorization Server.
+     * phoneNumber already exists in backend DB or Authorization Server.
      * @throws RoleNotFoundException if a specified role does not exist.
      * @throws RuntimeException if Authorization Server registration fails for
      * other reasons.
-     * @throws EmailSendingException if the initial verification email fails to send.
+     * @throws EmailSendingException if the initial verification email fails to
+     * send.
      */
     @Transactional
     public Mono<User> createUser(UserProfileCreateRequest request) {
-        log.debug("Attempting to create user in backend database from UserProfileCreateRequest: {}", request.getUsername());
+        log.debug("Attempting to create user with identifier type: {}", request.getIdentifierType());
 
+        Mono<Boolean> emailExistsMono = Mono.just(false);
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            emailExistsMono = userRepository.existsByEmail(request.getEmail());
+        }
+
+        Mono<Boolean> phoneNumberExistsMono = Mono.just(false);
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+            phoneNumberExistsMono = userRepository.existsByPhoneNumber(request.getPhoneNumber());
+        }
+        
+        String primaryIdentifier = null;
+        
+        if(null == request.getIdentifierType()){
+            throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
+        }else switch (request.getIdentifierType()) {
+            case IdentifierType.IDENTIFIER_TYPE_EMAIL -> primaryIdentifier = request.getEmail();
+            case IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER -> primaryIdentifier = request.getPhoneNumber();
+            default -> throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
+        }
+        
+        final String userIdentifier = primaryIdentifier;
+        
         return Mono.zip(
-                userRepository.existsByEmail(request.getEmail()),
-                userRepository.existsByUsername(request.getUsername())
+                emailExistsMono, phoneNumberExistsMono
         ).flatMap(tuple -> {
             boolean emailExists = tuple.getT1();
-            boolean usernameExists = tuple.getT2();
+            boolean phoneNumberExists = tuple.getT2();
 
             if (emailExists) {
-                log.warn("User creation failed in backend: Email '{}' already exists.", request.getEmail());
                 return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS));
             }
-            if (usernameExists) {
-                log.warn("User creation failed in backend: Username '{}' already exists.", request.getUsername());
-                return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS));
+            if (phoneNumberExists) {
+                return Mono.error(new DuplicateResourceException(ApiResponseMessages.PHONE_NUMBER_ALREADY_EXISTS));
             }
 
             // Create User entity for backend DB
             User newUser = new User();
-            newUser.setUsername(request.getUsername());
             newUser.setEmail(request.getEmail());
             newUser.setFirstName(request.getFirstName());
             newUser.setLastName(request.getLastName());
@@ -187,6 +211,9 @@ public class UserService {
             newUser.setCreatedAt(LocalDateTime.now());
             newUser.setUpdatedAt(LocalDateTime.now());
             newUser.setEnabled(true);
+            newUser.setEmailVerified(false); // Default
+            newUser.setPhoneVerified(false); // Default
+            newUser.setPrimaryIdentifierType(request.getIdentifierType());
 
             // Ensure roles are provided and valid
             if (request.getRoles() == null || request.getRoles().isEmpty()) {
@@ -208,18 +235,9 @@ public class UserService {
                     })
                     .flatMap(persistedUser -> {
                         Long userId = persistedUser.getId();
-                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", persistedUser.getUsername(), userId);
-
+                        log.info("User '{}' created successfully in backend DB with internal ID: {}. Proceeding to Authorization Server registration.", userIdentifier, userId);
                         // 2. Register user in Authorization Server via Admin API
-                        return iAdminService.createUserInAuthServer(
-                                request.getUsername(),
-                                request.getEmail(),
-                                request.getPassword(),
-                                userId,
-                                request.getFirstName(),
-                                request.getLastName(),
-                                request.getRoles()
-                        )
+                        return iAdminService.createUserInAuthServer(persistedUser)
                                 .flatMap(authServerAuthId -> {
                                     // 3. Update backend user with Authorization Server's authId
                                     persistedUser.setAuthId(authServerAuthId);
@@ -230,15 +248,15 @@ public class UserService {
                                     // 4. Generate OTP, store it, and publish email verification event
                                     log.info("Generating OTP and publishing email verification event for user {} (Auth ID: {}).", updatedUserAfterAuthId.getId(), updatedUserAfterAuthId.getAuthId());
                                     return otpService.generateAndStoreOtp(updatedUserAfterAuthId.getAuthId(), EMAIL_OTP_VALIDITY)
-                                            .flatMap(otpCode ->
-                                                notificationEventPublisherService.publishEmailVerificationRequestedEvent(
-                                                        updatedUserAfterAuthId.getAuthId(),
-                                                        updatedUserAfterAuthId.getEmail(),
-                                                        updatedUserAfterAuthId.getFirstName(),
-                                                        otpCode // Pass the actual OTP code
-                                                ).thenReturn(updatedUserAfterAuthId) // Return the user after event is published
+                                            .flatMap(otpCode
+                                                    -> notificationEventPublisherService.publishEmailVerificationRequestedEvent(
+                                                    updatedUserAfterAuthId.getAuthId(),
+                                                    updatedUserAfterAuthId.getEmail(),
+                                                    updatedUserAfterAuthId.getFirstName(),
+                                                    otpCode // Pass the actual OTP code
+                                            ).thenReturn(updatedUserAfterAuthId) // Return the user after event is published
                                             );
-                                })                         
+                                })
                                 .onErrorResume(e -> {
                                     // 5. If Authorization Server registration OR Email Verification initiation fails,
                                     //    rollback (delete) user from backend DB and Authorization Server.
@@ -249,10 +267,10 @@ public class UserService {
                                     Mono<Void> authServerDelete = Mono.empty();
                                     if (persistedUser.getAuthId() != null) {
                                         authServerDelete = iAdminService.deleteUserFromAuthServer(persistedUser.getAuthId())
-                                            .onErrorResume(authDeleteError -> {
-                                                log.error("Error during Auth Server rollback for user {}: {}", persistedUser.getAuthId(), authDeleteError.getMessage());
-                                                return Mono.empty(); // Continue with local delete even if Auth Server delete fails
-                                            });
+                                                .onErrorResume(authDeleteError -> {
+                                                    log.error("Error during Auth Server rollback for user {}: {}", persistedUser.getAuthId(), authDeleteError.getMessage());
+                                                    return Mono.empty(); // Continue with local delete even if Auth Server delete fails
+                                                });
                                     }
 
                                     return authServerDelete
@@ -262,21 +280,23 @@ public class UserService {
                     })
                     .flatMap(this::prepareDto)
                     .doOnSuccess(u -> log.debug("User created successfully with ID: {}", u.getId()))
-                    .doOnError(e -> log.error("Error creating user {}: {}", request.getUsername(), e.getMessage(), e));
+                    .doOnError(e -> log.error("Error creating user {}: {}", userIdentifier, e.getMessage(), e));
         });
     }
 
- 
     /**
-     * Validates the provided OTP for email verification and, if valid, marks the user's email as verified in Keycloak.
-     * If the purpose is 'USER_REGISTER', it also sends the onboarding email.
+     * Validates the provided OTP for email verification and, if valid, marks
+     * the user's email as verified in Authorization Server. If the purpose is
+     * 'USER_REGISTER', it also sends the onboarding email.
      *
-     * @param authServerUserId The Keycloak user ID.
+     * @param authServerUserId The Authorization Server user ID.
      * @param providedOtp The OTP code provided by the user.
-     * @param purpose The purpose of the OTP verification (e.g., "USER_REGISTER"). // NEW PARAM
+     * @param purpose The purpose of the OTP verification (e.g.,
+     * "USER_REGISTER"). // NEW PARAM
      * @return Mono<Boolean> true if verification successful, false otherwise.
      * @throws OtpValidationException if the OTP is invalid or expired.
-     * @throws UserNotFoundException if the user is not found in Keycloak.
+     * @throws UserNotFoundException if the user is not found in Authorization
+     * Server.
      * @throws RuntimeException for other internal errors.
      */
     public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp, String purpose) { // NEW PARAM
@@ -293,7 +313,7 @@ public class UserService {
                                         return userRepository.findByAuthId(authServerUserId)
                                                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
                                                 .flatMap(user -> {
-                                                    String loginUrl = appHost+LOGIN; // Replace with your actual login URL
+                                                    String loginUrl = appHost + LOGIN; // Replace with your actual login URL
                                                     return notificationEventPublisherService.publishUserRegisteredEvent(
                                                             String.valueOf(user.getId()),
                                                             user.getEmail(),
@@ -310,44 +330,46 @@ public class UserService {
                 })
                 .doOnSuccess(v -> log.debug("Email OTP verification process completed for user {}. Status: {}", authServerUserId, v))
                 .doOnError(e -> log.error("Error during email OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
-    }   
+    }
 
     /**
-     * Resends an email verification code (OTP) for a given user.
-     * Fetches the user's email from Keycloak, generates a new OTP, stores it,
+     * Resends an email verification code (OTP) for a given user. Fetches the
+     * user's email from Authorization Server, generates a new OTP, stores it,
      * and publishes a new email verification event.
      *
-     * @param authServerUserId The Keycloak user ID.
+     * @param authServerUserId The Authorization Server user ID.
      * @return Mono<Void> indicating completion.
-     * @throws UserNotFoundException if the user is not found in Keycloak.
-     * @throws IllegalArgumentException if user's email is missing or already verified.
+     * @throws UserNotFoundException if the user is not found in Authorization
+     * Server.
+     * @throws IllegalArgumentException if user's email is missing or already
+     * verified.
      */
     public Mono<Void> resendVerificationCode(String authServerUserId) {
         log.info("Resending verification code for user: {}", authServerUserId);
         return iAdminService.getUserFromAuthServerById(authServerUserId)
-            .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
-            .flatMap(userRepresentation -> {
-                String email = userRepresentation.getEmail();
-                String name = userRepresentation.getFirstName(); // Get username for template
-                if (email == null || email.isBlank()) {
-                    return Mono.error(new IllegalArgumentException("User does not have an email address to send a code to."));
-                }
-                if (userRepresentation.isEmailVerified() != null && userRepresentation.isEmailVerified()) {
-                    return Mono.error(new IllegalArgumentException("Email is already verified for this user."));
-                }
-                
-                log.info("Generating new OTP and publishing resend event for email '{}' for user '{}'.", email, authServerUserId);
-                return otpService.generateAndStoreOtp(authServerUserId, EMAIL_OTP_VALIDITY)
-                        .flatMap(otpCode ->
-                            notificationEventPublisherService.publishEmailVerificationRequestedEvent(
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
+                .flatMap(userRepresentation -> {
+                    String email = userRepresentation.getEmail();
+                    String name = userRepresentation.getFirstName(); // Get name for template
+                    if (email == null || email.isBlank()) {
+                        return Mono.error(new IllegalArgumentException("User does not have an email address to send a code to."));
+                    }
+                    if (userRepresentation.isEmailVerified() != null && userRepresentation.isEmailVerified()) {
+                        return Mono.error(new IllegalArgumentException("Email is already verified for this user."));
+                    }
+
+                    log.info("Generating new OTP and publishing resend event for email '{}' for user '{}'.", email, authServerUserId);
+                    return otpService.generateAndStoreOtp(authServerUserId, EMAIL_OTP_VALIDITY)
+                            .flatMap(otpCode
+                                    -> notificationEventPublisherService.publishEmailVerificationRequestedEvent(
                                     authServerUserId,
                                     email,
                                     name,
                                     otpCode // Pass the newly generated OTP
                             )
-                        );
-            })
-            .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
+                            );
+                })
+                .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
     }
 
     /**
@@ -407,7 +429,7 @@ public class UserService {
      * @param userRequest The DTO containing updated user information.
      * @return A Mono emitting the updated User object.
      * @throws ResourceNotFoundException if the user is not found.
-     * @throws DuplicateResourceException if the updated email or username
+     * @throws DuplicateResourceException if the updated email or phoneNumber
      * already exists for another user.
      */
     @Transactional
@@ -416,15 +438,15 @@ public class UserService {
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id)))
                 .flatMap(existingUser -> {
-                    // Check for duplicate username if changed
-                    Mono<Void> usernameCheck = Mono.empty();
-                    if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank()
-                            && !existingUser.getUsername().equalsIgnoreCase(userRequest.getUsername())) {
-                        usernameCheck = userRepository.existsByUsername(userRequest.getUsername())
+                    // Check for duplicate phoneNumber if changed
+                    Mono<Void> phoneNumberCheck = Mono.empty();
+                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
+                            && !existingUser.getPhoneNumber().equalsIgnoreCase(userRequest.getPhoneNumber())) {
+                        phoneNumberCheck = userRepository.existsByPhoneNumber(userRequest.getPhoneNumber())
                                 .flatMap(exists -> {
                                     if (exists) {
-                                        log.warn("Attempt to update username to an existing one: {}", userRequest.getUsername());
-                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.USERNAME_ALREADY_EXISTS));
+                                        log.warn("Attempt to update phoneNumber to an existing one: {}", userRequest.getPhoneNumber());
+                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.PHONE_NUMBER_ALREADY_EXISTS));
                                     }
                                     return Mono.empty();
                                 });
@@ -445,7 +467,7 @@ public class UserService {
                     }
 
                     // Combine checks
-                    return Mono.when(usernameCheck, emailCheck)
+                    return Mono.when(phoneNumberCheck, emailCheck)
                             .thenReturn(existingUser);
                 })
                 .flatMap(existingUser -> {
@@ -454,8 +476,8 @@ public class UserService {
                         existingUser.setAuthId(userRequest.getAuthId());
                     }
 
-                    if (userRequest.getUsername() != null && !userRequest.getUsername().isBlank()) {
-                        existingUser.setUsername(userRequest.getUsername());
+                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()) {
+                        existingUser.setPhoneNumber(userRequest.getPhoneNumber());
                     }
                     if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()) {
                         existingUser.setEmail(userRequest.getEmail());
@@ -573,22 +595,6 @@ public class UserService {
     }
 
     /**
-     * Retrieves a user by their username, enriching them.
-     *
-     * @param username The username of the user.
-     * @return A Mono emitting the User if found (enriched), or an error if not.
-     * @throws ResourceNotFoundException if the user is not found.
-     */
-    public Mono<User> getUserByUsername(String username) {
-        log.debug("Retrieving user by username: {}", username);
-        return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_USERNAME + username)))
-                .flatMap(this::prepareDto)
-                .doOnSuccess(user -> log.debug("User retrieved successfully by username: {}", user.getUsername()))
-                .doOnError(e -> log.error("Error retrieving user by username {}: {}", username, e.getMessage(), e));
-    }
-
-    /**
      * Retrieves a user by their email, enriching them.
      *
      * @param email The email of the user.
@@ -602,6 +608,22 @@ public class UserService {
                 .flatMap(this::prepareDto)
                 .doOnSuccess(user -> log.debug("User retrieved successfully by email: {}", user.getEmail()))
                 .doOnError(e -> log.error("Error retrieving user by email {}: {}", email, e.getMessage(), e));
+    }
+
+    /**
+     * Retrieves a user by their phone number, enriching them.
+     *
+     * @param phoneNumber The phone number of the user.
+     * @return A Mono emitting the User if found (enriched), or an error if not.
+     * @throws ResourceNotFoundException if the user is not found.
+     */
+    public Mono<User> getUserByPhoneNumber(String phoneNumber) {
+        log.debug("Retrieving user by phoneNumber: {}", phoneNumber);
+        return userRepository.findByPhoneNumber(phoneNumber)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_EMAIL + phoneNumber)))
+                .flatMap(this::prepareDto)
+                .doOnSuccess(user -> log.debug("User retrieved successfully by phone number: {}", user.getPhoneNumber()))
+                .doOnError(e -> log.error("Error retrieving user by phone number {}: {}", phoneNumber, e.getMessage(), e));
     }
 
     /**
@@ -689,32 +711,32 @@ public class UserService {
     }
 
     /**
-     * Finds users by username or email (case-insensitive, contains) with
+     * Finds users by phoneNumber or email (case-insensitive, contains) with
      * pagination, enriching each.
      *
-     * @param searchTerm The search term for username or email.
+     * @param searchTerm The search term for phoneNumber or email.
      * @param pageable Pagination information.
      * @return A Flux emitting matching users (enriched).
      */
-    public Flux<User> getUsersByUsernameOrEmail(String searchTerm, Pageable pageable) {
-        log.debug("Finding users by username or email containing '{}' with pagination: {}", searchTerm, pageable);
-        return userRepository.findByUsernameOrEmailContainingIgnoreCase(searchTerm, pageable)
+    public Flux<User> getUsersByPhoneNumberOrEmail(String searchTerm, Pageable pageable) {
+        log.debug("Finding users by phoneNumber or email containing '{}' with pagination: {}", searchTerm, pageable);
+        return userRepository.findByPhoneNumberOrEmailContainingIgnoreCase(searchTerm, pageable)
                 .flatMap(this::prepareDto)
-                .doOnComplete(() -> log.debug("Finished finding users by username or email containing '{}' for page {} with size {}.", searchTerm, pageable.getPageNumber(), pageable.getPageSize()))
-                .doOnError(e -> log.error("Error finding users by username or email {}: {}", searchTerm, e.getMessage(), e));
+                .doOnComplete(() -> log.debug("Finished finding users by phoneNumber or email containing '{}' for page {} with size {}.", searchTerm, pageable.getPageNumber(), pageable.getPageSize()))
+                .doOnError(e -> log.error("Error finding users by phoneNumber or email {}: {}", searchTerm, e.getMessage(), e));
     }
 
     /**
-     * Counts users by username or email (case-insensitive, contains).
+     * Counts users by phoneNumber or email (case-insensitive, contains).
      *
-     * @param searchTerm The search term for username or email.
+     * @param searchTerm The search term for phoneNumber or email.
      * @return A Mono emitting the count of matching users.
      */
-    public Mono<Long> countUsersByUsernameOrEmail(String searchTerm) {
-        log.debug("Counting users by username or email containing '{}'", searchTerm);
-        return userRepository.countByUsernameOrEmailContainingIgnoreCase(searchTerm)
-                .doOnSuccess(count -> log.debug("Total count for username or email containing '{}': {}", searchTerm, count))
-                .doOnError(e -> log.error("Error counting users by username or email {}: {}", searchTerm, e.getMessage(), e));
+    public Mono<Long> countUsersByPhoneNumberOrEmail(String searchTerm) {
+        log.debug("Counting users by phoneNumber or email containing '{}'", searchTerm);
+        return userRepository.countByPhoneNumberOrEmailContainingIgnoreCase(searchTerm)
+                .doOnSuccess(count -> log.debug("Total count for phoneNumber or email containing '{}': {}", searchTerm, count))
+                .doOnError(e -> log.error("Error counting users by phoneNumber or email {}: {}", searchTerm, e.getMessage(), e));
     }
 
     /**
@@ -815,16 +837,16 @@ public class UserService {
     }
 
     /**
-     * Checks if a user with the given username exists.
+     * Checks if a user with the given phoneNumber exists.
      *
-     * @param username The username to check.
+     * @param phoneNumber The phoneNumber to check.
      * @return A Mono emitting true if the user exists, false otherwise.
      */
-    public Mono<Boolean> existsByUsername(String username) {
-        log.debug("Checking if user exists by username: {}", username);
-        return userRepository.existsByUsername(username)
-                .doOnSuccess(exists -> log.debug("User with username {} exists: {}", username, exists))
-                .doOnError(e -> log.error("Error checking user existence by username {}: {}", username, e.getMessage(), e));
+    public Mono<Boolean> existsByPhoneNumber(String phoneNumber) {
+        log.debug("Checking if user exists by phoneNumber: {}", phoneNumber);
+        return userRepository.existsByPhoneNumber(phoneNumber)
+                .doOnSuccess(exists -> log.debug("User with phoneNumber {} exists: {}", phoneNumber, exists))
+                .doOnError(e -> log.error("Error checking user existence by phoneNumber {}: {}", phoneNumber, e.getMessage(), e));
     }
 
 }

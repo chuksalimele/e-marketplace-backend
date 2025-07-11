@@ -17,6 +17,9 @@ public enum BasicAuthHeaders {
     X_USER_PHONE("X-User-Phone"),
     X_USER_FIRST_NAME("X-User-First-Name"),
     X_USER_LAST_NAME("X-User-Last-Name"),
+    X_USER_EMAIL_VERIFIED("X-User-Email-Verified"),
+    X_USER_PHONE_VERIFIED("X-User-Phone-Verified"),
+    X_USER_PRIMARY_IDENTIFIER_TYPE("X-User-Primary-Identifier-Type"),
     X_USER_ROLES("X-User-Roles");
 
     // 1. Private field to hold the custom string value

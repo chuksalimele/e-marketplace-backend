@@ -18,8 +18,8 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
         
     Mono<User> findByAuthId(String authId);
     
-    // Find a user by username
-    Mono<User> findByUsername(String username);
+    // Find a user by phoneNumber
+    Mono<User> findByPhoneNumber(String phoneNumber); //@Deprecated - email is sufficient
 
     // Find a user by email
     Mono<User> findByEmail(String email);
@@ -36,13 +36,13 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     // Count users by last name
     Mono<Long> countByLastNameContainingIgnoreCase(String lastName);
 
-    // Find users by username or email, with pagination
-    @Query("SELECT * FROM users WHERE username ILIKE :searchTerm OR email ILIKE :searchTerm")
-    Flux<User> findByUsernameOrEmailContainingIgnoreCase(String searchTerm, Pageable pageable);
+    // Find users by phoneNumber or email, with pagination
+    @Query("SELECT * FROM users WHERE phoneNumber ILIKE :searchTerm OR email ILIKE :searchTerm")
+    Flux<User> findByPhoneNumberOrEmailContainingIgnoreCase(String searchTerm, Pageable pageable);
 
-    // Count users by username or email
-    @Query("SELECT COUNT(*) FROM users WHERE username ILIKE :searchTerm OR email ILIKE :searchTerm")
-    Mono<Long> countByUsernameOrEmailContainingIgnoreCase(String searchTerm);
+    // Count users by phoneNumber or email
+    @Query("SELECT COUNT(*) FROM users WHERE phoneNumber ILIKE :searchTerm OR email ILIKE :searchTerm")
+    Mono<Long> countByPhoneNumberOrEmailContainingIgnoreCase(String searchTerm);
 
     // Find users created after a certain date, with pagination
     Flux<User> findByCreatedAtAfter(java.time.LocalDateTime date, Pageable pageable);
@@ -58,7 +58,7 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     Mono<Boolean> existsByEmail(String email);
 
-    Mono<Boolean> existsByUsername(String username);
+    Mono<Boolean> existsByPhoneNumber(String phoneNumber);
     
     Mono<Boolean> existsByAuthId(String authId);
     
@@ -75,13 +75,13 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
            "WHERE u.id = :id")
     Flux<User> findUserWithRolesById(Long id);
 
-    // Custom query to find a user by username and fetch their roles
+    // Custom query to find a user by phoneNumber and fetch their roles
     @Query("SELECT u.*, r.id AS role_id, r.name AS role_name " +
            "FROM users u " +
            "LEFT JOIN user_roles ur ON u.id = ur.user_id " +
            "LEFT JOIN roles r ON ur.role_id = r.id " +
-           "WHERE u.username = :username")
-    Flux<User> findUserWithRolesByUsername(String username);
+           "WHERE u.phoneNumber = :phoneNumber")
+    Flux<User> findUserWithRolesByPhoneNumber(String phoneNumber);
 
     // Custom query to find a user by email and fetch their roles
     @Query("SELECT u.*, r.id AS role_id, r.name AS role_name " +

@@ -124,7 +124,7 @@ public class UserIntegrationService {
     }
     
     /**
-     * Checks if a user exists by their username.
+     * Checks if a user exists by their phoneNumber.
      * @param email The email of the user to check.
      * @return Mono<Boolean> true if user exists, false otherwise.
      * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
@@ -139,17 +139,17 @@ public class UserIntegrationService {
     }
     
     /**
-     * Checks if a user exists by their username.
-     * @param username The username of the user to check.
+     * Checks if a user exists by their phoneNumber.
+     * @param phoneNumber The phoneNumber of the user to check.
      * @return Mono<Boolean> true if user exists, false otherwise.
      * Throws ServiceUnavailableException if the User Service itself is unavailable or returns an error.
      */
-    public Mono<Boolean> userExistsByUsername(String username) {
+    public Mono<Boolean> userExistsByPhoneNumber(String phoneNumber) {
         Mono<Boolean> responseMono = webClient.get()
-                .uri(USER_EXISTS_BY_USERNAME, username)
+                .uri(USER_EXISTS_BY_PHONE_NUMBER, phoneNumber)
                 .retrieve()
                 .bodyToMono(Boolean.class);
 
-        return handleUserServiceErrors(responseMono, "checking user existence by username", username);
+        return handleUserServiceErrors(responseMono, "checking user existence by phoneNumber", phoneNumber);
     }    
 }

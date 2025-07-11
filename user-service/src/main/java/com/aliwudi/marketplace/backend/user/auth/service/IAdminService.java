@@ -1,5 +1,7 @@
 package com.aliwudi.marketplace.backend.user.auth.service;
 
+import com.aliwudi.marketplace.backend.common.model.User;
+import java.util.Map;
 import java.util.Set;
 import org.keycloak.representations.idm.UserRepresentation;
 import reactor.core.publisher.Mono;
@@ -15,16 +17,10 @@ public interface IAdminService {
      * Creates a user in the Authorization Server and sets their password.
      * This method is part of the "backend-first" hybrid registration.
      *
-     * @param username The username for the Authorization Server user.
-     * @param email The email for the Authorization Server user.
-     * @param password The plain-text password for the Authorization Server user.
-     * @param internalUserId The internal ID from the backend database to store as a custom attribute.
-     * @param firstName The first name of the user.
-     * @param lastName The last name of the user.
-     * @param roles The roles of the user
+     * @param user the user model
      * @return A Mono emitting the Authorization Server's 'authId' (UUID) of the newly created user.
      */
-    Mono<String> createUserInAuthServer(String username, String email, String password, Long internalUserId, String firstName, String lastName, Set<String> roles);
+    Mono<String> createUserInAuthServer(User user);
 
     /**
      * Retrieves a user from the Authorization Server by their Authorization Server ID.
@@ -42,7 +38,7 @@ public interface IAdminService {
      * @param attributeValue The new value of the attribute.
      * @return A Mono<Void> indicating completion.
      */
-    Mono<Void> updateUserAttributeInAuthServer(String authServerUserId, String attributeName, String attributeValue);
+    Mono<Void> updateUserAttribute(String authServerUserId, String attributeName, String attributeValue);
 
     /**
      * Deletes a user from the Authorization Server.
@@ -62,4 +58,10 @@ public interface IAdminService {
      */    
     Mono<Boolean> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified); // New method to be used by OTP service
 
+
+    Mono<Boolean> updatePhoneVerifiedStatus(String authServerUserId, boolean verified);
+    
+    Mono<UserRepresentation> getUserFromAuthServerByEmail(String email);
+    
+    Mono<UserRepresentation> getUserFromAuthServerByPhoneNumber(String phoneNumber);
 }

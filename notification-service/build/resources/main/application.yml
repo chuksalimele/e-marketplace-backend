@@ -6,8 +6,8 @@ server:
  
 # Set logging level to debug BUT REMOVE IN PRODUCTION      
 logging:
-  level:
-    org.springframework.security: DEBUG
+ level:
+  org.springframework.security: DEBUG
 
 truststore:
   path: classpath:backend_truststore.p12
@@ -33,44 +33,6 @@ spring:
     # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we do not need it
     exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
 
-
-  # RabbitMQ Connection Details for user-service
-  rabbitmq:
-    host: localhost # Change if RabbitMQ is on a different host
-  rabbitmq:
-    port: 5672
-  rabbitmq:
-    username: guest # TODO
-  rabbitmq:
-    password: guest #TODO
-
-  # spring.rabbitmq.virtual-host=/ # Uncomment if using a specific virtual host
-  # Spring Mail SMTP Configuration (REQUIRED for SmtpEmailSenderService)
-  # Replace with your actual SMTP server details. For production, use a dedicated email service.
-  #mail:
-  #  host: smtp.gmail.com # Example: smtp.sendgrid.net, email-smtp.us-east-1.amazonaws.com
-  #  port: 587 # Standard for TLS. Use 465 for SSL.
-  #  username: your-email@gmail.com # Your email address for sending
-  #  password: YOUR_EMAIL_APP_PASSWORD # IMPORTANT: Use an app password for Gmail, not your main password. For other providers, use the generated SMTP password.
-  #  properties:
-  #    mail.smtp.auth: true
-  #    mail.smtp.starttls.enable: true # Enable STARTTLS
-  #    mail.smtp.starttls.required: true # Require STARTTLS
-  #  test-connection: true # Test connection on application startup  
-  
-  #FOR TESTING - Email Configuration fo local development 
-  mail:
-    host: localhost
-    port: 1025
-    username: ""
-    password: ""
-    properties:
-      mail.smtp.auth: false
-      mail.smtp.starttls.enable: false
-    test-connection: true
-    
-
-    
 eureka:
   client:
     service-url:
@@ -87,4 +49,4 @@ jwt:
       resource-id: emaketplace-app
       principle-attribute: preferred_username
       
-    
+      

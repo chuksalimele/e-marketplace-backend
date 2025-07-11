@@ -3,7 +3,14 @@ package com.aliwudi.marketplace.backend.common.response;
 public interface ApiResponseMessages {
 
     public String INVALID_SHIPPING_ADDRESS = "Invalid shipping address";
-    public String INVALID_USERNAME = "Invalid username";
+    public String PHONE_NUMBER_ALREADY_EXISTS = "User with this phone number already exists.";
+    public String INVALID_PHONE_NUMBER = "Invalid phone number.";
+    public String USER_NOT_FOUND_PHONE_NUMBER = "User not found with phone number: ";
+    public String USER_NOT_FOUND_IDENTIFIER = "User not found with provided identifier (email or phone number).";
+    public String INVALID_IDENTIFIER_TYPE = "Invalid identifier type. Must be 'EMAIL' or 'PHONE_NUMBER'.";
+    public String IDENTIFIER_MISSING_FOR_TYPE = "Identifier field is missing for the specified identifier type.";
+    public String PHONE_VERIFICATION_FAILED = "Phone verification failed.";
+        
     public String INVALID_FIRST_NAME = "Invalid first name";
     public String INVALID_LAST_NAME = "Invalid last name";
     public String INVALID_EMAIL = "Invalid email";
@@ -21,8 +28,6 @@ public interface ApiResponseMessages {
     String USER_NOT_FOUND_EMAIL ="User not found with email - ";
     String USER_NOT_FOUND_AUTH_ID ="User not found with authorization id - ";
     
-
-    String USER_NOT_FOUND_USERNAME ="User not found with username - ";
 
     String ROLE_NOT_FOUND_MSG = "Role not found";
     String OLD_PASSWORD_MISMATCH = "Old password mismatch";
@@ -43,8 +48,8 @@ public interface ApiResponseMessages {
     String INVALID_USER_ID = "Invalid user ID"; 
     String INVALID_AUTHORIZATION_ID = "Invalid authorization ID"; 
     String SECURITY_CONTEXT_NOT_FOUND = "Security context not found";
-    String USERNAME_ALREADY_EXISTS = "Error: Username already exists!";
     String USERNAME_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER = "Error: Username already exists in authorization server!";
+    String IDENTIFIER_ALREADY_EXISTS_IN_AUTHORIZATION_SERVER = "Error: Identifier already exists in authorization server!";        
     String EMAIL_ALREADY_EXISTS = "Error: Email already exists!";
     String USER_REGISTERED_SUCCESS = "User registered successfully!";
     String ROLE_USER_NOT_FOUND = "Error: Default role 'ROLE_USER' is not found in the database. Please ensure it's configured";
@@ -53,7 +58,6 @@ public interface ApiResponseMessages {
     String INVALID_ROLE_PROVIDED = "Error: Invalid role provided"; // Append role name
     String ERROR_REGISTERING_USER = "An error occurred during user registration";
     String LOGIN_SUCCESS = "Login successful!";
-    String INVALID_CREDENTIALS = "Invalid username or password";
     String ERROR_AUTHENTICATING_USER = "An error occurred during authentication";
 
 

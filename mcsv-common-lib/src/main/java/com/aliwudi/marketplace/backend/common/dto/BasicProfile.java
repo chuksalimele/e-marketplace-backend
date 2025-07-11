@@ -16,11 +16,12 @@ import lombok.NoArgsConstructor;
 @Builder
 public class BasicProfile {
     
-    String authId;
-    Long userId;
-    String email;
-    String phoneNumber;
-    String firstName;
-    String lastName;    
+    private String authId;
+    private Long userId;
+    private String email;
+    private String phoneNumber;
+    private String firstName;
+    private String lastName;    
+    private String primaryIdentifierType; // "EMAIL" or "PHONE_NUMBER" - This is crucial    
     private Set<String> roles;
 }
