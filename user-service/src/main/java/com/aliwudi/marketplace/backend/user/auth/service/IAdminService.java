@@ -58,7 +58,6 @@ public interface IAdminService {
      */    
     Mono<Boolean> updateEmailVerifiedStatus(String authServerUserId, boolean isVerified); // New method to be used by OTP service
 
-
     Mono<Boolean> updatePhoneVerifiedStatus(String authServerUserId, boolean verified);
     
     Mono<UserRepresentation> getUserFromAuthServerByEmail(String email);

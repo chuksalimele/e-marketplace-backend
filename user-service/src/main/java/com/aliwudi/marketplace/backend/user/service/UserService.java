@@ -59,6 +59,8 @@ public class UserService {
 
     // OTP validity for email verification (e.g., 5 minutes)
     private static final Duration EMAIL_OTP_VALIDITY = Duration.ofMinutes(5);
+    private static final Duration SMS_OTP_VALIDITY = Duration.ofMinutes(5);
+    private static final Duration PHONE_CALL_OTP_VALIDITY = Duration.ofMinutes(5);
 
     @Value("${app.host}")
     private String appHost;
@@ -333,7 +335,55 @@ public class UserService {
                 .doOnSuccess(v -> log.debug("Email OTP verification process completed for user {}. Status: {}", authServerUserId, v))
                 .doOnError(e -> log.error("Error during email OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
     }
-
+    /**
+     * Validates the provided OTP for phone verification and, if valid, marks
+     * the user's phone as verified in Authorization Server. If the purpose is
+     * 'USER_REGISTER', it also sends the onboarding phone.
+     *
+     * @param authServerUserId The Authorization Server user ID.
+     * @param providedOtp The OTP code provided by the user.
+     * @param purpose The purpose of the OTP verification (e.g.,
+     * "USER_REGISTER"). // NEW PARAM
+     * @return Mono<Boolean> true if verification successful, false otherwise.
+     * @throws OtpValidationException if the OTP is invalid or expired.
+     * @throws UserNotFoundException if the user is not found in Authorization
+     * Server.
+     * @throws RuntimeException for other internal errors.
+     */
+    public Mono<Boolean> verifyPhoneOtp(String authServerUserId, String providedOtp, String purpose) { // NEW PARAM
+        log.info("Attempting to verify phone OTP for user: {} with purpose: {}", authServerUserId, purpose);
+        return otpService.validateOtp(authServerUserId, providedOtp)
+                .flatMap(isValid -> {
+                    if (isValid) {
+                        log.info("OTP valid for user {}. Updating phone verified status in authorization server.", authServerUserId);
+                        return iAdminService.updatePhoneVerifiedStatus(authServerUserId, true)
+                                .flatMap(isUpdated -> {
+                                    if (isUpdated && USER_REGISTER.equals(purpose)) {
+                                        log.info("Phone verification purpose is USER_REGISTER for user {}. Sending onboarding phone.", authServerUserId);
+                                        // Fetch user details to send onboarding phone
+                                        return userRepository.findByAuthId(authServerUserId)
+                                                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
+                                                .flatMap(user -> {
+                                                    String loginUrl = appHost + LOGIN; // Replace with your actual login URL
+                                                    return notificationEventPublisherService.publishUserRegisteredEvent(
+                                                            user.getPrimaryIdentifierType(),
+                                                            String.valueOf(user.getId()),
+                                                            user.getPrimaryIdentifier(),
+                                                            user.getFirstName(),
+                                                            loginUrl
+                                                    );
+                                                })
+                                                .thenReturn(true); // Return true after onboarding phone is sent
+                                    }
+                                    return Mono.just(true); // Return true if OTP valid but no onboarding needed
+                                });
+                    }
+                    return Mono.just(false); // Should not be reached if validateOtp throws exception
+                })
+                .doOnSuccess(v -> log.debug("Phone OTP verification process completed for user {}. Status: {}", authServerUserId, v))
+                .doOnError(e -> log.error("Error during phone OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
+    }
+    
     /**
      * Resends an email verification code (OTP) for a given user. Fetches the
      * user's email from Authorization Server, generates a new OTP, stores it,
@@ -346,7 +396,7 @@ public class UserService {
      * @throws IllegalArgumentException if user's email is missing or already
      * verified.
      */
-    public Mono<Void> resendVerificationCode(String authServerUserId) {
+    public Mono<Void> resendEmailVerificationCode(String authServerUserId) {
         log.info("Resending verification code for user: {}", authServerUserId);
         return iAdminService.getUserFromAuthServerById(authServerUserId)
                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
@@ -374,6 +424,78 @@ public class UserService {
                 .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
     }
 
+    /**
+     * Resends an SMS verification code (OTP) for a given user. Fetches the
+     * user's SMS from Authorization Server, generates a new OTP, stores it,
+     * and publishes a new SMS verification event.
+     *
+     * @param authServerUserId The Authorization Server user ID.
+     * @return Mono<Void> indicating completion.
+     * @throws UserNotFoundException if the user is not found in Authorization
+     * Server.
+     * @throws IllegalArgumentException if user's SMS is missing or already
+     * verified.
+     */
+    public Mono<Void> resendSmsVerificationCode(String authServerUserId) {
+        log.info("Resending verification code for user: {}", authServerUserId);
+        return userRepository.findByAuthId(authServerUserId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
+                .flatMap(user -> {
+                    String phoneNumber = user.getPhoneNumber();
+                    String name = user.getFirstName(); // Get name for template
+                    if (phoneNumber == null || phoneNumber.isBlank()) {
+                        return Mono.error(new IllegalArgumentException("User does not have an SMS address to send a code to."));
+                    }
+                    log.info("Generating new OTP and publishing resend event for SMS '{}' for user '{}'.", phoneNumber, authServerUserId);
+                    return otpService.generateAndStoreOtp(authServerUserId, SMS_OTP_VALIDITY)
+                            .flatMap(otpCode
+                                    -> notificationEventPublisherService.publishSmsVerificationRequestedEvent(
+                                    authServerUserId,
+                                    phoneNumber,
+                                    name,
+                                    otpCode // Pass the newly generated OTP
+                            )
+                            );
+                })
+                .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
+    }
+    
+    /**
+     * Resends an phoneCall verification code (OTP) for a given user. Fetches the
+     * user's phoneCall from Authorization Server, generates a new OTP, stores it,
+     * and publishes a new phoneCall verification event.
+     *
+     * @param authServerUserId The Authorization Server user ID.
+     * @return Mono<Void> indicating completion.
+     * @throws UserNotFoundException if the user is not found in Authorization
+     * Server.
+     * @throws IllegalArgumentException if user's phoneCall is missing or already
+     * verified.
+     */
+    public Mono<Void> resendPhoneCallVerificationCode(String authServerUserId) {
+        log.info("Resending verification code for user: {}", authServerUserId);
+        return userRepository.findByAuthId(authServerUserId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in Authorization Server: " + authServerUserId)))
+                .flatMap(user -> {
+                    String phoneNumber = user.getPhoneNumber();
+                    String name = user.getFirstName(); // Get name for template
+                    if (phoneNumber == null || phoneNumber.isBlank()) {
+                        return Mono.error(new IllegalArgumentException("User does not have an phoneCall address to send a code to."));
+                    }
+                    log.info("Generating new OTP and publishing resend event for phoneCall '{}' for user '{}'.", phoneNumber, authServerUserId);
+                    return otpService.generateAndStoreOtp(authServerUserId, PHONE_CALL_OTP_VALIDITY)
+                            .flatMap(otpCode
+                                    -> notificationEventPublisherService.publishPhoneCallVerificationRequestedEvent(
+                                    authServerUserId,
+                                    phoneNumber,
+                                    name,
+                                    otpCode // Pass the newly generated OTP
+                            )
+                            );
+                })
+                .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
+    }
+    
     /**
      * Finds a user by their internal database ID.
      *

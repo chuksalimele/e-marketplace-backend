@@ -36,10 +36,15 @@ public final class ApiConstants {
     public static final String EMAIL_VERIFICATION_VERIFY_OTP = "/email/verifyOTP";
     public static final String EMAIL_VERIFICATION_RESEND_CODE= "/email/resendVerificationCode";
     
-    //--- Phone verification Endpoints
-    public static final String PHONE_VERIFICATION_INITIATE = "/phone/initiateVerification";    
-    public static final String PHONE_VERIFICATION_VERIFY_OTP = "/phone/verifyOTP";
-    public static final String PHONE_VERIFICATION_RESEND_CODE = "/phone/resendVerificationCode";
+    //--- Phone Call verification Endpoints
+    public static final String SMS_VERIFICATION_INITIATE = "/sms/initiateVerification";    
+    public static final String SMS_VERIFICATION_VERIFY_OTP = "/sms/verifyOTP";
+    public static final String SMS_VERIFICATION_RESEND_CODE = "/sms/resendVerificationCode";
+    
+    //--- Phone Call verification Endpoints
+    public static final String PHONE_CALL_VERIFICATION_INITIATE = "/phoneCall/initiateVerification";    
+    public static final String PHONE_CALL_VERIFICATION_VERIFY_OTP = "/phoneCall/verifyOTP";
+    public static final String PHONE_CALL_VERIFICATION_RESEND_CODE = "/phoneCall/resendVerificationCode";
     
     // --- User Endpoints (from previous modification) ---
     public static final String USER_PROFILES_CREATE = "/profiles/create";

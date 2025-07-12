@@ -55,7 +55,7 @@ public class UserController {
 
     // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
     @Data
-    public static class EmailVerificationRequest {
+    public static class VerificationRequest {
         private String authServerUserId; // Authorization Server ID of the user
         private String purpose; 
         private String code;
@@ -104,12 +104,53 @@ public class UserController {
      * Endpoint to verify an email using an OTP.
      * This endpoint is typically called by the frontend after the user enters the OTP.
      *
-     * @param request The EmailVerificationRequest containing authServerUserId and the OTP code.
+     * @param request The VerificationRequest containing authServerUserId and the OTP code.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(SMS_VERIFICATION_VERIFY_OTP) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> verifySms(@RequestBody VerificationRequest request) {  
+        return verifyPhoneNumber(request);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+    /**
+     * Endpoint to verify an email using an OTP.
+     * This endpoint is typically called by the frontend after the user enters the OTP.
+     *
+     * @param request The VerificationRequest containing authServerUserId and the OTP code.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(PHONE_CALL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> verifyPhoneCall(@RequestBody VerificationRequest request) {  
+        return verifyPhoneNumber(request);
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+    
+    public Mono<Boolean> verifyPhoneNumber(@RequestBody VerificationRequest request) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Verification Code is required."));                        
+        }
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Verification Code is required."));
+        }
+        if (request.getPurpose()== null || request.getPurpose().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Verification purpose is required."));
+        }        
+        return userService.verifyPhoneOtp(request.getAuthServerUserId(), request.getCode(), request.getPurpose());
+        // Exceptions are handled by GlobalExceptionHandler.
+    }
+    
+    /**
+     * Endpoint to verify an email using an OTP.
+     * This endpoint is typically called by the frontend after the user enters the OTP.
+     *
+     * @param request The VerificationRequest containing authServerUserId and the OTP code.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(EMAIL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Boolean> verifyEmail(@RequestBody EmailVerificationRequest request) {
+    public Mono<Boolean> verifyEmail(@RequestBody VerificationRequest request) {
         if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
             return Mono.error(new IllegalArgumentException("Verification Code is required."));                        
         }
@@ -132,12 +173,46 @@ public class UserController {
      */
     @PostMapping(EMAIL_VERIFICATION_RESEND_CODE) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Void> resendVerificationCode(@RequestBody ResendVerificationCodeRequest request) {
+    public Mono<Void> resendEmailVerificationCode(@RequestBody ResendVerificationCodeRequest request) {
         if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
             return Mono.error(new IllegalArgumentException("Auth Server User ID is required."));
         }
 
-        return userService.resendVerificationCode(request.getAuthServerUserId());
+        return userService.resendEmailVerificationCode(request.getAuthServerUserId());
+            // Exceptions are handled by GlobalExceptionHandler.
+    }
+    /**
+     * Endpoint to resend an SMS verification code (OTP).
+     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     *
+     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(SMS_VERIFICATION_RESEND_CODE) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Void> resendSmsVerificationCode(@RequestBody ResendVerificationCodeRequest request) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Auth Server User ID is required."));
+        }
+
+        return userService.resendSmsVerificationCode(request.getAuthServerUserId());
+            // Exceptions are handled by GlobalExceptionHandler.
+    }
+    /**
+     * Endpoint to resend an phone call verification code (OTP).
+     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     *
+     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @return A Mono emitting a success/failure message.
+     */
+    @PostMapping(PHONE_CALL_VERIFICATION_RESEND_CODE) // NEW Endpoint
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Void> resendPhoneCallVerificationCode(@RequestBody ResendVerificationCodeRequest request) {
+        if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Auth Server User ID is required."));
+        }
+
+        return userService.resendPhoneCallVerificationCode(request.getAuthServerUserId());
             // Exceptions are handled by GlobalExceptionHandler.
     }
 
