@@ -38,6 +38,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class KeycloakAdminServiceImpl implements IAdminService { // Implements the generic interface
 
+    enum CustomAttr{
+         userId,
+         phoneVerified,
+         primaryIdentifierType,
+         roles;
+    }
+    
     @Value("${auth-server.admin.url}") // Using new generic config property
     private String authServerAdminUrl;
     @Value("${auth-server.admin.realm}") // Using new generic config property
@@ -132,10 +139,10 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 .collect(Collectors.joining(","));
 
             Map<String, List<String>> customAttributes = new HashMap<>();
-            customAttributes.put("userId", Collections.singletonList(String.valueOf(user.getId())));
-            customAttributes.put("primaryIdentifierType", Collections.singletonList(user.getPrimaryIdentifierType()));
-            customAttributes.put("phoneVerified", Collections.singletonList(String.valueOf(user.isPhoneVerified())));
-            customAttributes.put("roles", Collections.singletonList(roleNames));
+            customAttributes.put(CustomAttr.userId.name(), Collections.singletonList(String.valueOf(user.getId())));
+            customAttributes.put(CustomAttr.primaryIdentifierType.name(), Collections.singletonList(user.getPrimaryIdentifierType()));
+            customAttributes.put(CustomAttr.phoneVerified.name(), Collections.singletonList(String.valueOf(user.isPhoneVerified())));
+            customAttributes.put(CustomAttr.roles.name(), Collections.singletonList(roleNames));
 
             // Add phone number as an attribute if available
             if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
@@ -223,7 +230,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 if (attributes == null) {
                     attributes = new HashMap<>();
                 }
-                attributes.put("phoneVerified", Collections.singletonList(String.valueOf(verified)));
+                attributes.put(CustomAttr.phoneVerified.name(), Collections.singletonList(String.valueOf(verified)));
                 user.setAttributes(attributes);
                 userResource.update(user);
                 log.info("Keycloak user '{}' phone verification status updated to {}", authServerUserId, verified);
@@ -298,6 +305,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             // Keycloak's search method does not directly support searching by custom attributes.
             // We fetch a limited batch of users and filter client-side.
             // For very large user bases, this approach might be inefficient.
+            //COME BACK - ABEG O. SEE COMMENT DIRECTLY ABOVE
             Optional<UserRepresentation> user = keycloak.realm(userAuthRealm).users().search(null, 0, 1000) // Fetch up to 1000 users
                     .stream()
                     .filter(u -> u.getAttributes() != null && u.getAttributes().containsKey("phoneNumber") &&

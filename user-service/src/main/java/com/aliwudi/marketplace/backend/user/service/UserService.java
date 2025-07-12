@@ -178,19 +178,24 @@ public class UserService {
         if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
             phoneNumberExistsMono = userRepository.existsByPhoneNumber(request.getPhoneNumber());
         }
-        
+
         String primaryIdentifier = null;
-        
-        if(null == request.getIdentifierType()){
+
+        if (null == request.getIdentifierType()) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
-        }else switch (request.getIdentifierType()) {
-            case IdentifierType.IDENTIFIER_TYPE_EMAIL -> primaryIdentifier = request.getEmail();
-            case IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER -> primaryIdentifier = request.getPhoneNumber();
-            default -> throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
+        } else {
+            switch (request.getIdentifierType()) {
+                case IdentifierType.IDENTIFIER_TYPE_EMAIL ->
+                    primaryIdentifier = request.getEmail();
+                case IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER ->
+                    primaryIdentifier = request.getPhoneNumber();
+                default ->
+                    throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
+            }
         }
-        
+
         final String userPrimaryIdentifier = primaryIdentifier;
-        
+
         return Mono.zip(
                 emailExistsMono, phoneNumberExistsMono
         ).flatMap(tuple -> {
@@ -302,39 +307,59 @@ public class UserService {
      * Server.
      * @throws RuntimeException for other internal errors.
      */
-    public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp, String purpose) { // NEW PARAM
+    public Mono<Boolean> verifyEmailOtp(String authServerUserId, String providedOtp, String purpose) {
         log.info("Attempting to verify email OTP for user: {} with purpose: {}", authServerUserId, purpose);
         return otpService.validateOtp(authServerUserId, providedOtp)
                 .flatMap(isValid -> {
                     if (isValid) {
-                        log.info("OTP valid for user {}. Updating email verified status in authorization server.", authServerUserId);
+                        log.info("OTP valid for user {}. Updating email verified status in authorization server and local DB.", authServerUserId);
+                        // Update authorization server first
                         return iAdminService.updateEmailVerifiedStatus(authServerUserId, true)
-                                .flatMap(isUpdated -> {
-                                    if (isUpdated && USER_REGISTER.equals(purpose)) {
-                                        log.info("Email verification purpose is USER_REGISTER for user {}. Sending onboarding email.", authServerUserId);
-                                        // Fetch user details to send onboarding email
+                                .flatMap(isAuthServerUpdated -> {
+                                    if (isAuthServerUpdated) {
+                                        // If authorization server update succeeds, proceed with local DB update and event publishing
                                         return userRepository.findByAuthId(authServerUserId)
                                                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
                                                 .flatMap(user -> {
-                                                    String loginUrl = appHost + LOGIN; // Replace with your actual login URL
-                                                    return notificationEventPublisherService.publishUserRegisteredEvent(
-                                                            user.getPrimaryIdentifierType(),
-                                                            String.valueOf(user.getId()),
-                                                            user.getPrimaryIdentifier(),
-                                                            user.getFirstName(),
-                                                            loginUrl
-                                                    );
+                                                    user.setEmailVerified(true);
+                                                    return userRepository.save(user); // Attempt to save to local DB
                                                 })
-                                                .thenReturn(true); // Return true after onboarding email is sent
+                                                .flatMap(user -> {
+                                                    // Local DB update succeeded, now publish event
+                                                    if (USER_REGISTER.equals(purpose)) {
+                                                        log.info("Email verification purpose is USER_REGISTER for primary identifier user {}. Sending onboarding email.", authServerUserId);
+                                                        String loginUrl = appHost + LOGIN; // Replace with your actual login URL
+                                                        return notificationEventPublisherService.publishUserRegisteredEvent(
+                                                                user.getPrimaryIdentifierType(),
+                                                                String.valueOf(user.getId()),
+                                                                user.getPrimaryIdentifier(),
+                                                                user.getFirstName(),
+                                                                loginUrl
+                                                        ).thenReturn(user); // Return user to continue the chain
+                                                    }
+                                                    return Mono.just(user); // No event to publish, just pass the user
+                                                })
+                                                .thenReturn(true) // Indicate overall success of this branch
+                                                .onErrorResume(e -> {
+                                                    // If local DB save or event publishing fails, rollback authorization server emailVerified status
+                                                    log.error("Local DB update or event publishing failed for user {}. Attempting authorization server emailVerified rollback. Error: {}", authServerUserId, e.getMessage(), e);
+                                                    return iAdminService.updateEmailVerifiedStatus(authServerUserId, false) // Rollback authorization server status to false
+                                                            .onErrorResume(rollbackError -> {
+                                                                log.error("Failed to rollback authorization server emailVerified status for user {}: {}", authServerUserId, rollbackError.getMessage());
+                                                                return Mono.error(new RuntimeException("Inconsistency detected: Local DB update failed and authorization server emailVerified rollback also failed for user " + authServerUserId, e));
+                                                            })
+                                                            .then(Mono.error(e)); // Re-throw the original error after attempting rollback
+                                                });
                                     }
-                                    return Mono.just(true); // Return true if OTP valid but no onboarding needed
+                                    return Mono.just(false); // authorization server update failed
                                 });
                     }
-                    return Mono.just(false); // Should not be reached if validateOtp throws exception
+                    return Mono.just(false);
                 })
                 .doOnSuccess(v -> log.debug("Email OTP verification process completed for user {}. Status: {}", authServerUserId, v))
                 .doOnError(e -> log.error("Error during email OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
     }
+
     /**
      * Validates the provided OTP for phone verification and, if valid, marks
      * the user's phone as verified in Authorization Server. If the purpose is
@@ -350,40 +375,59 @@ public class UserService {
      * Server.
      * @throws RuntimeException for other internal errors.
      */
-    public Mono<Boolean> verifyPhoneOtp(String authServerUserId, String providedOtp, String purpose) { // NEW PARAM
+    public Mono<Boolean> verifyPhoneOtp(String authServerUserId, String providedOtp, String purpose) {
         log.info("Attempting to verify phone OTP for user: {} with purpose: {}", authServerUserId, purpose);
         return otpService.validateOtp(authServerUserId, providedOtp)
                 .flatMap(isValid -> {
                     if (isValid) {
-                        log.info("OTP valid for user {}. Updating phone verified status in authorization server.", authServerUserId);
+                        log.info("OTP valid for user {}. Updating phone verified status in authorization server and local DB.", authServerUserId);
+                        // Update authorization server first
                         return iAdminService.updatePhoneVerifiedStatus(authServerUserId, true)
-                                .flatMap(isUpdated -> {
-                                    if (isUpdated && USER_REGISTER.equals(purpose)) {
-                                        log.info("Phone verification purpose is USER_REGISTER for user {}. Sending onboarding phone.", authServerUserId);
-                                        // Fetch user details to send onboarding phone
+                                .flatMap(isAuthServerUpdated -> {
+                                    if (isAuthServerUpdated) {
+                                        // If authorization server update succeeds, proceed with local DB update and event publishing
                                         return userRepository.findByAuthId(authServerUserId)
                                                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found in local DB for Auth ID: " + authServerUserId)))
                                                 .flatMap(user -> {
-                                                    String loginUrl = appHost + LOGIN; // Replace with your actual login URL
-                                                    return notificationEventPublisherService.publishUserRegisteredEvent(
-                                                            user.getPrimaryIdentifierType(),
-                                                            String.valueOf(user.getId()),
-                                                            user.getPrimaryIdentifier(),
-                                                            user.getFirstName(),
-                                                            loginUrl
-                                                    );
+                                                    user.setPhoneVerified(true);
+                                                    return userRepository.save(user); // Attempt to save to local DB
                                                 })
-                                                .thenReturn(true); // Return true after onboarding phone is sent
+                                                .flatMap(user -> {
+                                                    // Local DB update succeeded, now publish event
+                                                    if (USER_REGISTER.equals(purpose)) {
+                                                        log.info("Phone verification purpose is USER_REGISTER for primary identifier user {}. Sending onboarding phone.", authServerUserId);
+                                                        String loginUrl = appHost + LOGIN; // Replace with your actual login URL
+                                                        return notificationEventPublisherService.publishUserRegisteredEvent(
+                                                                user.getPrimaryIdentifierType(),
+                                                                String.valueOf(user.getId()),
+                                                                user.getPrimaryIdentifier(),
+                                                                user.getFirstName(),
+                                                                loginUrl
+                                                        ).thenReturn(user); // Return user to continue the chain
+                                                    }
+                                                    return Mono.just(user); // No event to publish, just pass the user
+                                                })
+                                                .thenReturn(true) // Indicate overall success of this branch
+                                                .onErrorResume(e -> {
+                                                    // If local DB save or event publishing fails, rollback authorization server phoneVerified status
+                                                    log.error("Local DB update or event publishing failed for user {}. Attempting authorization server phoneVerified rollback. Error: {}", authServerUserId, e.getMessage(), e);
+                                                    return iAdminService.updatePhoneVerifiedStatus(authServerUserId, false) // Rollback authorization server status to false
+                                                            .onErrorResume(rollbackError -> {
+                                                                log.error("Failed to rollback authorization server phoneVerified status for user {}: {}", authServerUserId, rollbackError.getMessage());
+                                                                return Mono.error(new RuntimeException("Inconsistency detected: Local DB update failed and authorization server phoneVerified rollback also failed for user " + authServerUserId, e));
+                                                            })
+                                                            .then(Mono.error(e)); // Re-throw the original error after attempting rollback
+                                                });
                                     }
-                                    return Mono.just(true); // Return true if OTP valid but no onboarding needed
+                                    return Mono.just(false); // authorization server update failed
                                 });
                     }
-                    return Mono.just(false); // Should not be reached if validateOtp throws exception
+                    return Mono.just(false);
                 })
                 .doOnSuccess(v -> log.debug("Phone OTP verification process completed for user {}. Status: {}", authServerUserId, v))
                 .doOnError(e -> log.error("Error during phone OTP verification for user {}: {}", authServerUserId, e.getMessage(), e));
     }
-    
+
     /**
      * Resends an email verification code (OTP) for a given user. Fetches the
      * user's email from Authorization Server, generates a new OTP, stores it,
@@ -426,8 +470,8 @@ public class UserService {
 
     /**
      * Resends an SMS verification code (OTP) for a given user. Fetches the
-     * user's SMS from Authorization Server, generates a new OTP, stores it,
-     * and publishes a new SMS verification event.
+     * user's SMS from Authorization Server, generates a new OTP, stores it, and
+     * publishes a new SMS verification event.
      *
      * @param authServerUserId The Authorization Server user ID.
      * @return Mono<Void> indicating completion.
@@ -459,18 +503,18 @@ public class UserService {
                 })
                 .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
     }
-    
+
     /**
-     * Resends an phoneCall verification code (OTP) for a given user. Fetches the
-     * user's phoneCall from Authorization Server, generates a new OTP, stores it,
-     * and publishes a new phoneCall verification event.
+     * Resends an phoneCall verification code (OTP) for a given user. Fetches
+     * the user's phoneCall from Authorization Server, generates a new OTP,
+     * stores it, and publishes a new phoneCall verification event.
      *
      * @param authServerUserId The Authorization Server user ID.
      * @return Mono<Void> indicating completion.
      * @throws UserNotFoundException if the user is not found in Authorization
      * Server.
-     * @throws IllegalArgumentException if user's phoneCall is missing or already
-     * verified.
+     * @throws IllegalArgumentException if user's phoneCall is missing or
+     * already verified.
      */
     public Mono<Void> resendPhoneCallVerificationCode(String authServerUserId) {
         log.info("Resending verification code for user: {}", authServerUserId);
@@ -495,7 +539,7 @@ public class UserService {
                 })
                 .doOnError(e -> log.error("Error during resend verification code for user {}: {}", authServerUserId, e.getMessage(), e));
     }
-    
+
     /**
      * Finds a user by their internal database ID.
      *
