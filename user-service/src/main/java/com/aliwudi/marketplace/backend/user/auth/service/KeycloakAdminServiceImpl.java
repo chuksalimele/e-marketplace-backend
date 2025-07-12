@@ -91,12 +91,12 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             Keycloak keycloak = getAuthServerClient();
 
             // Check if user already exists by email in Keycloak (Keycloak's native search)
-            if (IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(user.getPrimaryIdentifierType())) {
+            if (IdentifierType.EMAIL.equals(user.getPrimaryIdentifierType())) {
                  List<UserRepresentation> existingUsersByEmail = keycloak.realm(userAuthRealm).users().searchByEmail(user.getEmail(), true);
                  if (!existingUsersByEmail.isEmpty()) {
                      throw new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS);
                  }
-            } else if (IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(user.getPrimaryIdentifierType())) {
+            } else if (IdentifierType.PHONE_NUMBER.equals(user.getPrimaryIdentifierType())) {
                 // Keycloak's search doesn't natively support phone number as a primary field for exact search.
                 // We'll search by the custom attribute "phoneNumber".
                 // This approach can be inefficient for very large user bases.

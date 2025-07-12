@@ -187,9 +187,9 @@ public class UserService {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
         } else {
             switch (request.getIdentifierType()) {
-                case IdentifierType.IDENTIFIER_TYPE_EMAIL ->
+                case IdentifierType.EMAIL ->
                     primaryIdentifier = request.getEmail();
-                case IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER ->
+                case IdentifierType.PHONE_NUMBER ->
                     primaryIdentifier = request.getPhoneNumber();
                 default ->
                     throw new IllegalArgumentException(ApiResponseMessages.INVALID_IDENTIFIER_TYPE);
@@ -603,85 +603,80 @@ public class UserService {
      * already exists for another user.
      */
     @Transactional
-    public Mono<User> updateUser(Long id, UserRequest userRequest) {
+        public Mono<User> updateUser(Long id, UserRequest userRequest) {
         log.debug("Updating user with ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id)))
                 .flatMap(existingUser -> {
-                    // Store original values to check for changes
+                    // Store original values for potential rollback in case local DB save fails
                     String originalEmail = existingUser.getEmail();
                     String originalPhoneNumber = existingUser.getPhoneNumber();
+                    boolean originalEmailVerified = existingUser.isEmailVerified();
+                    boolean originalPhoneVerified = existingUser.isPhoneVerified();
+                    String originalFirstName = existingUser.getFirstName();
+                    String originalLastName = existingUser.getLastName();
                     String authServerUserId = existingUser.getAuthId();
 
                     Mono<Void> authServerEmailUpdate = Mono.empty();
                     Mono<Void> authServerPhoneUpdate = Mono.empty();
-                    Mono<Void> authServerEmailVerifiedUpdate = Mono.empty();
-                    Mono<Void> authServerPhoneVerifiedUpdate = Mono.empty();
                     Mono<Void> authServerFirstNameUpdate = Mono.empty();
                     Mono<Void> authServerLastNameUpdate = Mono.empty();
 
                     boolean emailChanged = userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
-                            && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
+                                            && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
                     boolean phoneNumberChanged = userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
-                            && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
+                                            && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
+                    boolean firstNameChanged = userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()
+                                            && !userRequest.getFirstName().equalsIgnoreCase(originalFirstName);
+                    boolean lastNameChanged = userRequest.getLastName() != null && !userRequest.getLastName().isBlank()
+                                            && !userRequest.getLastName().equalsIgnoreCase(originalLastName);
 
-                    if (emailChanged && !IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(existingUser.getPrimaryIdentifierType())) {
+
+                    if (emailChanged && !IdentifierType.EMAIL.equals(existingUser.getPrimaryIdentifierType())) { // Use enum directly
                         log.info("Email changed for user {}. Updating in authorization server.", existingUser.getId());
                         existingUser.setEmail(userRequest.getEmail());
                         existingUser.setEmailVerified(false); // Mark as unverified upon change
 
                         authServerEmailUpdate = iAdminService.updateUserAttribute(authServerUserId, email.name(), userRequest.getEmail())
-                                .doOnSuccess(v -> log.info("Email updated in authorization server for user {}.", authServerUserId))
+                                .then(iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(false)))
+                                .doOnSuccess(v -> log.info("Email and verified status updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update email in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
-                                    return Mono.error(new RuntimeException("Failed to update email in authentication server."));
-                                });
-
-                        authServerEmailVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(false))
-                                .doOnSuccess(v -> log.info("EmailVerified updated in authorization server for user {}.", authServerUserId))
-                                .onErrorResume(e -> {
-                                    log.error("Failed to update email in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    log.error("Failed to update email/verified status in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update email in authentication server."));
                                 });
                     }
 
-                    if (phoneNumberChanged && !IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(existingUser.getPrimaryIdentifierType())) {
+                    if (phoneNumberChanged && !IdentifierType.PHONE_NUMBER.equals(existingUser.getPrimaryIdentifierType())) { // Use enum directly
                         log.info("Phone number changed for user {}. Updating in authorization server.", existingUser.getId());
                         existingUser.setPhoneNumber(userRequest.getPhoneNumber());
                         existingUser.setPhoneVerified(false); // Mark as unverified upon change
 
                         authServerPhoneUpdate = iAdminService.updateUserAttribute(authServerUserId, phone.name(), userRequest.getPhoneNumber())
+                                .then(iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(false)))
                                 .doOnSuccess(v -> log.info("Phone updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
                                     log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
                                 });
-
-                        authServerPhoneVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(false))
-                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
-                                .onErrorResume(e -> {
-                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
-                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
-                                });
                     }
 
-                    // Apply other updates to existingUser object
-                    if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
+                    // Apply other updates to existingUser object and prepare authorization server updates
+                    if (firstNameChanged) {
                         existingUser.setFirstName(userRequest.getFirstName());
                         authServerFirstNameUpdate = iAdminService.updateUserAttribute(authServerUserId, firstName.name(), userRequest.getFirstName())
-                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
+                                .doOnSuccess(v -> log.info("First name updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
-                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                    log.error("Failed to update first name in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update first name in authentication server."));
                                 });
                     }
-                    if (userRequest.getLastName() != null && !userRequest.getLastName().isBlank()) {
+                    if (lastNameChanged) {
                         existingUser.setLastName(userRequest.getLastName());
                         authServerLastNameUpdate = iAdminService.updateUserAttribute(authServerUserId, lastName.name(), userRequest.getLastName())
-                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
+                                .doOnSuccess(v -> log.info("Last name updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
-                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                    log.error("Failed to update last name in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update last name in authentication server."));
                                 });
                     }
                     if (userRequest.getShippingAddress() != null && !userRequest.getShippingAddress().isBlank()) {
@@ -708,26 +703,73 @@ public class UserService {
                         saveAndRoleUpdateMono = userRepository.save(existingUser);
                     }
 
-                    // Group email-related authorization server updates: attribute change then verified status change
-                    Mono<Void> emailAuthServerChain = Mono.empty();
-                    if (emailChanged) {
-                        emailAuthServerChain = authServerEmailUpdate.then(authServerEmailVerifiedUpdate);
-                    }
+                    // Group all authorization server updates (email, phone, first name, last name) to run concurrently
+                    Mono<Void> allAuthServerUpdates = Mono.when(
+                            authServerEmailUpdate,
+                            authServerPhoneUpdate,
+                            authServerFirstNameUpdate,
+                            authServerLastNameUpdate
+                    );
 
-                    // Group phone-related AuthServer updates: attribute change then verified status change
-                    Mono<Void> phoneAuthServerChain = Mono.empty();
-                    if (phoneNumberChanged) {
-                        phoneAuthServerChain = authServerPhoneUpdate.then(authServerPhoneVerifiedUpdate);
-                    }
+                    // Then, after all authorization server updates, proceed with the local DB save.
+                    // Add an onErrorResume block here to implement compensating transactions if saveAndRoleUpdateMono fails.
+                    return allAuthServerUpdates.then(saveAndRoleUpdateMono)
+                            .onErrorResume(e -> {
+                                log.error("Error during user update (local DB save or role update failed). Attempting authorization server rollback. Error: {}", e.getMessage(), e);
+                                Mono<Void> authServerRollback = Mono.empty();
 
-                    // Combine all *active* authorization server update chains to run concurrently
-                    Mono<Void> allAuthServerUpdates = Mono.when(authServerFirstNameUpdate,
-                            authServerLastNameUpdate,
-                            emailAuthServerChain,
-                            phoneAuthServerChain);
+                                // If email was changed, attempt to roll it back in authorization server
+                                if (emailChanged) {
+                                    authServerRollback = authServerRollback.then(
+                                        iAdminService.updateUserAttribute(authServerUserId, email.name(), originalEmail)
+                                            .then(iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(originalEmailVerified)))
+                                            .doOnSuccess(v -> log.warn("Authorization server email attributes rolled back for user {}.", authServerUserId))
+                                            .onErrorResume(rollbackE -> {
+                                                log.error("CRITICAL: Failed to rollback email in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                return Mono.empty(); // Continue, but this is a serious issue
+                                            })
+                                    );
+                                }
 
-                    // Then combine all AuthServer updates with the local DB save.
-                    return allAuthServerUpdates.then(saveAndRoleUpdateMono);
+                                // If phone number was changed, attempt to roll it back in authorization server
+                                if (phoneNumberChanged) {
+                                    authServerRollback = authServerRollback.then(
+                                        iAdminService.updateUserAttribute(authServerUserId, phone.name(), originalPhoneNumber)
+                                            .then(iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(originalPhoneVerified)))
+                                            .doOnSuccess(v -> log.warn("Authorization server phone attributes rolled back for user {}.", authServerUserId))
+                                            .onErrorResume(rollbackE -> {
+                                                log.error("CRITICAL: Failed to rollback phone number in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                return Mono.empty(); // Continue, but this is a serious issue
+                                            })
+                                    );
+                                }
+
+                                // If first name was changed, attempt to roll it back in authorization server
+                                if (firstNameChanged) {
+                                    authServerRollback = authServerRollback.then(
+                                        iAdminService.updateUserAttribute(authServerUserId, firstName.name(), originalFirstName)
+                                            .doOnSuccess(v -> log.warn("Authorization server first name rolled back for user {}.", authServerUserId))
+                                            .onErrorResume(rollbackE -> {
+                                                log.error("CRITICAL: Failed to rollback first name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                return Mono.empty(); // Continue, but this is a serious issue
+                                            })
+                                    );
+                                }
+
+                                // If last name was changed, attempt to roll it back in authorization server
+                                if (lastNameChanged) {
+                                    authServerRollback = authServerRollback.then(
+                                        iAdminService.updateUserAttribute(authServerUserId, lastName.name(), originalLastName)
+                                            .doOnSuccess(v -> log.warn("Authorization server last name rolled back for user {}.", authServerUserId))
+                                            .onErrorResume(rollbackE -> {
+                                                log.error("CRITICAL: Failed to rollback last name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                return Mono.empty(); // Continue, but this is a serious issue
+                                            })
+                                    );
+                                }
+
+                                return authServerRollback.then(Mono.error(e)); // Re-throw the original error after attempting rollback
+                            });
                 })
                 .flatMap(this::prepareDto)
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
