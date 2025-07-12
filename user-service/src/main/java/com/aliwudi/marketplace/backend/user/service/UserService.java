@@ -603,7 +603,7 @@ public class UserService {
      * already exists for another user.
      */
     @Transactional
-        public Mono<User> updateUser(Long id, UserRequest userRequest) {
+    public Mono<User> updateUser(Long id, UserRequest userRequest) {
         log.debug("Updating user with ID: {}", id);
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id)))
@@ -623,14 +623,13 @@ public class UserService {
                     Mono<Void> authServerLastNameUpdate = Mono.empty();
 
                     boolean emailChanged = userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
-                                            && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
+                            && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
                     boolean phoneNumberChanged = userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
-                                            && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
+                            && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
                     boolean firstNameChanged = userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()
-                                            && !userRequest.getFirstName().equalsIgnoreCase(originalFirstName);
+                            && !userRequest.getFirstName().equalsIgnoreCase(originalFirstName);
                     boolean lastNameChanged = userRequest.getLastName() != null && !userRequest.getLastName().isBlank()
-                                            && !userRequest.getLastName().equalsIgnoreCase(originalLastName);
-
+                            && !userRequest.getLastName().equalsIgnoreCase(originalLastName);
 
                     if (emailChanged && !IdentifierType.EMAIL.equals(existingUser.getPrimaryIdentifierType())) { // Use enum directly
                         log.info("Email changed for user {}. Updating in authorization server.", existingUser.getId());
@@ -721,50 +720,50 @@ public class UserService {
                                 // If email was changed, attempt to roll it back in authorization server
                                 if (emailChanged) {
                                     authServerRollback = authServerRollback.then(
-                                        iAdminService.updateUserAttribute(authServerUserId, email.name(), originalEmail)
-                                            .then(iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(originalEmailVerified)))
-                                            .doOnSuccess(v -> log.warn("Authorization server email attributes rolled back for user {}.", authServerUserId))
-                                            .onErrorResume(rollbackE -> {
-                                                log.error("CRITICAL: Failed to rollback email in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
-                                                return Mono.empty(); // Continue, but this is a serious issue
-                                            })
+                                            iAdminService.updateUserAttribute(authServerUserId, email.name(), originalEmail)
+                                                    .then(iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(originalEmailVerified)))
+                                                    .doOnSuccess(v -> log.warn("Authorization server email attributes rolled back for user {}.", authServerUserId))
+                                                    .onErrorResume(rollbackE -> {
+                                                        log.error("CRITICAL: Failed to rollback email in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                        return Mono.empty(); // Continue, but this is a serious issue
+                                                    })
                                     );
                                 }
 
                                 // If phone number was changed, attempt to roll it back in authorization server
                                 if (phoneNumberChanged) {
                                     authServerRollback = authServerRollback.then(
-                                        iAdminService.updateUserAttribute(authServerUserId, phone.name(), originalPhoneNumber)
-                                            .then(iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(originalPhoneVerified)))
-                                            .doOnSuccess(v -> log.warn("Authorization server phone attributes rolled back for user {}.", authServerUserId))
-                                            .onErrorResume(rollbackE -> {
-                                                log.error("CRITICAL: Failed to rollback phone number in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
-                                                return Mono.empty(); // Continue, but this is a serious issue
-                                            })
+                                            iAdminService.updateUserAttribute(authServerUserId, phone.name(), originalPhoneNumber)
+                                                    .then(iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(originalPhoneVerified)))
+                                                    .doOnSuccess(v -> log.warn("Authorization server phone attributes rolled back for user {}.", authServerUserId))
+                                                    .onErrorResume(rollbackE -> {
+                                                        log.error("CRITICAL: Failed to rollback phone number in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                        return Mono.empty(); // Continue, but this is a serious issue
+                                                    })
                                     );
                                 }
 
                                 // If first name was changed, attempt to roll it back in authorization server
                                 if (firstNameChanged) {
                                     authServerRollback = authServerRollback.then(
-                                        iAdminService.updateUserAttribute(authServerUserId, firstName.name(), originalFirstName)
-                                            .doOnSuccess(v -> log.warn("Authorization server first name rolled back for user {}.", authServerUserId))
-                                            .onErrorResume(rollbackE -> {
-                                                log.error("CRITICAL: Failed to rollback first name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
-                                                return Mono.empty(); // Continue, but this is a serious issue
-                                            })
+                                            iAdminService.updateUserAttribute(authServerUserId, firstName.name(), originalFirstName)
+                                                    .doOnSuccess(v -> log.warn("Authorization server first name rolled back for user {}.", authServerUserId))
+                                                    .onErrorResume(rollbackE -> {
+                                                        log.error("CRITICAL: Failed to rollback first name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                        return Mono.empty(); // Continue, but this is a serious issue
+                                                    })
                                     );
                                 }
 
                                 // If last name was changed, attempt to roll it back in authorization server
                                 if (lastNameChanged) {
                                     authServerRollback = authServerRollback.then(
-                                        iAdminService.updateUserAttribute(authServerUserId, lastName.name(), originalLastName)
-                                            .doOnSuccess(v -> log.warn("Authorization server last name rolled back for user {}.", authServerUserId))
-                                            .onErrorResume(rollbackE -> {
-                                                log.error("CRITICAL: Failed to rollback last name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
-                                                return Mono.empty(); // Continue, but this is a serious issue
-                                            })
+                                            iAdminService.updateUserAttribute(authServerUserId, lastName.name(), originalLastName)
+                                                    .doOnSuccess(v -> log.warn("Authorization server last name rolled back for user {}.", authServerUserId))
+                                                    .onErrorResume(rollbackE -> {
+                                                        log.error("CRITICAL: Failed to rollback last name in authorization server for user {}. Manual intervention may be required. Error: {}", authServerUserId, rollbackE.getMessage());
+                                                        return Mono.empty(); // Continue, but this is a serious issue
+                                                    })
                                     );
                                 }
 
@@ -776,7 +775,6 @@ public class UserService {
                 .doOnError(e -> log.error("Error updating user with ID {}: {}", id, e.getMessage(), e));
     }
 
-
     /**
      * Deletes a user by their ID. This operation is transactional.
      *
@@ -787,9 +785,34 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUser(Long id) {
         log.debug("Attempting to delete user with ID: {}", id);
-        return userRepository.deleteById(id)
-                .doOnSuccess(v -> log.debug("User deleted successfully with ID: {}", id))
-                .doOnError(e -> log.error("Error deleting user {}: {}", id, e.getMessage(), e));
+
+        return userRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id))) // 1. Ensure user exists
+                .flatMap(user -> {
+                    String authServerUserId = user.getAuthId();
+
+                    // 2. Prioritize deletion from the Authorization Server (e.g., Keycloak)
+                    return iAdminService.deleteUserFromAuthServer(authServerUserId)
+                            .doOnSuccess(v -> log.info("User deleted from authorization server (Keycloak) for auth ID: {}", authServerUserId))
+                            .onErrorResume(e -> {
+                                // If Keycloak deletion fails, log and propagate error.
+                                // The local DB remains untouched, preventing inconsistency.
+                                log.error("Failed to delete user from authorization server for auth ID {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                return Mono.error(new RuntimeException("Failed to delete user from authentication server. Please retry.", e));
+                            })
+                            // 3. If Authorization Server deletion succeeds, then delete from Local Database
+                            .then(userRepository.deleteById(id))
+                            .doOnSuccess(v -> log.info("User deleted from local database for ID: {}", id))
+                            .onErrorResume(e -> {
+                                // CRITICAL INCONSISTENCY: Keycloak deletion succeeded, but local DB failed.
+                                // Automatic rollback (re-creating user in Keycloak) for deletion is complex and usually not safe.
+                                // This state requires strong logging and potentially a manual reconciliation process.
+                                log.error("CRITICAL: Failed to delete user from local database for ID {} AFTER successful authorization server deletion. Manual intervention may be required. Error: {}", id, e.getMessage(), e);
+                                return Mono.error(new RuntimeException("Failed to delete user from local database after authorization server deletion. Inconsistency detected."));
+                            });
+                })
+                .doOnSuccess(v -> log.debug("User deletion process completed successfully for ID: {}", id))
+                .doOnError(e -> log.error("Overall error during user deletion for ID {}: {}", id, e.getMessage(), e));
     }
 
     /**
@@ -806,11 +829,36 @@ public class UserService {
     @Transactional
     public Mono<Void> deleteUserByAuthId(String authId) {
         log.debug("Attempting to delete user with Auth ID: {}", authId);
-        // Delete from backend DB first
-        return userRepository.deleteByAuthId(authId)
-                .then(iAdminService.deleteUserFromAuthServer(authId)) // Call generic method to delete from Auth Server
-                .doOnSuccess(v -> log.debug("User deleted successfully with Auth ID: {}", authId))
-                .doOnError(e -> log.error("Error deleting user {}: {}", authId, e.getMessage(), e));
+
+        // 1. Find the user by authId to confirm existence before proceeding
+        return userRepository.findByAuthId(authId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)))
+                .flatMap(user -> {
+                    // 2. Prioritize deletion from the Authorization Server (e.g., Keycloak)
+                    return iAdminService.deleteUserFromAuthServer(authId)
+                            .doOnSuccess(v -> log.info("User deleted from authorization server (Keycloak) for auth ID: {}", authId))
+                            .onErrorResume(e -> {
+                                // If Keycloak deletion fails, log and propagate error.
+                                // The local DB remains untouched, preventing inconsistency.
+                                log.error("Failed to delete user from authorization server for auth ID {}. Error: {}", authId, e.getMessage(), e);
+                                // Depending on the exact exception from iAdminService, you might wrap it differently.
+                                // If it's a 'user not found in auth server' type error, you might choose to proceed
+                                // with local deletion or throw a specific error. For now, general runtime exception.
+                                return Mono.error(new RuntimeException("Failed to delete user from authentication server.", e));
+                            })
+                            // 3. If Authorization Server deletion succeeds, then delete from Local Database
+                            .then(userRepository.deleteById(user.getId())) // Use user's primary ID for local deletion
+                            .doOnSuccess(v -> log.info("User deleted from local database for ID: {} (Auth ID: {})", user.getId(), authId))
+                            .onErrorResume(e -> {
+                                // CRITICAL INCONSISTENCY: Keycloak deletion succeeded, but local DB failed.
+                                // Automatic rollback (re-creating user in Keycloak) for deletion is complex and usually not safe.
+                                // This state requires strong logging and potentially a manual reconciliation process.
+                                log.error("CRITICAL: Failed to delete user from local database for ID {} (Auth ID: {}) AFTER successful authorization server deletion. Manual intervention may be required. Error: {}", user.getId(), authId, e.getMessage(), e);
+                                return Mono.error(new RuntimeException("Failed to delete user from local database after authorization server deletion. Inconsistency detected."));
+                            });
+                })
+                .doOnSuccess(v -> log.debug("User deletion process completed successfully for Auth ID: {}", authId))
+                .doOnError(e -> log.error("Overall error during user deletion for Auth ID {}: {}", authId, e.getMessage(), e));
     }
 
     /**
