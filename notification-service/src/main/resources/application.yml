@@ -70,9 +70,12 @@ spring:
     test-connection: true
     
 twilio:
-  account.sid: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  auth.token: your_auth_token
-  phone.number: +1234567890 # Your Twilio phone number
+  account:
+    sid: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  auth:
+    token: your_auth_token
+  phone:
+    number: +1234567890 # Your Twilio phone number
     
 eureka:
   client:
