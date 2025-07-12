@@ -65,7 +65,7 @@ public class UserEventListener {
      */
     @RabbitListener(queues = REGISTRATION_ONBOARDING_QUEUE)
     public void handleUserRegistration(UserRegisteredEvent event) {
-        log.info("Received UserRegisteredEvent for user: {} ({})", event.getName(), event.getEmail());
+        log.info("Received UserRegisteredEvent for user: {} ({})", event.getName(), event.getPrimaryIdenter());
 
         String subject = "Welcome to Our Application!"; // Can be externalized
         String templateName = "email/registration-success"; // Path to your Thymeleaf template
@@ -76,13 +76,13 @@ public class UserEventListener {
         // Add other common variables if needed
 
         emailNotificationService.sendTemplatedEmail(
-            event.getEmail(),
+            event.getPrimaryIdenter(),
             subject,
             templateName,
             templateVariables
         ).subscribe(
-            v -> log.info("Welcome email successfully sent to {}", event.getEmail()),
-            e -> log.error("Failed to send welcome email to {}: {}", event.getEmail(), e.getMessage(), e)
+            v -> log.info("Welcome email successfully sent to {}", event.getPrimaryIdenter()),
+            e -> log.error("Failed to send welcome email to {}: {}", event.getPrimaryIdenter(), e.getMessage(), e)
         );
     }
 
@@ -93,7 +93,7 @@ public class UserEventListener {
      */
     @RabbitListener(queues = PASSWORD_RESET_QUEUE)
     public void handlePasswordResetRequest(PasswordResetRequestedEvent event) {
-        log.info("Received PasswordResetRequestedEvent for user: {} ({})", event.getName(), event.getEmail());
+        log.info("Received PasswordResetRequestedEvent for user: {} ({})", event.getName(), event.getPrimaryIdentifier());
 
         String subject = "Password Reset Request"; // Can be externalized
         String templateName = "email/password-reset"; // Path to your Thymeleaf template
@@ -105,13 +105,13 @@ public class UserEventListener {
         // Add other common variables if needed
 
         emailNotificationService.sendTemplatedEmail(
-            event.getEmail(),
+            event.getPrimaryIdentifier(),
             subject,
             templateName,
             templateVariables
         ).subscribe(
-            v -> log.info("Password reset email successfully sent to {}", event.getEmail()),
-            e -> log.error("Failed to send password reset email to {}: {}", event.getEmail(), e.getMessage(), e)
+            v -> log.info("Password reset email successfully sent to {}", event.getPrimaryIdentifier()),
+            e -> log.error("Failed to send password reset email to {}: {}", event.getPrimaryIdentifier(), e.getMessage(), e)
         );
     }
 }

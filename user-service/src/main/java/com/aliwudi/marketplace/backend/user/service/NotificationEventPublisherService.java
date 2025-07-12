@@ -133,16 +133,17 @@ public class NotificationEventPublisherService {
     /**
      * Publishes an event to request a password reset email.
      *
+     * @param identifierType
      * @param userId The internal user ID from your database.
-     * @param email The user's email address.
-     * @param username The user's username.
+     * @param identifier
+     * @param name
      * @param resetLink The full URL for password reset (with token).
      * @return Mono<Void> indicating the event has been published.
      */
-    public Mono<Void> publishPasswordResetRequestedEvent(String userId, String email, String name, String resetLink) {
-        PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(userId, email, name, resetLink);
+    public Mono<Void> publishPasswordResetRequestedEvent(String identifierType, String userId, String identifier, String name, String resetLink) {
+        PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(identifierType, userId, identifier, name, resetLink);
         log.info("Publishing PasswordResetRequestedEvent for user: {} to exchange {} with routing key {}",
-                 email, USER_EVENTS_EXCHANGE, PASSWORD_RESET_ROUTING_KEY);
+                 identifier, USER_EVENTS_EXCHANGE, PASSWORD_RESET_ROUTING_KEY);
 
         return Mono.fromRunnable(() ->
             rabbitTemplate.convertAndSend(
@@ -150,8 +151,8 @@ public class NotificationEventPublisherService {
                 PASSWORD_RESET_ROUTING_KEY,
                 event
             )
-        ).doOnSuccess(v -> log.debug("PasswordResetRequestedEvent for {} published.", email))
-         .doOnError(e -> log.error("Failed to publish PasswordResetRequestedEvent for {}: {}", email, e.getMessage(), e))
+        ).doOnSuccess(v -> log.debug("PasswordResetRequestedEvent for {} published.", identifier))
+         .doOnError(e -> log.error("Failed to publish PasswordResetRequestedEvent for {}: {}", identifier, e.getMessage(), e))
          .then()
          .subscribeOn(Schedulers.boundedElastic());
     }

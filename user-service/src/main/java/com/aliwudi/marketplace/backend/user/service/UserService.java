@@ -70,13 +70,14 @@ public class UserService {
      * notification service. This method generates a temporary token and
      * publishes an event for email delivery.
      *
-     * @param email The email address of the user requesting password reset.
+     * @param identifier The email address of the user requesting password reset.
      * @return Mono<Void> indicating the event has been published.
      * @throws ResourceNotFoundException if no user found with the given email.
      */
-    public Mono<Void> initiatePasswordReset(String email) {
-        log.info("Initiating password reset for email: {}", email);
-        return userRepository.findByEmail(email)
+    public Mono<Void> initiatePasswordReset(String identifier) {
+        log.info("Initiating password reset for user identifier: {}", identifier);
+        return userRepository.findByEmail(identifier)
+                .switchIfEmpty(userRepository.findByPhoneNumber(identifier))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND)))
                 .flatMap(user -> {
                     // In a real application, you would generate a secure, time-limited password reset token here.
@@ -86,13 +87,14 @@ public class UserService {
 
                     // MODIFIED: Publish password reset requested event
                     return notificationEventPublisherService.publishPasswordResetRequestedEvent(
+                            user.getPrimaryIdentifierType(),
                             String.valueOf(user.getId()),
-                            user.getEmail(),
+                            identifier,
                             user.getFirstName(),
                             resetLink
                     );
                 })
-                .doOnError(e -> log.error("Error initiating password reset for {}: {}", email, e.getMessage(), e));
+                .doOnError(e -> log.error("Error initiating password reset for {}: {}", identifier, e.getMessage(), e));
     }
 
     /**
@@ -644,15 +646,22 @@ public class UserService {
                         existingUser.setAuthId(userRequest.getAuthId());
                     }
 
-                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()) {
+                    
+                    if (!existingUser.getPrimaryIdentifierType().equals(IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER)
+                            && userRequest.getPhoneNumber() != null
+                            && !userRequest.getPhoneNumber().isBlank()) {
                         existingUser.setPhoneNumber(userRequest.getPhoneNumber());
+                        existingUser.setPhoneVerified(false);
                     }
-                    if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()) {
+                        
+                    
+                    if (!existingUser.getPrimaryIdentifierType().equals(IdentifierType.IDENTIFIER_TYPE_EMAIL)
+                            && userRequest.getEmail() != null 
+                            && !userRequest.getEmail().isBlank()) {
                         existingUser.setEmail(userRequest.getEmail());
+                        existingUser.setEmailVerified(false);
                     }
-                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()) {
-                        existingUser.setPhoneNumber(userRequest.getPhoneNumber());
-                    }
+
                     if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
                         existingUser.setFirstName(userRequest.getFirstName());
                     }
