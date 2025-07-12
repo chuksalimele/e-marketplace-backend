@@ -19,7 +19,7 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
     Mono<User> findByAuthId(String authId);
     
     // Find a user by phoneNumber
-    Mono<User> findByPhoneNumber(String phoneNumber); //@Deprecated - email is sufficient
+    Mono<User> findByPhoneNumber(String phoneNumber); 
 
     // Find a user by email
     Mono<User> findByEmail(String email);
