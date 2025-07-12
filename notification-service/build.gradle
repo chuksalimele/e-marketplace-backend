@@ -3,7 +3,9 @@ description = 'notification-service'
 
 dependencies {
         implementation project(':mcsv-common-lib')
-        
+
+        implementation 'com.twilio.sdk:twilio:10.9.2'
+
         implementation 'org.springframework.boot:spring-boot-starter-thymeleaf' // HTML email templating
 
         implementation 'org.springframework.boot:spring-boot-starter-security'
