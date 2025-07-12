@@ -73,7 +73,7 @@ twilio:
   account:
     sid: ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   auth:
-    token: f0a468ec9e6bde02de081e61ec7c5bcf
+    token: XXXXXXXXXXXXXXXXXX
   phone:
     number: +15077347433 # Your Twilio phone number
     
