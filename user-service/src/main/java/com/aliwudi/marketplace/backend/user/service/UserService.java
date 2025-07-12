@@ -613,62 +613,76 @@ public class UserService {
                     String originalPhoneNumber = existingUser.getPhoneNumber();
                     String authServerUserId = existingUser.getAuthId();
 
-                    Mono<Void> keycloakEmailUpdate = Mono.empty();
-                    Mono<Void> keycloakPhoneUpdate = Mono.empty();
-                    Mono<Void> keycloakEmailVerifiedUpdate = Mono.empty();
-                    Mono<Void> keycloakPhoneVerifiedUpdate = Mono.empty();
+                    Mono<Void> authServerEmailUpdate = Mono.empty();
+                    Mono<Void> authServerPhoneUpdate = Mono.empty();
+                    Mono<Void> authServerEmailVerifiedUpdate = Mono.empty();
+                    Mono<Void> authServerPhoneVerifiedUpdate = Mono.empty();
+                    Mono<Void> authServerFirstNameUpdate = Mono.empty();
+                    Mono<Void> authServerLastNameUpdate = Mono.empty();
 
                     boolean emailChanged = userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
                             && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
                     boolean phoneNumberChanged = userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
                             && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
 
-                    if (emailChanged) {
-                        log.info("Email changed for user {}. Updating in Keycloak.", existingUser.getId());
+                    if (emailChanged && !IdentifierType.IDENTIFIER_TYPE_EMAIL.equals(existingUser.getPrimaryIdentifierType())) {
+                        log.info("Email changed for user {}. Updating in authorization server.", existingUser.getId());
                         existingUser.setEmail(userRequest.getEmail());
                         existingUser.setEmailVerified(false); // Mark as unverified upon change
-                        
-                        keycloakEmailUpdate = iAdminService.updateUserAttribute(authServerUserId, email.name(), userRequest.getEmail())
-                                .doOnSuccess(v -> log.info("Email updated in Keycloak for user {}.", authServerUserId))
+
+                        authServerEmailUpdate = iAdminService.updateUserAttribute(authServerUserId, email.name(), userRequest.getEmail())
+                                .doOnSuccess(v -> log.info("Email updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update email in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    log.error("Failed to update email in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update email in authentication server."));
                                 });
-                        
-                        keycloakEmailVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(false))
-                                .doOnSuccess(v -> log.info("EmailVerified updated in Keycloak for user {}.", authServerUserId))
+
+                        authServerEmailVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(false))
+                                .doOnSuccess(v -> log.info("EmailVerified updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update email in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    log.error("Failed to update email in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update email in authentication server."));
-                                });                        
+                                });
                     }
 
-                    if (phoneNumberChanged) {
-                        log.info("Phone number changed for user {}. Updating in Keycloak.", existingUser.getId());
+                    if (phoneNumberChanged && !IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER.equals(existingUser.getPrimaryIdentifierType())) {
+                        log.info("Phone number changed for user {}. Updating in authorization server.", existingUser.getId());
                         existingUser.setPhoneNumber(userRequest.getPhoneNumber());
                         existingUser.setPhoneVerified(false); // Mark as unverified upon change
-                        
-                        keycloakPhoneUpdate = iAdminService.updateUserAttribute(authServerUserId, phone.name(), userRequest.getPhoneNumber())
-                                .doOnSuccess(v -> log.info("Phone updated in Keycloak for user {}.", authServerUserId))
+
+                        authServerPhoneUpdate = iAdminService.updateUserAttribute(authServerUserId, phone.name(), userRequest.getPhoneNumber())
+                                .doOnSuccess(v -> log.info("Phone updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update phone in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
                                 });
-                        
-                        keycloakPhoneVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(false))
-                                .doOnSuccess(v -> log.info("PhoneVerified updated in Keycloak for user {}.", authServerUserId))
+
+                        authServerPhoneVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(false))
+                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
                                 .onErrorResume(e -> {
-                                    log.error("Failed to update phone in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
                                     return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
-                                });   
+                                });
                     }
 
                     // Apply other updates to existingUser object
                     if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
                         existingUser.setFirstName(userRequest.getFirstName());
+                        authServerFirstNameUpdate = iAdminService.updateUserAttribute(authServerUserId, firstName.name(), userRequest.getFirstName())
+                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                });
                     }
                     if (userRequest.getLastName() != null && !userRequest.getLastName().isBlank()) {
                         existingUser.setLastName(userRequest.getLastName());
+                        authServerLastNameUpdate = iAdminService.updateUserAttribute(authServerUserId, lastName.name(), userRequest.getLastName())
+                                .doOnSuccess(v -> log.info("PhoneVerified updated in authorization server for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update phone in authorization server for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                });
                     }
                     if (userRequest.getShippingAddress() != null && !userRequest.getShippingAddress().isBlank()) {
                         existingUser.setShippingAddress(userRequest.getShippingAddress());
@@ -694,42 +708,32 @@ public class UserService {
                         saveAndRoleUpdateMono = userRepository.save(existingUser);
                     }
 
-                    // Combine Keycloak updates and then local DB save.
-                    // Mono.when will run both keycloakEmailUpdate and keycloakPhoneUpdate concurrently.
-                    // The .then() ensures that saveAndRoleUpdateMono (local DB save) runs only after both Keycloak operations complete successfully.
-                    return Mono.when(keycloakEmailUpdate,
-                            keycloakEmailVerifiedUpdate,
-                            keycloakPhoneUpdate,
-                            keycloakPhoneVerifiedUpdate)
-                            .then(saveAndRoleUpdateMono);
+                    // Group email-related authorization server updates: attribute change then verified status change
+                    Mono<Void> emailAuthServerChain = Mono.empty();
+                    if (emailChanged) {
+                        emailAuthServerChain = authServerEmailUpdate.then(authServerEmailVerifiedUpdate);
+                    }
+
+                    // Group phone-related AuthServer updates: attribute change then verified status change
+                    Mono<Void> phoneAuthServerChain = Mono.empty();
+                    if (phoneNumberChanged) {
+                        phoneAuthServerChain = authServerPhoneUpdate.then(authServerPhoneVerifiedUpdate);
+                    }
+
+                    // Combine all *active* authorization server update chains to run concurrently
+                    Mono<Void> allAuthServerUpdates = Mono.when(authServerFirstNameUpdate,
+                            authServerLastNameUpdate,
+                            emailAuthServerChain,
+                            phoneAuthServerChain);
+
+                    // Then combine all AuthServer updates with the local DB save.
+                    return allAuthServerUpdates.then(saveAndRoleUpdateMono);
                 })
                 .flatMap(this::prepareDto)
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))
                 .doOnError(e -> log.error("Error updating user with ID {}: {}", id, e.getMessage(), e));
     }
 
-    /**
-     * Updates an existing user's Authorization Server Auth ID. This method is
-     * used after successful Authorization Server registration.
-     *
-     * @param user The User object with the Authorization Server Auth ID to
-     * update.
-     * @return A Mono emitting the updated User object.
-     * @throws ResourceNotFoundException if the user is not found.
-     */
-    @Transactional
-    public Mono<User> updateUser(User user) {
-        log.debug("Updating user's Authorization Server Auth ID for user: {}", user.getId()); // Generic log
-        return userRepository.findById(user.getId())
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND + user.getId())))
-                .flatMap(existingUser -> {
-                    existingUser.setAuthId(user.getAuthId());
-                    existingUser.setUpdatedAt(LocalDateTime.now());
-                    return userRepository.save(existingUser);
-                })
-                .doOnSuccess(updatedUser -> log.info("User {} Authorization Server Auth ID updated to {}.", updatedUser.getId(), updatedUser.getAuthId())) // Generic log
-                .doOnError(e -> log.error("Error updating user {} Authorization Server Auth ID: {}", user.getId(), e.getMessage(), e)); // Generic log
-    }
 
     /**
      * Deletes a user by their ID. This operation is transactional.

@@ -10,6 +10,8 @@ package com.aliwudi.marketplace.backend.user.enumeration;
  */
 public enum AuthServerAttribute {
     userId,
+    firstName,
+    lastName,
     email,
     phone,
     emailVerified,
