@@ -69,14 +69,7 @@ spring:
       mail.smtp.starttls.enable: false
     test-connection: true
     
-twilio:
-  account:
-    sid: ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-  auth:
-    token: XXXXXXXXXXXXXXXXXX
-  phone:
-    number: +15077347433 # Your Twilio phone number
-    
+
 eureka:
   client:
     service-url:
