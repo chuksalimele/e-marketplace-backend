@@ -71,11 +71,11 @@ spring:
     
 twilio:
   account:
-    sid: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    sid: ACa55281758aa4d1730cf023a08dd91213
   auth:
-    token: your_auth_token
+    token: f0a468ec9e6bde02de081e61ec7c5bcf
   phone:
-    number: +1234567890 # Your Twilio phone number
+    number: +15077347433 # Your Twilio phone number
     
 eureka:
   client:

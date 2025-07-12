@@ -7,7 +7,19 @@ server:
 
 app:
   host: https://localhost
-
+  
+# Your backend's callback URIs for social logins
+# IMPORTANT: These must match EXACTLY what you configure in Google/Facebook developer consoles  
+  social:
+    google:
+      redirect-uri: https://your-backend.com/api/auth/google/callback
+    facebook:
+      redirect-uri: https://your-backend.com/api/auth/facebook/callback
+  # Your frontend's deep link scheme (adjust as per your native app)
+  frontend:
+    redirect-scheme: your-native-app-scheme://auth   
+    
+    
 truststore:
   path: classpath:backend_truststore.p12
   password: microservicetrustpass@123+@+
@@ -54,8 +66,10 @@ spring:
 # Keycloak/Authorization Server Configuration
 auth-server:
   url: https://localhost:8443 # Your Authorization Server URL (e.g., Keycloak URL)
+  auth-url: http://localhost:8443/auth
   realm: chuks-emaketplace-realm # The realm where your application users reside
-
+  resource: your-spring-boot-client-id # The client ID of your Spring Boot app in Keycloak
+  
   # Configuration for the backend service to call Authorization Server Admin API
   admin:
     url: https://localhost:8443 # Authorization Server Admin URL (e.g., Keycloak Admin URL)
@@ -90,3 +104,6 @@ jwt:
     converter:
       resource-id: emaketplace-app
       principle-attribute: preferred_username
+      
+
+
