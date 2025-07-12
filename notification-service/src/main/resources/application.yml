@@ -71,7 +71,7 @@ spring:
     
 twilio:
   account:
-    sid: ACa55281758aa4d1730cf023a08dd91213
+    sid: ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   auth:
     token: f0a468ec9e6bde02de081e61ec7c5bcf
   phone:
