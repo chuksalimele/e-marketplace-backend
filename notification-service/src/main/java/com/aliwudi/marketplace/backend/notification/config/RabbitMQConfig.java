@@ -14,14 +14,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-
-
     @Bean
     public TopicExchange userEventsExchange() {
         return new TopicExchange(USER_EVENTS_EXCHANGE, true, false); // Durable, not auto-delete
     }
 
-
+    // --- Queue Declarations ---
     @Bean
     public Queue emailVerificationQueue() {
         return new Queue(EMAIL_VERIFICATION_QUEUE, true); // Durable
@@ -37,7 +35,19 @@ public class RabbitMQConfig {
         return new Queue(PASSWORD_RESET_QUEUE, true); // Durable
     }
 
+    // NEW: SMS Verification Queue
+    @Bean
+    public Queue smsVerificationQueue() {
+        return new Queue(SMS_VERIFICATION_QUEUE, true); // Durable
+    }
 
+    // NEW: Phone Call Verification Queue
+    @Bean
+    public Queue phoneCallVerificationQueue() {
+        return new Queue(PHONE_CALL_VERIFICATION_QUEUE, true); // Durable
+    }
+
+    // --- Binding Declarations ---
     @Bean
     public Binding emailVerificationBinding(Queue emailVerificationQueue, TopicExchange userEventsExchange) {
         return BindingBuilder.bind(emailVerificationQueue)
@@ -59,8 +69,23 @@ public class RabbitMQConfig {
                              .with(PASSWORD_RESET_ROUTING_KEY);
     }
 
+    // NEW: SMS Verification Binding
+    @Bean
+    public Binding smsVerificationBinding(Queue smsVerificationQueue, TopicExchange userEventsExchange) {
+        return BindingBuilder.bind(smsVerificationQueue)
+                             .to(userEventsExchange)
+                             .with(SMS_VERIFICATION_ROUTING_KEY);
+    }
+
+    // NEW: Phone Call Verification Binding
+    @Bean
+    public Binding phoneCallVerificationBinding(Queue phoneCallVerificationQueue, TopicExchange userEventsExchange) {
+        return BindingBuilder.bind(phoneCallVerificationQueue)
+                             .to(userEventsExchange)
+                             .with(PHONE_CALL_VERIFICATION_ROUTING_KEY);
+    }
+
     // --- Message Converter ---
-    // This is crucial for sending/receiving Java objects as JSON messages
     @Bean
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
