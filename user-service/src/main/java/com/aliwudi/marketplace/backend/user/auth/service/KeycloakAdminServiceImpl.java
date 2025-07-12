@@ -26,6 +26,7 @@ import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceExcepti
 import com.aliwudi.marketplace.backend.common.exception.ServiceException;
 import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException;
 import com.aliwudi.marketplace.backend.common.model.User;
+import static com.aliwudi.marketplace.backend.user.enumeration.AuthServerAttribute.*;
 import java.util.stream.Collectors;
 
 /**
@@ -38,12 +39,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class KeycloakAdminServiceImpl implements IAdminService { // Implements the generic interface
 
-    enum CustomAttr{
-         userId,
-         phoneVerified,
-         primaryIdentifierType,
-         roles;
-    }
     
     @Value("${auth-server.admin.url}") // Using new generic config property
     private String authServerAdminUrl;
@@ -123,7 +118,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             keycloakUser.setUsername(keycloakUsername); // Set the dynamic username
             keycloakUser.setEmail(user.getEmail()); // Always set email if available
             keycloakUser.setFirstName(user.getFirstName());
-            keycloakUser.setLastName(user.getLastName());
+            keycloakUser.setLastName(user.getLastName());            
             keycloakUser.setEmailVerified(false);
 
             // Set password
@@ -139,10 +134,11 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 .collect(Collectors.joining(","));
 
             Map<String, List<String>> customAttributes = new HashMap<>();
-            customAttributes.put(CustomAttr.userId.name(), Collections.singletonList(String.valueOf(user.getId())));
-            customAttributes.put(CustomAttr.primaryIdentifierType.name(), Collections.singletonList(user.getPrimaryIdentifierType()));
-            customAttributes.put(CustomAttr.phoneVerified.name(), Collections.singletonList(String.valueOf(user.isPhoneVerified())));
-            customAttributes.put(CustomAttr.roles.name(), Collections.singletonList(roleNames));
+            customAttributes.put(userId.name(), Collections.singletonList(String.valueOf(user.getId())));
+            customAttributes.put(primaryIdentifierType.name(), Collections.singletonList(user.getPrimaryIdentifierType()));
+            customAttributes.put(phone.name(), Collections.singletonList(String.valueOf(user.getPhoneNumber())));
+            customAttributes.put(phoneVerified.name(), Collections.singletonList(String.valueOf(user.isPhoneVerified())));
+            customAttributes.put(roles.name(), Collections.singletonList(roleNames));
 
             // Add phone number as an attribute if available
             if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
@@ -230,7 +226,7 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 if (attributes == null) {
                     attributes = new HashMap<>();
                 }
-                attributes.put(CustomAttr.phoneVerified.name(), Collections.singletonList(String.valueOf(verified)));
+                attributes.put(phoneVerified.name(), Collections.singletonList(String.valueOf(verified)));
                 user.setAttributes(attributes);
                 userResource.update(user);
                 log.info("Keycloak user '{}' phone verification status updated to {}", authServerUserId, verified);

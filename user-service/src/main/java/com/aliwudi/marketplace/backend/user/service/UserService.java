@@ -32,9 +32,8 @@ import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.common.exception.InvalidUserDataException;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
+import static com.aliwudi.marketplace.backend.user.enumeration.AuthServerAttribute.*;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -70,7 +69,8 @@ public class UserService {
      * notification service. This method generates a temporary token and
      * publishes an event for email delivery.
      *
-     * @param identifier The email address of the user requesting password reset.
+     * @param identifier The email address of the user requesting password
+     * reset.
      * @return Mono<Void> indicating the event has been published.
      * @throws ResourceNotFoundException if no user found with the given email.
      */
@@ -608,60 +608,62 @@ public class UserService {
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_ID + id)))
                 .flatMap(existingUser -> {
-                    // Check for duplicate phoneNumber if changed
-                    Mono<Void> phoneNumberCheck = Mono.empty();
-                    if (userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
-                            && !existingUser.getPhoneNumber().equalsIgnoreCase(userRequest.getPhoneNumber())) {
-                        phoneNumberCheck = userRepository.existsByPhoneNumber(userRequest.getPhoneNumber())
-                                .flatMap(exists -> {
-                                    if (exists) {
-                                        log.warn("Attempt to update phoneNumber to an existing one: {}", userRequest.getPhoneNumber());
-                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.PHONE_NUMBER_ALREADY_EXISTS));
-                                    }
-                                    return Mono.empty();
-                                });
-                    }
+                    // Store original values to check for changes
+                    String originalEmail = existingUser.getEmail();
+                    String originalPhoneNumber = existingUser.getPhoneNumber();
+                    String authServerUserId = existingUser.getAuthId();
 
-                    // Check for duplicate email if changed
-                    Mono<Void> emailCheck = Mono.empty();
-                    if (userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
-                            && !existingUser.getEmail().equalsIgnoreCase(userRequest.getEmail())) {
-                        emailCheck = userRepository.existsByEmail(userRequest.getEmail())
-                                .flatMap(exists -> {
-                                    if (exists) {
-                                        log.warn("Attempt to update email to an existing one: {}", userRequest.getEmail());
-                                        return Mono.error(new DuplicateResourceException(ApiResponseMessages.EMAIL_ALREADY_EXISTS));
-                                    }
-                                    return Mono.empty();
-                                });
-                    }
+                    Mono<Void> keycloakEmailUpdate = Mono.empty();
+                    Mono<Void> keycloakPhoneUpdate = Mono.empty();
+                    Mono<Void> keycloakEmailVerifiedUpdate = Mono.empty();
+                    Mono<Void> keycloakPhoneVerifiedUpdate = Mono.empty();
 
-                    // Combine checks
-                    return Mono.when(phoneNumberCheck, emailCheck)
-                            .thenReturn(existingUser);
-                })
-                .flatMap(existingUser -> {
-                    // Apply updates
-                    if (userRequest.getAuthId() != null && !userRequest.getAuthId().isBlank()) {
-                        existingUser.setAuthId(userRequest.getAuthId());
-                    }
+                    boolean emailChanged = userRequest.getEmail() != null && !userRequest.getEmail().isBlank()
+                            && !userRequest.getEmail().equalsIgnoreCase(originalEmail);
+                    boolean phoneNumberChanged = userRequest.getPhoneNumber() != null && !userRequest.getPhoneNumber().isBlank()
+                            && !userRequest.getPhoneNumber().equalsIgnoreCase(originalPhoneNumber);
 
-                    
-                    if (!existingUser.getPrimaryIdentifierType().equals(IdentifierType.IDENTIFIER_TYPE_PHONE_NUMBER)
-                            && userRequest.getPhoneNumber() != null
-                            && !userRequest.getPhoneNumber().isBlank()) {
-                        existingUser.setPhoneNumber(userRequest.getPhoneNumber());
-                        existingUser.setPhoneVerified(false);
-                    }
-                        
-                    
-                    if (!existingUser.getPrimaryIdentifierType().equals(IdentifierType.IDENTIFIER_TYPE_EMAIL)
-                            && userRequest.getEmail() != null 
-                            && !userRequest.getEmail().isBlank()) {
+                    if (emailChanged) {
+                        log.info("Email changed for user {}. Updating in Keycloak.", existingUser.getId());
                         existingUser.setEmail(userRequest.getEmail());
-                        existingUser.setEmailVerified(false);
+                        existingUser.setEmailVerified(false); // Mark as unverified upon change
+                        
+                        keycloakEmailUpdate = iAdminService.updateUserAttribute(authServerUserId, email.name(), userRequest.getEmail())
+                                .doOnSuccess(v -> log.info("Email updated in Keycloak for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update email in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update email in authentication server."));
+                                });
+                        
+                        keycloakEmailVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, emailVerified.name(), String.valueOf(false))
+                                .doOnSuccess(v -> log.info("EmailVerified updated in Keycloak for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update email in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update email in authentication server."));
+                                });                        
                     }
 
+                    if (phoneNumberChanged) {
+                        log.info("Phone number changed for user {}. Updating in Keycloak.", existingUser.getId());
+                        existingUser.setPhoneNumber(userRequest.getPhoneNumber());
+                        existingUser.setPhoneVerified(false); // Mark as unverified upon change
+                        
+                        keycloakPhoneUpdate = iAdminService.updateUserAttribute(authServerUserId, phone.name(), userRequest.getPhoneNumber())
+                                .doOnSuccess(v -> log.info("Phone updated in Keycloak for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update phone in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                });
+                        
+                        keycloakPhoneVerifiedUpdate = iAdminService.updateUserAttribute(authServerUserId, phoneVerified.name(), String.valueOf(false))
+                                .doOnSuccess(v -> log.info("PhoneVerified updated in Keycloak for user {}.", authServerUserId))
+                                .onErrorResume(e -> {
+                                    log.error("Failed to update phone in Keycloak for user {}. Error: {}", authServerUserId, e.getMessage(), e);
+                                    return Mono.error(new RuntimeException("Failed to update phone in authentication server."));
+                                });   
+                    }
+
+                    // Apply other updates to existingUser object
                     if (userRequest.getFirstName() != null && !userRequest.getFirstName().isBlank()) {
                         existingUser.setFirstName(userRequest.getFirstName());
                     }
@@ -673,6 +675,7 @@ public class UserService {
                     }
                     existingUser.setUpdatedAt(LocalDateTime.now());
 
+                    Mono<User> saveAndRoleUpdateMono;
                     // Handle roles if provided in UserRequest, otherwise keep existing roles
                     if (userRequest.getRoles() != null && !userRequest.getRoles().isEmpty()) {
                         Set<Mono<Role>> roleMonos = userRequest.getRoles().stream()
@@ -680,16 +683,25 @@ public class UserService {
                                 .switchIfEmpty(Mono.error(new RoleNotFoundException(ApiResponseMessages.ROLE_NOT_FOUND + " : " + roleName))))
                                 .collect(Collectors.toSet());
 
-                        return Flux.fromIterable(roleMonos)
-                                .flatMap(mono -> mono)
+                        saveAndRoleUpdateMono = Flux.fromIterable(roleMonos)
+                                .flatMap(Mono::flux)
                                 .collect(Collectors.toSet())
                                 .flatMap(newRoles -> {
                                     existingUser.setRoles(newRoles);
                                     return userRepository.save(existingUser);
                                 });
                     } else {
-                        return userRepository.save(existingUser);
+                        saveAndRoleUpdateMono = userRepository.save(existingUser);
                     }
+
+                    // Combine Keycloak updates and then local DB save.
+                    // Mono.when will run both keycloakEmailUpdate and keycloakPhoneUpdate concurrently.
+                    // The .then() ensures that saveAndRoleUpdateMono (local DB save) runs only after both Keycloak operations complete successfully.
+                    return Mono.when(keycloakEmailUpdate,
+                            keycloakEmailVerifiedUpdate,
+                            keycloakPhoneUpdate,
+                            keycloakPhoneVerifiedUpdate)
+                            .then(saveAndRoleUpdateMono);
                 })
                 .flatMap(this::prepareDto)
                 .doOnSuccess(u -> log.debug("User updated successfully with ID: {}", u.getId()))

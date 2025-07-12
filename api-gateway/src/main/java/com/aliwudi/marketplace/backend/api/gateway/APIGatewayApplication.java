@@ -1,6 +1,6 @@
 package com.aliwudi.marketplace.backend.api.gateway;
 
-import com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders;
+import static com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders.*;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
 import com.aliwudi.marketplace.backend.common.util.JwtAuthConverter;
 import org.springframework.boot.SpringApplication;
@@ -229,16 +229,16 @@ public class APIGatewayApplication {
 
                         if (authId != null) {
                             ServerHttpRequest request = exchange.getRequest().mutate()
-                                .header(BasicAuthHeaders.X_USER_AUTH_ID.getHeaderName(), authId) // Propagate user auth ID
-                                .header(BasicAuthHeaders.X_USER_ID.getHeaderName(), userId) // Propagate user ID - registration id on the database
-                                .header(BasicAuthHeaders.X_USER_EMAIL.getHeaderName(), email) // Propagate user email
-                                .header(BasicAuthHeaders.X_USER_PHONE.getHeaderName(), phone) // Propagate user phone number
-                                .header(BasicAuthHeaders.X_USER_FIRST_NAME.getHeaderName(), firstName) 
-                                .header(BasicAuthHeaders.X_USER_LAST_NAME.getHeaderName(), lastName)   
-                                .header(BasicAuthHeaders.X_USER_EMAIL_VERIFIED.getHeaderName(), emailVerified)   
-                                .header(BasicAuthHeaders.X_USER_PHONE_VERIFIED.getHeaderName(), phoneVerified)   
-                                .header(BasicAuthHeaders.X_USER_PRIMARY_IDENTIFIER_TYPE.getHeaderName(), primaryIdentifierType)   
-                                .header(BasicAuthHeaders.X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user roles
+                                .header(X_USER_AUTH_ID.getHeaderName(), authId) // Propagate user auth ID
+                                .header(X_USER_ID.getHeaderName(), userId) // Propagate user ID - registration id on the database
+                                .header(X_USER_EMAIL.getHeaderName(), email) // Propagate user email
+                                .header(X_USER_PHONE.getHeaderName(), phone) // Propagate user phone number
+                                .header(X_USER_FIRST_NAME.getHeaderName(), firstName) 
+                                .header(X_USER_LAST_NAME.getHeaderName(), lastName)   
+                                .header(X_USER_EMAIL_VERIFIED.getHeaderName(), emailVerified)   
+                                .header(X_USER_PHONE_VERIFIED.getHeaderName(), phoneVerified)   
+                                .header(X_USER_PRIMARY_IDENTIFIER_TYPE.getHeaderName(), primaryIdentifierType)   
+                                .header(X_USER_ROLES.getHeaderName(), rolesStr) // Propagate user roles
                                 .build();
                             return exchange.mutate().request(request).build();
                         }
