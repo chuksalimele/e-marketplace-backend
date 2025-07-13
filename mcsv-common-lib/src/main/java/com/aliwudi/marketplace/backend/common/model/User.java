@@ -37,6 +37,7 @@ public class User {
     private boolean emailVerified;
     private boolean phoneVerified;
     private String shippingAddress;
+    private LocalDateTime lastLoginAt;
     
     private boolean enabled;
     

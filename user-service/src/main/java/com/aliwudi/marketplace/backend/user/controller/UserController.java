@@ -9,14 +9,13 @@ import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundExceptio
 import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException;
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
-import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
-import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
+import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
+import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
-import com.aliwudi.marketplace.backend.user.validation.CreateUserValidation;
 
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.Valid;
@@ -24,8 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity; // New import for ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize; // For role-based authorization
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -33,9 +30,16 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException; // For date parsing from request params
-import org.springframework.validation.annotation.Validated;
+import java.util.Map;
 import lombok.Data; // New import for DTOs
-import lombok.Builder; // New import for DTOs
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType; // NEW IMPORT
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.web.reactive.function.BodyInserters; // NEW IMPORT
+import org.springframework.web.reactive.function.client.WebClient;
 
 
 /*
@@ -52,7 +56,23 @@ NOTE: In order to align with industry best practices we have removed
 public class UserController {
 
     private final UserService userService;
+    private final WebClient.Builder webClientBuilder; // Inject WebClient.Builder
 
+    private final JwtDecoder jwtDecoder;
+    
+    @Value("${keycloak.auth-server-url}")
+    private String keycloakAuthServerUrl;
+
+    @Value("${keycloak.realm}")
+    private String keycloakRealm;
+
+    @Value("${keycloak.resource}")
+    private String keycloakClientId;
+
+    // We might need a secret for public clients if using confidential client access later
+    @Value("${keycloak.credentials.secret:}") // @Value with default empty string for optional secret
+    private String keycloakClientSecret;
+    
     // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
     @Data
     public static class VerificationRequest {
@@ -68,6 +88,81 @@ public class UserController {
     }
     // --- END NEW DTOs ---
 
+    /**
+     * Endpoint for user login using username/email and password.
+     * Authenticates directly against Keycloak's token endpoint.
+     *
+     * @param loginRequest DTO containing username/email and password.
+     * @return Mono<ResponseEntity<Map<String, Object>>> containing Keycloak tokens.
+     */
+    @PostMapping(LOGIN) // Or AUTH_LOGIN if defined in ApiConstants
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<User> login(@Valid @RequestBody LoginRequest loginRequest) {
+        log.info("Attempting login for user: {}", loginRequest.getUserIdentifier());
+
+        String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakAuthServerUrl, keycloakRealm);
+
+        // Build the form data for the token request
+        BodyInserters.FormInserter<String> formData = BodyInserters.fromFormData("grant_type", "password")
+                .with("client_id", keycloakClientId)
+                .with("username", loginRequest.getUserIdentifier())
+                .with("password", loginRequest.getPassword());
+
+        // Only add client_secret if it's present (for confidential clients)
+        if (keycloakClientSecret != null && !keycloakClientSecret.isBlank()) {
+            formData = formData.with("client_secret", keycloakClientSecret);
+        }
+
+        return webClientBuilder.build().post()
+                .uri(tokenUrl)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(formData)
+                .retrieve()
+                .onStatus(status-> status.is4xxClientError(), clientResponse ->
+                        clientResponse.bodyToMono(Map.class)
+                                .flatMap(errorBody -> {
+                                    String errorMessage = (String) errorBody.getOrDefault("error_description", "Authentication failed");
+                                    log.warn("Keycloak login failed for user {}: {}", loginRequest.getUserIdentifier(), errorMessage);
+                                    // You can create a more specific exception if needed
+                                    return Mono.error(new IllegalArgumentException("Login failed: " + errorMessage));
+                                })
+                )
+                .onStatus(status->status.is5xxServerError(), clientResponse ->
+                        Mono.error(new RuntimeException("Keycloak server error during login for user: " + loginRequest.getUserIdentifier()))
+                )
+                .bodyToMono(Map.class) // Keycloak returns a map of tokens
+                .flatMap(keycloakTokens -> {
+                    log.info("Successfully authenticated user: {}", loginRequest.getUserIdentifier());
+
+                    // Optionally, update the user's last login time in your backend DB
+                    String accessToken = (String) keycloakTokens.get("access_token");
+
+                    
+                    // Decode access token to get 'sub' (authId) for updating last login
+                    // This requires JwtDecoder to be available in UserController or passed to UserService
+                    // For now, let's just use the username to update last login if the User model has username
+                    // or you can retrieve the authId from an ID token if present.
+                    
+                    // Extract userId from access_token
+                     try {
+                         Jwt jwt = jwtDecoder.decode(accessToken); // Requires JwtDecoder in UserController or passed to UserService
+                         Map<String, Object> claims = jwt.getClaims();
+                         //String authId = jwt.getSubject();
+                         String userId = (String) claims.get(JwtClaims.userId.name());
+                         return Mono.just(Long.valueOf(userId));
+                     } catch (Exception e) {                                             
+                         return Mono.error(new RuntimeException("Could not decode access token to update last login: " + e.getMessage()));                        
+                     }                    
+                })
+                .flatMap(userId->userService.findById(userId))
+                .flatMap(existingUser -> {
+                    log.info("User {} logging in. Updating last login time.", existingUser.getId());
+                    existingUser.setLastLoginAt(LocalDateTime.now());
+                    return userService.updateUserOnDB(existingUser);
+                })
+                .doOnError(e -> log.error("Login process error for {}: {}", loginRequest.getUserIdentifier(), e.getMessage(), e));
+    }
+    
     /**
      * Creates a new user profile in the backend database and registers the user in Authorization Server.
      * This method now implements the "backend-first" hybrid registration approach.

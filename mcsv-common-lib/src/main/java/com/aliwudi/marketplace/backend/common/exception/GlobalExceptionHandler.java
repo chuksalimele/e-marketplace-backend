@@ -384,6 +384,32 @@ public class GlobalExceptionHandler {
         return Mono.just(new ResponseEntity<>(errorDetails, HttpStatus.SERVICE_UNAVAILABLE));
     }
 
+    // NEW: Handler for Keycloak brokering errors
+    @ExceptionHandler(KeycloakBrokeringException.class)
+    public ResponseEntity<Map<String, Object>> handleKeycloakBrokeringException(KeycloakBrokeringException ex) {
+        log.error("Keycloak brokering error: {}", ex.getMessage(), ex);
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now());
+        errorDetails.put("status", HttpStatus.BAD_GATEWAY.value()); // Or INTERNAL_SERVER_ERROR
+        errorDetails.put("error", "Keycloak Brokering Error");
+        errorDetails.put("message", "Failed to authenticate with identity provider via Keycloak: " + ex.getMessage());
+        errorDetails.put("path", "");
+        return new ResponseEntity<>(errorDetails, HttpStatus.BAD_GATEWAY);
+    }
+
+    // NEW: Handler for social login processing errors (ID token parsing, user persistence)
+    @ExceptionHandler(SocialLoginProcessingException.class)
+    public ResponseEntity<Map<String, Object>> handleSocialLoginProcessingException(SocialLoginProcessingException ex) {
+        log.error("Social login processing error: {}", ex.getMessage(), ex);
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now());
+        errorDetails.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        errorDetails.put("error", "Social Login Processing Error");
+        errorDetails.put("message", "An error occurred during social login: " + ex.getMessage());
+        errorDetails.put("path", "");
+        return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    
     /**
      * Handles all other unexpected exceptions not caught by more specific handlers.
      * This acts as a fallback to catch any unhandled runtime exceptions.

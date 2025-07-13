@@ -62,5 +62,4 @@ public interface IAdminService {
     
     Mono<UserRepresentation> getUserFromAuthServerByEmail(String email);
     
-    Mono<UserRepresentation> getUserFromAuthServerByPhoneNumber(String phoneNumber);
 }

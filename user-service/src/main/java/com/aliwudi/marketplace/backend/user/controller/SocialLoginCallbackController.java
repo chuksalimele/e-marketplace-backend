@@ -1,12 +1,17 @@
-package com.aliwudi.marketplace.backend.auth.controller;
+package com.aliwudi.marketplace.backend.user.controller;
 
-import com.aliwudi.marketplace.backend.user.service.UserService; // Import your UserService
-import com.aliwudi.marketplace.backend.common.model.User; // Import your User model
-import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceException; // If you handle duplicates
-import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException; // If you handle not found
+import com.aliwudi.marketplace.backend.common.constants.IdentifierType;
+import com.aliwudi.marketplace.backend.common.exception.KeycloakBrokeringException;
+import com.aliwudi.marketplace.backend.common.exception.SocialLoginProcessingException;
+import com.aliwudi.marketplace.backend.user.service.UserService;
+import com.aliwudi.marketplace.backend.common.model.User; // Keep if User model is still directly used elsewhere
+import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest; // NEW IMPORT: Your DTO
+import com.aliwudi.marketplace.backend.common.enumeration.ERole;
+import com.aliwudi.marketplace.backend.common.model.Role;
+import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +28,12 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
-import java.time.LocalDateTime; // For setting creation/update times
+import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Objects; // For Objects.requireNonNull
+import java.util.Objects;
+import java.util.Set; // For roles
+import java.util.HashSet; // For roles
+import java.util.UUID; // For generating placeholder password
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,15 +43,16 @@ public class SocialLoginCallbackController {
 
     private final WebClient.Builder webClientBuilder;
     private WebClient webClient;
-    private final UserService userService; // Inject UserService
+    private final UserService userService;
+    private final JwtDecoder jwtDecoder;
 
-    @Value("${auth-server.auth-url}")
+    @Value("${keycloak.auth-server-url}")
     private String keycloakAuthServerUrl;
 
-    @Value("${auth-server.realm}")
+    @Value("${keycloak.realm}")
     private String keycloakRealm;
 
-    @Value("${auth-server.resource}")
+    @Value("${keycloak.resource}")
     private String keycloakClientId;
 
     @Value("${app.social.google.redirect-uri}")
@@ -62,8 +71,8 @@ public class SocialLoginCallbackController {
 
     @GetMapping("/google/callback")
     public Mono<Void> handleGoogleCallback(@RequestParam String code,
-                                           @RequestParam String state,
-                                           ServerWebExchange exchange) {
+            @RequestParam String state,
+            ServerWebExchange exchange) {
         log.info("Received Google callback. Code: {}, State: {}", code, state);
         // TODO: IMPORTANT! Implement robust CSRF state validation here.
 
@@ -73,50 +82,41 @@ public class SocialLoginCallbackController {
                 .uri(tokenExchangeUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("code", code)
-                                 .with("grant_type", "authorization_code")
-                                 .with("redirect_uri", googleCallbackUri)
-                                 .with("client_id", keycloakClientId))
+                        .with("grant_type", "authorization_code")
+                        .with("redirect_uri", googleCallbackUri)
+                        .with("client_id", keycloakClientId))
                 .retrieve()
-                .onStatus(HttpStatus::isError, clientResponse ->
-                    clientResponse.bodyToMono(String.class)
-                                  .flatMap(errorBody -> {
-                                      log.error("Error from Keycloak broker for Google login: Status={}, Body={}",
-                                                clientResponse.statusCode(), errorBody);
-                                      return Mono.error(new RuntimeException("Keycloak brokering failed: " + errorBody));
-                                  })
+                .onStatus(status -> status.isError(), clientResponse
+                        -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> {
+                            log.error("Error from Keycloak broker for Google login: Status={}, Body={}",
+                                    clientResponse.statusCode(), errorBody);
+                            return Mono.error(new KeycloakBrokeringException("Keycloak brokering failed for Google: " + errorBody));
+                        })
                 )
                 .bodyToMono(Map.class)
                 .flatMap(keycloakTokens -> {
                     String accessToken = (String) keycloakTokens.get("access_token");
                     String idToken = (String) keycloakTokens.get("id_token");
-                    String refreshToken = (String) keycloakTokens.get("refresh_token");
 
-                    // --- NEW: Process ID Token and Persist User Data ---
                     return processAndPersistUser(idToken)
-                            .flatMap(persistedUser -> {
+                            .flatMap(persistedUser -> { // Now returns User object from userService
                                 log.info("User {} (ID: {}) successfully processed/persisted after Google login.",
-                                         persistedUser.getEmail(), persistedUser.getId());
+                                        persistedUser.getEmail(), persistedUser.getId());
 
-                                // Now, redirect to frontend with Keycloak tokens
                                 String frontendDeepLink = String.format("%s?access_token=%s&id_token=%s",
-                                                                        frontendRedirectScheme, accessToken, idToken);
+                                        frontendRedirectScheme, accessToken, idToken);
                                 exchange.getResponse().setStatusCode(HttpStatus.FOUND);
                                 exchange.getResponse().getHeaders().setLocation(URI.create(frontendDeepLink));
                                 return Mono.empty();
                             });
-                })
-                .doOnError(e -> log.error("Failed to process Google callback: {}", e.getMessage(), e))
-                .onErrorResume(e -> {
-                    log.error("An error occurred during Google social login: {}", e.getMessage());
-                    exchange.getResponse().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-                    return Mono.empty();
                 });
     }
 
     @GetMapping("/facebook/callback")
     public Mono<Void> handleFacebookCallback(@RequestParam String code,
-                                            @RequestParam String state,
-                                            ServerWebExchange exchange) {
+            @RequestParam String state,
+            ServerWebExchange exchange) {
         log.info("Received Facebook callback. Code: {}, State: {}", code, state);
         // TODO: IMPORTANT! Implement robust CSRF state validation here.
 
@@ -126,104 +126,95 @@ public class SocialLoginCallbackController {
                 .uri(tokenExchangeUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("code", code)
-                                 .with("grant_type", "authorization_code")
-                                 .with("redirect_uri", facebookCallbackUri)
-                                 .with("client_id", keycloakClientId))
+                        .with("grant_type", "authorization_code")
+                        .with("redirect_uri", facebookCallbackUri)
+                        .with("client_id", keycloakClientId))
                 .retrieve()
-                .onStatus(HttpStatus::isError, clientResponse ->
-                    clientResponse.bodyToMono(String.class)
-                                  .flatMap(errorBody -> {
-                                      log.error("Error from Keycloak broker for Facebook login: Status={}, Body={}",
-                                                clientResponse.statusCode(), errorBody);
-                                      return Mono.error(new RuntimeException("Keycloak brokering failed: " + errorBody));
-                                  })
+                .onStatus(status -> status.isError(), clientResponse
+                        -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> {
+                            log.error("Error from Keycloak broker for Facebook login: Status={}, Body={}",
+                                    clientResponse.statusCode(), errorBody);
+                            return Mono.error(new KeycloakBrokeringException("Keycloak brokering failed for Facebook: " + errorBody));
+                        })
                 )
                 .bodyToMono(Map.class)
                 .flatMap(keycloakTokens -> {
                     String accessToken = (String) keycloakTokens.get("access_token");
                     String idToken = (String) keycloakTokens.get("id_token");
-                    String refreshToken = (String) keycloakTokens.get("refresh_token");
 
-                    // --- NEW: Process ID Token and Persist User Data ---
                     return processAndPersistUser(idToken)
-                            .flatMap(persistedUser -> {
+                            .flatMap(persistedUser -> { // Now returns User object from userService
                                 log.info("User {} (ID: {}) successfully processed/persisted after Facebook login.",
-                                         persistedUser.getEmail(), persistedUser.getId());
+                                        persistedUser.getEmail(), persistedUser.getId());
 
-                                // Now, redirect to frontend with Keycloak tokens
                                 String frontendDeepLink = String.format("%s?access_token=%s&id_token=%s",
-                                                                        frontendRedirectScheme, accessToken, idToken);
+                                        frontendRedirectScheme, accessToken, idToken);
                                 exchange.getResponse().setStatusCode(HttpStatus.FOUND);
                                 exchange.getResponse().getHeaders().setLocation(URI.create(frontendDeepLink));
                                 return Mono.empty();
                             });
-                })
-                .doOnError(e -> log.error("Failed to process Facebook callback: {}", e.getMessage(), e))
-                .onErrorResume(e -> {
-                    log.error("An error occurred during Facebook social login: {}", e.getMessage());
-                    exchange.getResponse().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-                    return Mono.empty();
                 });
     }
 
     /**
-     * Parses the Keycloak ID Token, extracts user information,
-     * and either creates a new user or updates an existing one in the backend database.
+     * Parses the Keycloak ID Token using JwtDecoder, extracts user information,
+     * constructs a UserProfileCreateRequest, and then either creates a new user
+     * or updates an existing one in the backend database.
      *
-     * @param idToken The ID Token received from Keycloak.
+     * @param idToken The ID Token string received from Keycloak.
      * @return Mono<User> emitting the persisted User entity.
      */
     private Mono<User> processAndPersistUser(String idToken) {
         return Mono.fromCallable(() -> {
-            // Decode the ID Token (no signature verification needed here as Keycloak already issued it)
-            DecodedJWT jwt = JWT.decode(idToken);
-            String authId = jwt.getSubject(); // Keycloak's user ID (sub claim)
-            String email = jwt.getClaim("email").asString();
-            String firstName = jwt.getClaim("given_name").asString();
-            String lastName = jwt.getClaim("family_name").asString();
-            String fullName = jwt.getClaim("name").asString();
-            // You can extract other claims as needed, e.g., preferred_username, picture, etc.
+            try {
+                Jwt jwt = jwtDecoder.decode(idToken);
+                Map<String, Object> claims = jwt.getClaims();
 
-            log.debug("Decoded ID Token for authId: {}, email: {}", authId, email);
+                String authId = jwt.getSubject();
+                String email = (String) claims.get("email");
+                String firstName = (String) claims.get("given_name");
+                String lastName = (String) claims.get("family_name");
+                String fullName = (String) claims.get("name"); // Used for logging, not directly in DTO
 
-            // Return a DTO or map of claims to pass to userService
-            return new UserClaims(authId, email, firstName, lastName, fullName);
+                log.debug("Decoded ID Token for authId: {}, email: {}", authId, email);
+
+                // Construct UserProfileCreateRequest
+                UserProfileCreateRequest userProfileCreateRequest = new UserProfileCreateRequest();
+                userProfileCreateRequest.setAuthId(authId);
+                userProfileCreateRequest.setEmail(email);
+                userProfileCreateRequest.setFirstName(firstName);
+                userProfileCreateRequest.setLastName(lastName);
+                userProfileCreateRequest.setIdentifierType(IdentifierType.EMAIL); // For social login, email is primary identifier
+                userProfileCreateRequest.setPhoneNumber(""); // Not provided by social login
+                // Set a placeholder password to satisfy @NotBlank on DTO. UserService.createSocialUser will ignore it.
+                userProfileCreateRequest.setPassword(UUID.randomUUID().toString());
+
+                Set<String> roles = new HashSet<>();
+                roles.add(ERole.ROLE_USER.name()); // Assign a default role for social users
+                userProfileCreateRequest.setRoles(roles);
+
+                return userProfileCreateRequest;
+
+            } catch (Exception e) {
+                throw new SocialLoginProcessingException("Failed to decode or parse ID Token with JwtDecoder.", e);
+            }
         })
-        .flatMap(claims -> userService.findByAuthId(claims.authId)
-                .switchIfEmpty(Mono.defer(() -> {
-                    // User does not exist, create a new one
-                    log.info("Creating new user for social login: {}", claims.email);
-                    User newUser = User.builder()
-                                        .primaryIdentifierType("COME BACK")                                        
-                                        .authId(claims.authId)                                      
-                                        .email(claims.email)
-                                        .firstName(claims.firstName)
-                                        .lastName(claims.lastName)
-                                        .username(claims.email) // Or generate a unique username if email is not unique
-                                        .enabled(true)
-                                        .emailVerified(true) // Assuming social provider verifies email which is very likely                                    
-                                        .registrationDate(LocalDateTime.now())
-                                        .lastLogin(LocalDateTime.now())
-                                        .build();
-                    // Call a service method to save the new user
-                    // This method needs to be added/modified in your UserService
-                    return userService.createSocialUser(newUser); // This method should also handle assigning default roles
-                }))
+                .flatMap(userProfileCreateRequest
+                        -> userService.findByAuthId(userProfileCreateRequest.getAuthId())
+                        .switchIfEmpty(Mono.defer(() -> {
+                            log.info("Creating new social user: {}", userProfileCreateRequest.getEmail());
+                            // Call the new createSocialUser method in UserService
+                            return userService.createUser(userProfileCreateRequest);
+                        })))
                 .flatMap(existingUser -> {
-                    // User exists, potentially update last login time or other details
                     log.info("User {} already exists. Updating last login time.", existingUser.getEmail());
-                    existingUser.setLastLogin(LocalDateTime.now());
-                    // You might want to update other fields here if they can change in the social provider
-                    // e.g., existingUser.setFirstName(claims.firstName);
-                    return userService.updateUser(existingUser); // This method should save changes
+                    existingUser.setLastLoginAt(LocalDateTime.now());
+                    return userService.updateUserOnDB(existingUser);
                 })
                 .onErrorResume(e -> {
-                    log.error("Error processing or persisting user from ID Token: {}", e.getMessage(), e);
-                    return Mono.error(new RuntimeException("Failed to process social user data.", e));
-                })
-        );
+                    log.error("Error during user persistence after social login: {}", e.getMessage(), e);
+                    return Mono.error(new SocialLoginProcessingException("Failed to persist user data after social login.", e));
+                });
     }
-
-    // Helper class to hold parsed claims for easier passing
-    private record UserClaims(String authId, String email, String firstName, String lastName, String fullName) {}
 }

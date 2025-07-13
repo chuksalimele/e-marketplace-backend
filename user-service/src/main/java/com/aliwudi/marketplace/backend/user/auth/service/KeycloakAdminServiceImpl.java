@@ -40,16 +40,16 @@ import java.util.stream.Collectors;
 public class KeycloakAdminServiceImpl implements IAdminService { // Implements the generic interface
 
     
-    @Value("${auth-server.admin.url}") // Using new generic config property
+    @Value("${keycloak.admin.url}") // Using new generic config property
     private String authServerAdminUrl;
-    @Value("${auth-server.admin.realm}") // Using new generic config property
+    @Value("${keycloak.admin.realm}") // Using new generic config property
     private String authServerAdminRealm;
-    @Value("${auth-server.admin.client-id}") // Using new generic config property
+    @Value("${keycloak.admin.client-id}") // Using new generic config property
     private String authServerAdminClientId;
-    @Value("${auth-server.admin.client-secret}") // Using new generic config property
+    @Value("${keycloak.admin.client-secret}") // Using new generic config property
     private String authServerAdminClientSecret;
 
-    @Value("${auth-server.realm}") // Existing realm for user data
+    @Value("${keycloak.realm}") // Existing realm for user data
     private String userAuthRealm; // Renamed for generic context
 
     private final Map<String, Keycloak> authServerClientCache = new ConcurrentHashMap<>(); // Generic name
@@ -117,8 +117,15 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
             keycloakUser.setEnabled(true);
             keycloakUser.setUsername(keycloakUsername); // Set the dynamic username
             keycloakUser.setEmail(user.getEmail()); // Always set email if available
-            keycloakUser.setFirstName(user.getFirstName());
-            keycloakUser.setLastName(user.getLastName());            
+            
+            // the given_name 
+            // but we will still create the firstName attribute below for consistentcy
+            keycloakUser.setFirstName(user.getFirstName()); 
+            
+            // the family_name 
+            // but we will still create the lastName attribute below for consistentcy       
+            keycloakUser.setLastName(user.getLastName());   
+            
             keycloakUser.setEmailVerified(false);
 
             // Set password
@@ -135,6 +142,10 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
 
             Map<String, List<String>> customAttributes = new HashMap<>();
             customAttributes.put(userId.name(), Collections.singletonList(String.valueOf(user.getId())));
+            //for consistency set the firstName attribute - we know is same as given_name
+            customAttributes.put(firstName.name(), Collections.singletonList(String.valueOf(user.getFirstName())));
+            //for consistency set the lastName attribute - we know is same as family_name
+            customAttributes.put(lastName.name(), Collections.singletonList(String.valueOf(user.getLastName())));
             customAttributes.put(primaryIdentifierType.name(), Collections.singletonList(user.getPrimaryIdentifierType()));
             customAttributes.put(phone.name(), Collections.singletonList(String.valueOf(user.getPhoneNumber())));
             customAttributes.put(phoneVerified.name(), Collections.singletonList(String.valueOf(user.isPhoneVerified())));
@@ -282,37 +293,6 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                 return users.get(0);
             } else {
                 log.warn("User with email '{}' not found in realm '{}'.", email, userAuthRealm);
-                return null;
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    /**
-     * Retrieves a user from the Authorization Server (Keycloak) by their phone number.
-     * This method searches users by a custom attribute "phoneNumber".
-     *
-     * @param phoneNumber The phone number of the user.
-     * @return A Mono emitting the UserRepresentation, or empty if not found.
-     */
-    @Override
-    public Mono<UserRepresentation> getUserFromAuthServerByPhoneNumber(String phoneNumber) {
-        return Mono.fromCallable(() -> {
-            Keycloak keycloak = getAuthServerClient();
-            // Keycloak's search method does not directly support searching by custom attributes.
-            // We fetch a limited batch of users and filter client-side.
-            // For very large user bases, this approach might be inefficient.
-            //COME BACK - ABEG O. SEE COMMENT DIRECTLY ABOVE
-            Optional<UserRepresentation> user = keycloak.realm(userAuthRealm).users().search(null, 0, 1000) // Fetch up to 1000 users
-                    .stream()
-                    .filter(u -> u.getAttributes() != null && u.getAttributes().containsKey("phoneNumber") &&
-                                 u.getAttributes().get("phoneNumber").contains(phoneNumber))
-                    .findFirst();
-
-            if (user.isPresent()) {
-                log.debug("Found user by phone number '{}' in realm '{}'.", phoneNumber, userAuthRealm);
-                return user.get();
-            } else {
-                log.warn("User with phone number '{}' not found in realm '{}'.", phoneNumber, userAuthRealm);
                 return null;
             }
         }).subscribeOn(Schedulers.boundedElastic());

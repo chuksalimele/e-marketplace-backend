@@ -33,8 +33,8 @@ spring:
       resourceserver:
         jwt:
           # This issuer-uri is good for matching the 'iss' claim in the JWT.
-          # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.
-          issuer-uri: https://localhost:8443 # Replace with your Auth Server's actual issuer URI
+          # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.          
+          issuer-uri: https://localhost:8443/realms/chuks-emaketplace-realm # Should match the 'iss' claim in the JWT
 
           # THIS IS CRUCIAL FOR SIGNATURE VERIFICATION.
           # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
@@ -63,8 +63,8 @@ spring:
       timeout: 5s # Connection timeout
       database: 0 # Redis database index (default is 0)
 
-# Keycloak/Authorization Server Configuration
-auth-server:
+# Keycloak Authorization Server Configuration
+keycloak:
   url: https://localhost:8443 # Your Authorization Server URL (e.g., Keycloak URL)
   auth-url: http://localhost:8443/auth
   realm: chuks-emaketplace-realm # The realm where your application users reside

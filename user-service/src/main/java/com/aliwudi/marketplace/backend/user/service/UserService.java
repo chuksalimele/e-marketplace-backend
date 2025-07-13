@@ -1,6 +1,7 @@
 package com.aliwudi.marketplace.backend.user.service;
 
 import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.LOGIN;
+import static com.aliwudi.marketplace.backend.common.constants.ApiConstants.USER_CONTROLLER_BASE;
 import static com.aliwudi.marketplace.backend.common.constants.EventType.USER_REGISTER;
 import com.aliwudi.marketplace.backend.common.constants.IdentifierType;
 import com.aliwudi.marketplace.backend.user.repository.UserRepository;
@@ -12,7 +13,7 @@ import com.aliwudi.marketplace.backend.common.exception.DuplicateResourceExcepti
 import com.aliwudi.marketplace.backend.common.exception.RoleNotFoundException;
 import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; // New import
 import com.aliwudi.marketplace.backend.common.exception.OtpValidationException; // New import
-import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for auth-server user not found
+import com.aliwudi.marketplace.backend.common.exception.UserNotFoundException; // New import for  user not found
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,11 @@ public class UserService {
     @Value("${app.host}")
     private String appHost;
 
+    private String getLoginPath() {
+        return appHost + USER_CONTROLLER_BASE + LOGIN;
+    }
+
+    
     /**
      * Initiates the password reset process by publishing an event to the
      * notification service. This method generates a temporary token and
@@ -330,7 +336,7 @@ public class UserService {
                                                     // Local DB update succeeded, now publish event
                                                     if (USER_REGISTER.equals(purpose)) {
                                                         log.info("Email verification purpose is USER_REGISTER for primary identifier user {}. Sending onboarding email.", authServerUserId);
-                                                        String loginUrl = appHost + LOGIN; // Replace with your actual login URL
+                                                        String loginUrl = getLoginPath(); // Replace with your actual login URL
                                                         return notificationEventPublisherService.publishUserRegisteredEvent(
                                                                 user.getPrimaryIdentifierType(),
                                                                 String.valueOf(user.getId()),
@@ -398,7 +404,7 @@ public class UserService {
                                                     // Local DB update succeeded, now publish event
                                                     if (USER_REGISTER.equals(purpose)) {
                                                         log.info("Phone verification purpose is USER_REGISTER for primary identifier user {}. Sending onboarding phone.", authServerUserId);
-                                                        String loginUrl = appHost + LOGIN; // Replace with your actual login URL
+                                                        String loginUrl = getLoginPath(); // Replace with your actual login URL
                                                         return notificationEventPublisherService.publishUserRegisteredEvent(
                                                                 user.getPrimaryIdentifierType(),
                                                                 String.valueOf(user.getId()),
@@ -776,6 +782,23 @@ public class UserService {
     }
 
     /**
+     * The method is used only if the attributes of the user changed
+     * is does not exist in the authorization server to avoid data inconsistentcy
+     * accross the local db and the authorization server
+     * 
+     * e.g lastLoginAt (login time) does not exist at the authorizaton server so 
+     * the method can be used to update it
+     * 
+     * @param user
+     * @return 
+     */
+    public Mono<User> updateUserOnDB(User user) {
+        return userRepository.save(user)
+               .doOnSuccess(_user -> log.debug("User with id {} save successfully", _user.getId()))
+              .doOnError(e -> log.error("Error saving user with  id  {}: {}", user.getId(), e.getMessage(), e));
+    }    
+   
+    /**
      * Deletes a user by their ID. This operation is transactional.
      *
      * @param id The ID of the user to delete.
@@ -915,7 +938,7 @@ public class UserService {
      * @param pageable Pagination information.
      * @return A Flux emitting all users (enriched).
      */
-    public Flux<User> getAllUsers(Pageable pageable) {
+    public Flux<User> getAllUsers(Pageable pageable) {        
         log.debug("Retrieving all users with pagination: {}", pageable);
         return userRepository.findAllBy(pageable)
                 .flatMap(this::prepareDto)
