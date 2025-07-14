@@ -38,6 +38,7 @@ public class User {
     private boolean phoneVerified;
     private String shippingAddress;
     private LocalDateTime lastLoginAt;
+    private LocalDateTime lastLogoutAt;
     
     private boolean enabled;
     

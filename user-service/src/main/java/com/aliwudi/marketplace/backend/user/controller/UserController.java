@@ -14,6 +14,7 @@ import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
 import com.aliwudi.marketplace.backend.user.auth.service.KeycloakSettings;
 import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
+import com.aliwudi.marketplace.backend.user.dto.LogoutRequest;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
@@ -154,12 +155,80 @@ public class UserController {
                      }                    
                 })
                 .flatMap(userId->userService.findById(userId))
-                .flatMap(existingUser -> {
-                    log.info("User {} logging in. Updating last login time.", existingUser.getId());
-                    existingUser.setLastLoginAt(LocalDateTime.now());
-                    return userService.updateUserOnDB(existingUser);
+                .flatMap(user -> {
+                    log.info("User {} logging in. Updating last login time.", user.getId());
+                    user.setLastLoginAt(LocalDateTime.now());
+                    return userService.updateUserOnDB(user);
                 })
                 .doOnError(e -> log.error("Login process error for {}: {}", loginRequest.getUserIdentifier(), e.getMessage(), e));
+    }
+
+    @PostMapping(LOGOUT)
+    @ResponseStatus(HttpStatus.OK)
+    public Mono<Boolean> logout(@Valid @RequestBody LogoutRequest logoutRequest) {
+        log.info("Attempting logout for user (refresh token revocation).");
+
+        String revokeUrl = String.format("%s/realms/%s/protocol/openid-connect/revoke", kcSetting.getUrl(), kcSetting.getRealm());
+
+        // Build the form data for the token revocation request
+        BodyInserters.FormInserter<String> formData = BodyInserters.fromFormData("client_id", kcSetting.getClientId())
+                .with("token", logoutRequest.getRefreshToken())
+                .with("token_type_hint", "refresh_token");
+
+        // Only add client_secret if it's present (for confidential clients)
+        if (kcSetting.getClientSecret() != null && !kcSetting.getClientSecret().isBlank()) {
+            formData = formData.with("client_secret", kcSetting.getClientSecret());
+        }
+
+        return webClient.post()
+                .uri(revokeUrl)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(formData)
+                .retrieve()
+                .onStatus(status->status.isError(), clientResponse -> {
+                    // Keycloak returns 200 even if the token is already invalid/not found,
+                    // but it's good practice to handle potential errors.
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> {
+                                log.error("Keycloak token revocation failed. Status: {}, Response: {}", clientResponse.statusCode(), errorBody);
+                                // Don't throw an error that prevents the user from logging out on client side,
+                                // but log it for debugging.
+                                return Mono.just(new RuntimeException("Token revocation failed: " + errorBody));
+                            });
+                })
+                .bodyToMono(Void.class) // Keycloak returns an empty body on success (200 OK)
+                .then(Mono.defer(() -> {
+                    // After successful token revocation, you might want to record the logout in your DB
+                    // You'll need the user ID to do this. This typically comes from the access token
+                    // or a session managed by your backend. For simplicity here, we'll assume
+                    // you can get the user ID from the refresh token if needed, or that
+                    // recording logout is less critical than token invalidation.
+                    // If you need the userId from the refresh token, you'd need to decode it here.
+                    // For now, let's just log and then call a generic recordLogout.
+
+                    // Decode the refresh token to get the userId for recording logout
+                    try {
+                        Jwt jwt = jwtDecoder.decode(logoutRequest.getRefreshToken());
+                        Map<String, Object> claims = jwt.getClaims();
+                        String userIdString = (String) claims.get(JwtClaims.userId.name());
+                        if (userIdString != null) {
+                            Long userId = Long.valueOf(userIdString);
+                            return userService.findById(userId)
+                                    .flatMap(user -> {
+                                        log.info("User {} logging in. Updating last login time.", user.getId());
+                                        user.setLastLogoutAt(LocalDateTime.now());
+                                        return userService.updateUserOnDB(user);
+                                    }).thenReturn(true);
+
+                        } else {
+                            log.warn("Could not extract userId from refresh token for logout recording.");
+                            return Mono.just(false);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to decode refresh token or record logout: {}", e.getMessage(), e);
+                        return Mono.just(false);
+                    }
+                }));
     }
     
     /**
