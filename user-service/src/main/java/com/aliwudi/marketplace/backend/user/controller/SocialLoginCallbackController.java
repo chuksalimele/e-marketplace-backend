@@ -8,6 +8,7 @@ import com.aliwudi.marketplace.backend.common.model.User; // Keep if User model 
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest; // NEW IMPORT: Your DTO
 import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import com.aliwudi.marketplace.backend.common.model.Role;
+import com.aliwudi.marketplace.backend.user.auth.service.KeycloakSettings;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
 
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -34,6 +35,7 @@ import java.util.Objects;
 import java.util.Set; // For roles
 import java.util.HashSet; // For roles
 import java.util.UUID; // For generating placeholder password
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -42,18 +44,12 @@ import java.util.UUID; // For generating placeholder password
 public class SocialLoginCallbackController {
 
     private final WebClient.Builder webClientBuilder;
+    private final ReactorClientHttpConnector connector;
     private WebClient webClient;
     private final UserService userService;
     private final JwtDecoder jwtDecoder;
 
-    @Value("${keycloak.auth-server-url}")
-    private String keycloakAuthServerUrl;
-
-    @Value("${keycloak.realm}")
-    private String keycloakRealm;
-
-    @Value("${keycloak.resource}")
-    private String keycloakClientId;
+    private final KeycloakSettings kcSetting;
 
     @Value("${app.social.google.redirect-uri}")
     private String googleCallbackUri;
@@ -66,7 +62,10 @@ public class SocialLoginCallbackController {
 
     @jakarta.annotation.PostConstruct
     public void init() {
-        this.webClient = webClientBuilder.baseUrl(keycloakAuthServerUrl).build();
+        this.webClient = webClientBuilder
+                .clientConnector(connector)
+                .baseUrl(kcSetting.getUrl())
+                .build();
     }
 
     @GetMapping("/google/callback")
@@ -76,7 +75,7 @@ public class SocialLoginCallbackController {
         log.info("Received Google callback. Code: {}, State: {}", code, state);
         // TODO: IMPORTANT! Implement robust CSRF state validation here.
 
-        String tokenExchangeUrl = String.format("/realms/%s/broker/google/token", keycloakRealm);
+        String tokenExchangeUrl = String.format("/realms/%s/broker/google/token", kcSetting.getRealm());
 
         return webClient.post()
                 .uri(tokenExchangeUrl)
@@ -84,7 +83,7 @@ public class SocialLoginCallbackController {
                 .body(BodyInserters.fromFormData("code", code)
                         .with("grant_type", "authorization_code")
                         .with("redirect_uri", googleCallbackUri)
-                        .with("client_id", keycloakClientId))
+                        .with("client_id", kcSetting.getClientId()))
                 .retrieve()
                 .onStatus(status -> status.isError(), clientResponse
                         -> clientResponse.bodyToMono(String.class)
@@ -120,7 +119,7 @@ public class SocialLoginCallbackController {
         log.info("Received Facebook callback. Code: {}, State: {}", code, state);
         // TODO: IMPORTANT! Implement robust CSRF state validation here.
 
-        String tokenExchangeUrl = String.format("/realms/%s/broker/facebook/token", keycloakRealm);
+        String tokenExchangeUrl = String.format("/realms/%s/broker/facebook/token", kcSetting.getRealm());
 
         return webClient.post()
                 .uri(tokenExchangeUrl)
@@ -128,7 +127,7 @@ public class SocialLoginCallbackController {
                 .body(BodyInserters.fromFormData("code", code)
                         .with("grant_type", "authorization_code")
                         .with("redirect_uri", facebookCallbackUri)
-                        .with("client_id", keycloakClientId))
+                        .with("client_id", kcSetting.getClientId()))
                 .retrieve()
                 .onStatus(status -> status.isError(), clientResponse
                         -> clientResponse.bodyToMono(String.class)

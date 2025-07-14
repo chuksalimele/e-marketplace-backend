@@ -12,6 +12,7 @@ import com.aliwudi.marketplace.backend.common.exception.EmailSendingException; /
 import com.aliwudi.marketplace.backend.common.response.ApiResponseMessages; // For consistent messages
 import com.aliwudi.marketplace.backend.common.dto.UserProfileCreateRequest;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
+import com.aliwudi.marketplace.backend.user.auth.service.KeycloakSettings;
 import com.aliwudi.marketplace.backend.user.dto.LoginRequest;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
@@ -36,6 +37,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType; // NEW IMPORT
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.reactive.function.BodyInserters; // NEW IMPORT
@@ -57,21 +59,11 @@ public class UserController {
 
     private final UserService userService;
     private final WebClient.Builder webClientBuilder; // Inject WebClient.Builder
-
+    private WebClient webClient;
+    private final ReactorClientHttpConnector connector;
     private final JwtDecoder jwtDecoder;
     
-    @Value("${keycloak.auth-server-url}")
-    private String keycloakAuthServerUrl;
-
-    @Value("${keycloak.realm}")
-    private String keycloakRealm;
-
-    @Value("${keycloak.resource}")
-    private String keycloakClientId;
-
-    // We might need a secret for public clients if using confidential client access later
-    @Value("${keycloak.credentials.secret:}") // @Value with default empty string for optional secret
-    private String keycloakClientSecret;
+    private final KeycloakSettings kcSetting;
     
     // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
     @Data
@@ -88,6 +80,13 @@ public class UserController {
     }
     // --- END NEW DTOs ---
 
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        this.webClient = webClientBuilder
+                .clientConnector(connector)
+                .baseUrl(kcSetting.getUrl())
+                .build();
+    }    
     /**
      * Endpoint for user login using username/email and password.
      * Authenticates directly against Keycloak's token endpoint.
@@ -95,25 +94,25 @@ public class UserController {
      * @param loginRequest DTO containing username/email and password.
      * @return Mono<ResponseEntity<Map<String, Object>>> containing Keycloak tokens.
      */
-    @PostMapping(LOGIN) // Or AUTH_LOGIN if defined in ApiConstants
+    @PostMapping(LOGIN)
     @ResponseStatus(HttpStatus.OK)
     public Mono<User> login(@Valid @RequestBody LoginRequest loginRequest) {
         log.info("Attempting login for user: {}", loginRequest.getUserIdentifier());
 
-        String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakAuthServerUrl, keycloakRealm);
+        String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", kcSetting.getUrl(), kcSetting.getRealm());
 
         // Build the form data for the token request
         BodyInserters.FormInserter<String> formData = BodyInserters.fromFormData("grant_type", "password")
-                .with("client_id", keycloakClientId)
+                .with("client_id", kcSetting.getClientId())
                 .with("username", loginRequest.getUserIdentifier())
                 .with("password", loginRequest.getPassword());
 
         // Only add client_secret if it's present (for confidential clients)
-        if (keycloakClientSecret != null && !keycloakClientSecret.isBlank()) {
-            formData = formData.with("client_secret", keycloakClientSecret);
+        if (kcSetting.getClientSecret() != null && !kcSetting.getClientSecret().isBlank()) {
+            formData = formData.with("client_secret", kcSetting.getClientSecret());
         }
 
-        return webClientBuilder.build().post()
+        return webClient.post()
                 .uri(tokenUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(formData)

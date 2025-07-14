@@ -32,7 +32,7 @@ import io.netty.handler.ssl.SslContext; // Explicit Netty SslContext import
  * Truststore path and password are now loaded from simplified application properties (e.g., 'truststore.path').
  */
 @Configuration
-public class JwkSetClientConfig {
+public class WebClientConfig {
 
     // Injected from application.properties or application.yml using simplified keys
     @Value("${truststore.path}")
@@ -41,14 +41,8 @@ public class JwkSetClientConfig {
     @Value("${truststore.password}")
     private String truststorePassword;
 
-    /**
-     * Defines a specific WebClient instance that uses the manually configured truststore.
-     * This WebClient will be used exclusively for fetching JWK Sets.
-     *
-     * @return A WebClient configured with the manually loaded truststore for trusted connections.
-     */
-    @Bean("jwkSetWebClient")
-    public WebClient jwkSetWebClient() {
+    @Bean
+    public ReactorClientHttpConnector getWebClientConnector(){
         try {
             // 1. Load the KeyStore (truststore) manually using injected path and password
             KeyStore trustStore = KeyStore.getInstance("PKCS12");
@@ -98,9 +92,26 @@ public class JwkSetClientConfig {
             // 6. Create a ReactorClientHttpConnector from this customized HttpClient.
             ReactorClientHttpConnector connector = new ReactorClientHttpConnector(httpClient);
 
-            // 7. Build a WebClient instance using this specific connector.
+            return connector;
+
+        } catch (Exception e) {
+            System.err.println("Error creating ReactorClientHttpConnector with  SSL trust: " + e.getMessage());
+            throw new RuntimeException("Failed to configure ReactorClientHttpConnector due to SSL error", e);
+        }
+    }
+    
+    /**
+     * Defines a specific WebClient instance that uses the manually configured truststore.
+     * This WebClient will be used exclusively for fetching JWK Sets.
+     *
+     * @return A WebClient configured with the manually loaded truststore for trusted connections.
+     */
+    @Bean("jwkSetWebClient")
+    public WebClient jwkSetWebClient() {
+        try {
+
             return WebClient.builder()
-                    .clientConnector(connector)
+                    .clientConnector(getWebClientConnector())
                     .build();
 
         } catch (Exception e) {

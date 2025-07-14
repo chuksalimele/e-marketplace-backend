@@ -66,29 +66,22 @@ spring:
 # Keycloak Authorization Server Configuration
 keycloak:
   url: https://localhost:8443 # Your Authorization Server URL (e.g., Keycloak URL)
-  auth-url: http://localhost:8443/auth
   realm: chuks-emaketplace-realm # The realm where your application users reside
-  resource: your-spring-boot-client-id # The client ID of your Spring Boot app in Keycloak
+  resource: user-service-admin-client # The client ID of your Spring Boot app in Keycloak
+  client-secret: QoXJCjOidqPhICRGYwLu8hybte8OOnyw
+  username: admin
+  password: admin
   
   # Configuration for the backend service to call Authorization Server Admin API
   admin:
     url: https://localhost:8443 # Authorization Server Admin URL (e.g., Keycloak Admin URL)
     realm: master # Realm where your admin client (e.g., admin-cli or a custom client for this service) resides
     client-id: admin-cli # The client ID this service will use to get an admin token
-    client-secret: YOUR_KEYCLOAK_ADMIN_CLI_SECRET # The secret for the admin-cli or your custom admin client.
+    client-secret: BCNIMVMNgZ6Q8oe0DmHxfHopERJsf7MS # The secret for the admin-cli or your custom admin client.
                                                   # IMPORTANT: For 'admin-cli', you might need to enable 'Service Accounts Enabled'
                                                   # and get the secret from the 'Credentials' tab.
                                                   # For production, create a dedicated confidential client for this service
                                                   # with 'Service Accounts Enabled' and appropriate realm-management roles.
-
-# Removed redundant Keycloak admin properties for clarity and consolidation:
-# admin-cli-client-id: admin-cli
-# admin-username: admin
-# admin-password: admin
-# admin-auth-server-url: https://localhost:8443
-# admin-realm: chuks-emaketplace-realm
-# admin-service-client-id: user-service-admin-client
-# admin-service-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET
 
 
 eureka:
