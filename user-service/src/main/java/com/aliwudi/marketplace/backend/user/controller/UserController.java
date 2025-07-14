@@ -18,6 +18,7 @@ import com.aliwudi.marketplace.backend.user.dto.LogoutRequest;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.EmailVerificationService;
 // REMOVED: import com.aliwudi.marketplace.backend.user.auth.service.IAdminService;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
+import static com.aliwudi.marketplace.backend.user.enumeration.KeycloakFormParams.*;
 
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.Valid;
@@ -50,8 +51,7 @@ NOTE: In order to align with industry best practices we have removed
       authentication service implementation (jwt encoding, decoding e.t.c)
       from user-service microservice. Authentication is now solely done
       by authorization server (e.g keycloak)
-*/
-
+ */
 @Slf4j
 @RestController
 @RequestMapping(USER_CONTROLLER_BASE) // MODIFIED: Using constant for base path
@@ -63,19 +63,21 @@ public class UserController {
     private WebClient webClient;
     private final ReactorClientHttpConnector connector;
     private final JwtDecoder jwtDecoder;
-    
+
     private final KeycloakSettings kcSetting;
-    
+
     // --- NEW: Request DTOs (Data Transfer Objects) for Email Verification ---
     @Data
     public static class VerificationRequest {
+
         private String authServerUserId; // Authorization Server ID of the user
-        private String purpose; 
+        private String purpose;
         private String code;
     }
 
     @Data
-    public static class ResendVerificationCodeRequest {        
+    public static class ResendVerificationCodeRequest {
+
         private String authServerUserId;
         private String purpose;
     }
@@ -87,13 +89,15 @@ public class UserController {
                 .clientConnector(connector)
                 .baseUrl(kcSetting.getUrl())
                 .build();
-    }    
+    }
+
     /**
-     * Endpoint for user login using username/email and password.
-     * Authenticates directly against Keycloak's token endpoint.
+     * Endpoint for user login using username/email and password. Authenticates
+     * directly against Keycloak's token endpoint.
      *
      * @param loginRequest DTO containing username/email and password.
-     * @return Mono<ResponseEntity<Map<String, Object>>> containing Keycloak tokens.
+     * @return Mono<ResponseEntity<Map<String, Object>>> containing Keycloak
+     * tokens.
      */
     @PostMapping(LOGIN)
     @ResponseStatus(HttpStatus.OK)
@@ -103,10 +107,11 @@ public class UserController {
         String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", kcSetting.getUrl(), kcSetting.getRealm());
 
         // Build the form data for the token request
-        BodyInserters.FormInserter<String> formData = BodyInserters.fromFormData("grant_type", "password")
-                .with("client_id", kcSetting.getClientId())
-                .with("username", loginRequest.getUserIdentifier())
-                .with("password", loginRequest.getPassword());
+        BodyInserters.FormInserter<String> formData = BodyInserters
+                .fromFormData(GRANT_TYPE.name(), PASSWORD.name())
+                .with(CLIENT_ID.name(), kcSetting.getClientId())
+                .with(USERNAME.name(), loginRequest.getUserIdentifier())
+                .with(PASSWORD.name(), loginRequest.getPassword());
 
         // Only add client_secret if it's present (for confidential clients)
         if (kcSetting.getClientSecret() != null && !kcSetting.getClientSecret().isBlank()) {
@@ -118,17 +123,17 @@ public class UserController {
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(formData)
                 .retrieve()
-                .onStatus(status-> status.is4xxClientError(), clientResponse ->
-                        clientResponse.bodyToMono(Map.class)
-                                .flatMap(errorBody -> {
-                                    String errorMessage = (String) errorBody.getOrDefault("error_description", "Authentication failed");
-                                    log.warn("Keycloak login failed for user {}: {}", loginRequest.getUserIdentifier(), errorMessage);
-                                    // You can create a more specific exception if needed
-                                    return Mono.error(new IllegalArgumentException("Login failed: " + errorMessage));
-                                })
+                .onStatus(status -> status.is4xxClientError(), clientResponse
+                        -> clientResponse.bodyToMono(Map.class)
+                        .flatMap(errorBody -> {
+                            String errorMessage = (String) errorBody.getOrDefault("error_description", "Authentication failed");
+                            log.warn("Keycloak login failed for user {}: {}", loginRequest.getUserIdentifier(), errorMessage);
+                            // You can create a more specific exception if needed
+                            return Mono.error(new IllegalArgumentException("Login failed: " + errorMessage));
+                        })
                 )
-                .onStatus(status->status.is5xxServerError(), clientResponse ->
-                        Mono.error(new RuntimeException("Keycloak server error during login for user: " + loginRequest.getUserIdentifier()))
+                .onStatus(status -> status.is5xxServerError(), clientResponse
+                        -> Mono.error(new RuntimeException("Keycloak server error during login for user: " + loginRequest.getUserIdentifier()))
                 )
                 .bodyToMono(Map.class) // Keycloak returns a map of tokens
                 .flatMap(keycloakTokens -> {
@@ -137,24 +142,22 @@ public class UserController {
                     // Optionally, update the user's last login time in your backend DB
                     String accessToken = (String) keycloakTokens.get("access_token");
 
-                    
                     // Decode access token to get 'sub' (authId) for updating last login
                     // This requires JwtDecoder to be available in UserController or passed to UserService
                     // For now, let's just use the username to update last login if the User model has username
                     // or you can retrieve the authId from an ID token if present.
-                    
                     // Extract userId from access_token
-                     try {
-                         Jwt jwt = jwtDecoder.decode(accessToken); // Requires JwtDecoder in UserController or passed to UserService
-                         Map<String, Object> claims = jwt.getClaims();
-                         //String authId = jwt.getSubject();
-                         String userId = (String) claims.get(JwtClaims.userId.name());
-                         return Mono.just(Long.valueOf(userId));
-                     } catch (Exception e) {                                             
-                         return Mono.error(new RuntimeException("Could not decode access token to update last login: " + e.getMessage()));                        
-                     }                    
+                    try {
+                        Jwt jwt = jwtDecoder.decode(accessToken); // Requires JwtDecoder in UserController or passed to UserService
+                        Map<String, Object> claims = jwt.getClaims();
+                        //String authId = jwt.getSubject();
+                        String userId = (String) claims.get(JwtClaims.userId.name());
+                        return Mono.just(Long.valueOf(userId));
+                    } catch (Exception e) {
+                        return Mono.error(new RuntimeException("Could not decode access token to update last login: " + e.getMessage()));
+                    }
                 })
-                .flatMap(userId->userService.findById(userId))
+                .flatMap(userId -> userService.findById(userId))
                 .flatMap(user -> {
                     log.info("User {} logging in. Updating last login time.", user.getId());
                     user.setLastLoginAt(LocalDateTime.now());
@@ -171,9 +174,10 @@ public class UserController {
         String revokeUrl = String.format("%s/realms/%s/protocol/openid-connect/revoke", kcSetting.getUrl(), kcSetting.getRealm());
 
         // Build the form data for the token revocation request
-        BodyInserters.FormInserter<String> formData = BodyInserters.fromFormData("client_id", kcSetting.getClientId())
-                .with("token", logoutRequest.getRefreshToken())
-                .with("token_type_hint", "refresh_token");
+        BodyInserters.FormInserter<String> formData = BodyInserters
+                .fromFormData(CLIENT_ID.name(), kcSetting.getClientId())
+                .with(TOKEN.name(), logoutRequest.getRefreshToken())
+                .with(TOKEN_TYPE_HINT.name(), REFRESH_TOKEN.name());
 
         // Only add client_secret if it's present (for confidential clients)
         if (kcSetting.getClientSecret() != null && !kcSetting.getClientSecret().isBlank()) {
@@ -185,7 +189,7 @@ public class UserController {
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(formData)
                 .retrieve()
-                .onStatus(status->status.isError(), clientResponse -> {
+                .onStatus(status -> status.isError(), clientResponse -> {
                     // Keycloak returns 200 even if the token is already invalid/not found,
                     // but it's good practice to handle potential errors.
                     return clientResponse.bodyToMono(String.class)
@@ -230,19 +234,23 @@ public class UserController {
                     }
                 }));
     }
-    
+
     /**
-     * Creates a new user profile in the backend database and registers the user in Authorization Server.
-     * This method now implements the "backend-first" hybrid registration approach.
-     * This endpoint is typically called by the frontend (mobile/web) for user self-registration.
-     * It now also initiates email verification immediately after successful user creation.
+     * Creates a new user profile in the backend database and registers the user
+     * in Authorization Server. This method now implements the "backend-first"
+     * hybrid registration approach. This endpoint is typically called by the
+     * frontend (mobile/web) for user self-registration. It now also initiates
+     * email verification immediately after successful user creation.
      *
-     * @param request The UserProfileCreateRequest containing user details including password.
+     * @param request The UserProfileCreateRequest containing user details
+     * including password.
      * @return A Mono emitting the created User object.
-     * @throws DuplicateResourceException if a user with the given email or phoneNumber already exists.
+     * @throws DuplicateResourceException if a user with the given email or
+     * phoneNumber already exists.
      * @throws RoleNotFoundException if a specified role does not exist.
      * @throws IllegalArgumentException if input is invalid.
-     * @throws EmailSendingException if the initial verification email fails to send.
+     * @throws EmailSendingException if the initial verification email fails to
+     * send.
      */
     @PostMapping(USER_PROFILES_CREATE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -252,9 +260,9 @@ public class UserController {
     public Mono<User> createUser(@Valid @RequestBody UserProfileCreateRequest request) {
 
         // Basic validation for critical fields (can be enhanced with @Validated groups if desired)
-        if (request.getEmail() == null || request.getEmail().isBlank() ||
-            request.getPassword() == null || request.getPassword().isBlank()) {
-            return Mono.error(new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST));                                    
+        if (request.getEmail() == null || request.getEmail().isBlank()
+                || request.getPassword() == null || request.getPassword().isBlank()) {
+            return Mono.error(new IllegalArgumentException(ApiResponseMessages.INVALID_USER_CREATION_REQUEST));
         }
 
         // The UserService.createUser now handles the entire backend DB save, Authorization Server registration,
@@ -264,74 +272,80 @@ public class UserController {
     }
 
     /**
-     * Endpoint to verify an email using an OTP.
-     * This endpoint is typically called by the frontend after the user enters the OTP.
+     * Endpoint to verify an email using an OTP. This endpoint is typically
+     * called by the frontend after the user enters the OTP.
      *
-     * @param request The VerificationRequest containing authServerUserId and the OTP code.
+     * @param request The VerificationRequest containing authServerUserId and
+     * the OTP code.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(SMS_VERIFICATION_VERIFY_OTP) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Boolean> verifySms(@RequestBody VerificationRequest request) {  
+    public Mono<Boolean> verifySms(@RequestBody VerificationRequest request) {
         return verifyPhoneNumber(request);
         // Exceptions are handled by GlobalExceptionHandler.
     }
+
     /**
-     * Endpoint to verify an email using an OTP.
-     * This endpoint is typically called by the frontend after the user enters the OTP.
+     * Endpoint to verify an email using an OTP. This endpoint is typically
+     * called by the frontend after the user enters the OTP.
      *
-     * @param request The VerificationRequest containing authServerUserId and the OTP code.
+     * @param request The VerificationRequest containing authServerUserId and
+     * the OTP code.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(PHONE_CALL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Boolean> verifyPhoneCall(@RequestBody VerificationRequest request) {  
+    public Mono<Boolean> verifyPhoneCall(@RequestBody VerificationRequest request) {
         return verifyPhoneNumber(request);
         // Exceptions are handled by GlobalExceptionHandler.
     }
-    
+
     public Mono<Boolean> verifyPhoneNumber(@RequestBody VerificationRequest request) {
         if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
-            return Mono.error(new IllegalArgumentException("Verification Code is required."));                        
+            return Mono.error(new IllegalArgumentException("Verification Code is required."));
         }
         if (request.getCode() == null || request.getCode().isBlank()) {
             return Mono.error(new IllegalArgumentException("Verification Code is required."));
         }
-        if (request.getPurpose()== null || request.getPurpose().isBlank()) {
+        if (request.getPurpose() == null || request.getPurpose().isBlank()) {
             return Mono.error(new IllegalArgumentException("Verification purpose is required."));
-        }        
+        }
         return userService.verifyPhoneOtp(request.getAuthServerUserId(), request.getCode(), request.getPurpose());
         // Exceptions are handled by GlobalExceptionHandler.
     }
-    
+
     /**
-     * Endpoint to verify an email using an OTP.
-     * This endpoint is typically called by the frontend after the user enters the OTP.
+     * Endpoint to verify an email using an OTP. This endpoint is typically
+     * called by the frontend after the user enters the OTP.
      *
-     * @param request The VerificationRequest containing authServerUserId and the OTP code.
+     * @param request The VerificationRequest containing authServerUserId and
+     * the OTP code.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(EMAIL_VERIFICATION_VERIFY_OTP) // NEW Endpoint
     @ResponseStatus(HttpStatus.OK)
     public Mono<Boolean> verifyEmail(@RequestBody VerificationRequest request) {
         if (request.getAuthServerUserId() == null || request.getAuthServerUserId().isBlank()) {
-            return Mono.error(new IllegalArgumentException("Verification Code is required."));                        
+            return Mono.error(new IllegalArgumentException("Verification Code is required."));
         }
         if (request.getCode() == null || request.getCode().isBlank()) {
             return Mono.error(new IllegalArgumentException("Verification Code is required."));
         }
-        if (request.getPurpose()== null || request.getPurpose().isBlank()) {
+        if (request.getPurpose() == null || request.getPurpose().isBlank()) {
             return Mono.error(new IllegalArgumentException("Verification purpose is required."));
-        }        
+        }
         return userService.verifyEmailOtp(request.getAuthServerUserId(), request.getCode(), request.getPurpose());
         // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
-     * Endpoint to resend an email verification code (OTP).
-     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     * Endpoint to resend an email verification code (OTP). This endpoint is
+     * typically called by the frontend if the user didn't receive the first
+     * OTP.
      *
-     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @param request The ResendVerificationCodeRequest containing the
+     * authServerUserId.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(EMAIL_VERIFICATION_RESEND_CODE) // NEW Endpoint
@@ -342,13 +356,16 @@ public class UserController {
         }
 
         return userService.resendEmailVerificationCode(request.getAuthServerUserId());
-            // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
+
     /**
-     * Endpoint to resend an SMS verification code (OTP).
-     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     * Endpoint to resend an SMS verification code (OTP). This endpoint is
+     * typically called by the frontend if the user didn't receive the first
+     * OTP.
      *
-     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @param request The ResendVerificationCodeRequest containing the
+     * authServerUserId.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(SMS_VERIFICATION_RESEND_CODE) // NEW Endpoint
@@ -359,13 +376,16 @@ public class UserController {
         }
 
         return userService.resendSmsVerificationCode(request.getAuthServerUserId());
-            // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
+
     /**
-     * Endpoint to resend an phone call verification code (OTP).
-     * This endpoint is typically called by the frontend if the user didn't receive the first OTP.
+     * Endpoint to resend an phone call verification code (OTP). This endpoint
+     * is typically called by the frontend if the user didn't receive the first
+     * OTP.
      *
-     * @param request The ResendVerificationCodeRequest containing the authServerUserId.
+     * @param request The ResendVerificationCodeRequest containing the
+     * authServerUserId.
      * @return A Mono emitting a success/failure message.
      */
     @PostMapping(PHONE_CALL_VERIFICATION_RESEND_CODE) // NEW Endpoint
@@ -376,13 +396,14 @@ public class UserController {
         }
 
         return userService.resendPhoneCallVerificationCode(request.getAuthServerUserId());
-            // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
      * Retrieves a user by their Authorization Server authorization ID.
      *
-     * @param authId The Authorization Server authorization ID of the user to retrieve.
+     * @param authId The Authorization Server authorization ID of the user to
+     * retrieve.
      * @return A Mono emitting the User object.
      * @throws ResourceNotFoundException if the user is not found.
      * @throws IllegalArgumentException if authId is invalid.
@@ -397,7 +418,7 @@ public class UserController {
         }
         return userService.findByAuthId(authId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(ApiResponseMessages.USER_NOT_FOUND_AUTH_ID + authId)));
-                // Exceptions are handled by GlobalExceptionHandler.
+        // Exceptions are handled by GlobalExceptionHandler.
     }
 
     /**
@@ -418,19 +439,17 @@ public class UserController {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_ID);
         }
         // Basic check for at least one field to update
-        if (userRequest.getFirstName() == null && userRequest.getLastName() == null &&
-            userRequest.getEmail() == null && userRequest.getPhoneNumber() == null &&
-            userRequest.getShippingAddress() == null && userRequest.getRoles() == null) {
+        if (userRequest.getFirstName() == null && userRequest.getLastName() == null
+                && userRequest.getEmail() == null && userRequest.getPhoneNumber() == null
+                && userRequest.getShippingAddress() == null && userRequest.getRoles() == null) {
             throw new IllegalArgumentException(ApiResponseMessages.INVALID_USER_UPDATE_REQUEST);
         }
         return userService.updateUser(id, userRequest);
         // Exceptions are handled by GlobalExceptionHandler.
     }
 
-
     /**
-     * Endpoint to delete a user by their ID.
-     * Accessible only by 'admin'.
+     * Endpoint to delete a user by their ID. Accessible only by 'admin'.
      *
      * @param id The ID of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
@@ -449,17 +468,14 @@ public class UserController {
     }
 
     /**
-     * Endpoint to delete a user by their Auth ID. Accessible
-     * only by 'admin' The method is typically called by
-     * the authorization server (e.g Keycloak) for the purpose
-     * of rollback in the case where an error occurred during
-     * user creation to avoid data inconsistency arising when
-     * an error occurs while creating the corresponding user on
-     * the micro service after creation in the authorization server
-     * or any such related errors that can cause inconsistency
-     * *
-     * @param authId The auth ID (ID at the authorization server e.g Keycloak)
-     * of the user to delete.
+     * Endpoint to delete a user by their Auth ID. Accessible only by 'admin'
+     * The method is typically called by the authorization server (e.g Keycloak)
+     * for the purpose of rollback in the case where an error occurred during
+     * user creation to avoid data inconsistency arising when an error occurs
+     * while creating the corresponding user on the micro service after creation
+     * in the authorization server or any such related errors that can cause
+     * inconsistency * @param authId The auth ID (ID at the authorization server
+     * e.g Keycloak) of the user to delete.
      * @return A Mono<Void> indicating completion (HTTP 204 No Content).
      * @throws IllegalArgumentException if user ID is invalid.
      * @throws ResourceNotFoundException if the user is not found.
@@ -475,10 +491,9 @@ public class UserController {
         // Exceptions are handled by GlobalExceptionHandler.
     }
 
-
     /**
-     * Endpoint to retrieve a user by their ID.
-     * Accessible by 'admin' or the 'user' themselves.
+     * Endpoint to retrieve a user by their ID. Accessible by 'admin' or the
+     * 'user' themselves.
      *
      * @param id The ID of the user to retrieve.
      * @return A Mono emitting the User.
@@ -497,8 +512,8 @@ public class UserController {
     }
 
     /**
-     * Endpoint to retrieve a user by their phoneNumber.
-     * Accessible by 'admin' or for specific public lookups (e.g., phoneNumber availability check).
+     * Endpoint to retrieve a user by their phoneNumber. Accessible by 'admin'
+     * or for specific public lookups (e.g., phoneNumber availability check).
      *
      * @param phoneNumber The phoneNumber of the user.
      * @return A Mono emitting the User.
@@ -517,8 +532,8 @@ public class UserController {
     }
 
     /**
-     * Endpoint to retrieve a user by their email.
-     * Accessible by 'admin' only due to privacy concerns.
+     * Endpoint to retrieve a user by their email. Accessible by 'admin' only
+     * due to privacy concerns.
      *
      * @param email The email of the user.
      * @return A Mono emitting the User.
@@ -537,8 +552,8 @@ public class UserController {
     }
 
     /**
-     * Endpoint to retrieve all users with pagination.
-     * Accessible by 'admin' only.
+     * Endpoint to retrieve all users with pagination. Accessible by 'admin'
+     * only.
      *
      * @param page The page number (0-indexed).
      * @param size The number of items per page.
@@ -565,8 +580,7 @@ public class UserController {
     }
 
     /**
-     * Endpoint to count all users.
-     * Accessible by 'admin' only.
+     * Endpoint to count all users. Accessible by 'admin' only.
      *
      * @return A Mono emitting the total count of users.
      */
@@ -588,7 +602,8 @@ public class UserController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux emitting matching users.
-     * @throws IllegalArgumentException if first name or pagination parameters are invalid.
+     * @throws IllegalArgumentException if first name or pagination parameters
+     * are invalid.
      */
     @GetMapping(USER_ADMIN_BY_FIRST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
@@ -609,8 +624,8 @@ public class UserController {
     }
 
     /**
-     * Counts users by first name (case-insensitive, contains).
-     * Accessible by 'admin'.
+     * Counts users by first name (case-insensitive, contains). Accessible by
+     * 'admin'.
      *
      * @param firstName The first name to search for.
      * @return A Mono emitting the count of matching users.
@@ -637,7 +652,8 @@ public class UserController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux emitting matching users.
-     * @throws IllegalArgumentException if last name or pagination parameters are invalid.
+     * @throws IllegalArgumentException if last name or pagination parameters
+     * are invalid.
      */
     @GetMapping(USER_ADMIN_BY_LAST_NAME) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
@@ -658,8 +674,8 @@ public class UserController {
     }
 
     /**
-     * Counts users by last name (case-insensitive, contains).
-     * Accessible by 'admin'.
+     * Counts users by last name (case-insensitive, contains). Accessible by
+     * 'admin'.
      *
      * @param lastName The last name to search for.
      * @return A Mono emitting the count of matching users.
@@ -677,8 +693,8 @@ public class UserController {
     }
 
     /**
-     * Finds users by phoneNumber or email (case-insensitive, contains) with pagination.
-     * Accessible by 'admin'.
+     * Finds users by phoneNumber or email (case-insensitive, contains) with
+     * pagination. Accessible by 'admin'.
      *
      * @param searchTerm The search term for phoneNumber or email.
      * @param page The page number (0-indexed).
@@ -686,7 +702,8 @@ public class UserController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux emitting matching users.
-     * @throws IllegalArgumentException if search term or pagination parameters are invalid.
+     * @throws IllegalArgumentException if search term or pagination parameters
+     * are invalid.
      */
     @GetMapping(USER_ADMIN_BY_PHONE_NUMBER_OR_EMAIL) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
@@ -726,8 +743,8 @@ public class UserController {
     }
 
     /**
-     * Finds users created after a certain date with pagination.
-     * Accessible by 'admin'.
+     * Finds users created after a certain date with pagination. Accessible by
+     * 'admin'.
      *
      * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @param page The page number (0-indexed).
@@ -735,7 +752,8 @@ public class UserController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux emitting matching users.
-     * @throws IllegalArgumentException if date format or pagination parameters are invalid.
+     * @throws IllegalArgumentException if date format or pagination parameters
+     * are invalid.
      */
     @GetMapping(USER_ADMIN_BY_CREATED_AT_AFTER) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
@@ -762,8 +780,7 @@ public class UserController {
     }
 
     /**
-     * Counts users created after a certain date.
-     * Accessible by 'admin'.
+     * Counts users created after a certain date. Accessible by 'admin'.
      *
      * @param date The cutoff date (ISO 8601 format:WriteHeader-MM-ddTHH:mm:ss).
      * @return A Mono emitting the count of matching users.
@@ -786,8 +803,8 @@ public class UserController {
     }
 
     /**
-     * Finds users with a specific shipping address (case-insensitive, contains) with pagination.
-     * Accessible by 'admin'.
+     * Finds users with a specific shipping address (case-insensitive, contains)
+     * with pagination. Accessible by 'admin'.
      *
      * @param shippingAddress The shipping address to search for.
      * @param page The page number (0-indexed).
@@ -795,7 +812,8 @@ public class UserController {
      * @param sortBy The field to sort by.
      * @param sortDir The sort direction (asc/desc).
      * @return A Flux emitting matching users.
-     * @throws IllegalArgumentException if shipping address or pagination parameters are invalid.
+     * @throws IllegalArgumentException if shipping address or pagination
+     * parameters are invalid.
      */
     @GetMapping(USER_ADMIN_BY_SHIPPING_ADDRESS) // MODIFIED: Using constant for endpoint
     @ResponseStatus(HttpStatus.OK)
@@ -816,8 +834,8 @@ public class UserController {
     }
 
     /**
-     * Counts users with a specific shipping address (case-insensitive, contains).
-     * Accessible by 'admin'.
+     * Counts users with a specific shipping address (case-insensitive,
+     * contains). Accessible by 'admin'.
      *
      * @param shippingAddress The shipping address to search for.
      * @return A Mono emitting the count of matching users.
@@ -833,11 +851,13 @@ public class UserController {
         return userService.countUsersByShippingAddress(shippingAddress);
         // Errors are handled by GlobalExceptionHandler.
     }
-        /**
+
+    /**
      * Checks if a user with the given authorization id exists.
      *
      * @param authId The authId to check.
-     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @return A Mono emitting true if the user exists, false otherwise
+     * (Boolean).
      * @throws IllegalArgumentException if email is invalid.
      */
     @GetMapping(USER_EXISTS_BY_AUTH_ID) // MODIFIED: Using constant for endpoint
@@ -854,7 +874,8 @@ public class UserController {
      * Checks if a user with the given user id exists.
      *
      * @param userId The userId to check.
-     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @return A Mono emitting true if the user exists, false otherwise
+     * (Boolean).
      * @throws IllegalArgumentException if email is invalid.
      */
     @GetMapping(USER_EXISTS_BY_USER_ID) // MODIFIED: Using constant for endpoint
@@ -868,11 +889,12 @@ public class UserController {
     }
 
     /**
-     * Checks if a user with the given email exists.
-     * Can be used for registration forms to check email availability.
+     * Checks if a user with the given email exists. Can be used for
+     * registration forms to check email availability.
      *
      * @param email The email to check.
-     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @return A Mono emitting true if the user exists, false otherwise
+     * (Boolean).
      * @throws IllegalArgumentException if email is invalid.
      */
     @GetMapping(USER_EXISTS_BY_EMAIL) // MODIFIED: Using constant for endpoint
@@ -886,11 +908,12 @@ public class UserController {
     }
 
     /**
-     * Checks if a user with the given phoneNumber exists.
-     * Can be used for registration forms to check phoneNumber availability.
+     * Checks if a user with the given phoneNumber exists. Can be used for
+     * registration forms to check phoneNumber availability.
      *
      * @param phoneNumber The phoneNumber to check.
-     * @return A Mono emitting true if the user exists, false otherwise (Boolean).
+     * @return A Mono emitting true if the user exists, false otherwise
+     * (Boolean).
      * @throws IllegalArgumentException if phoneNumber is invalid.
      */
     @GetMapping(USER_EXISTS_BY_PHONE_NUMBER) // MODIFIED: Using constant for endpoint

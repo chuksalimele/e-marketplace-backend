@@ -10,6 +10,7 @@ import com.aliwudi.marketplace.backend.common.enumeration.ERole;
 import com.aliwudi.marketplace.backend.common.model.Role;
 import com.aliwudi.marketplace.backend.user.auth.service.KeycloakSettings;
 import com.aliwudi.marketplace.backend.user.dto.UserRequest;
+import static com.aliwudi.marketplace.backend.user.enumeration.KeycloakFormParams.*;
 
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -81,9 +82,9 @@ public class SocialLoginCallbackController {
                 .uri(tokenExchangeUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("code", code)
-                        .with("grant_type", "authorization_code")
-                        .with("redirect_uri", googleCallbackUri)
-                        .with("client_id", kcSetting.getClientId()))
+                        .with(GRANT_TYPE.name(), AUTHORIZATION_CODE.name())
+                        .with(REDIRECT_URI.name(), googleCallbackUri)
+                        .with(CLIENT_ID.name(), kcSetting.getClientId()))
                 .retrieve()
                 .onStatus(status -> status.isError(), clientResponse
                         -> clientResponse.bodyToMono(String.class)
@@ -125,9 +126,9 @@ public class SocialLoginCallbackController {
                 .uri(tokenExchangeUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("code", code)
-                        .with("grant_type", "authorization_code")
-                        .with("redirect_uri", facebookCallbackUri)
-                        .with("client_id", kcSetting.getClientId()))
+                        .with(GRANT_TYPE.name(), AUTHORIZATION_CODE.name())
+                        .with(REDIRECT_URI.name(), facebookCallbackUri)
+                        .with(CLIENT_ID.name(), kcSetting.getClientId()))
                 .retrieve()
                 .onStatus(status -> status.isError(), clientResponse
                         -> clientResponse.bodyToMono(String.class)
@@ -206,10 +207,10 @@ public class SocialLoginCallbackController {
                             // Call the new createSocialUser method in UserService
                             return userService.createUser(userProfileCreateRequest);
                         })))
-                .flatMap(existingUser -> {
-                    log.info("User {} already exists. Updating last login time.", existingUser.getEmail());
-                    existingUser.setLastLoginAt(LocalDateTime.now());
-                    return userService.updateUserOnDB(existingUser);
+                .flatMap(user -> {
+                    log.info("User {} logging in. Updating last login time.", user.getEmail());
+                    user.setLastLoginAt(LocalDateTime.now());
+                    return userService.updateUserOnDB(user);
                 })
                 .onErrorResume(e -> {
                     log.error("Error during user persistence after social login: {}", e.getMessage(), e);
