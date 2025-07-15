@@ -34,6 +34,8 @@ subprojects {
     dependencies {
         implementation fileTree(dir: "${rootProject.projectDir}/lib", include: ["**/*.jar"])
         implementation 'org.springframework.boot:spring-boot-starter-amqp'
+        implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.3.0")
+
     }
 
     dependencyManagement {

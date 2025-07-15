@@ -16,7 +16,7 @@ logging:
 
 truststore:
   path: classpath:backend_truststore.p12
-  password: microservicetrustpass@123+@+
+  password: ${truststore.password} # -> microservicetrustpass@123+@+
   
 spring: # ONLY ONE TOP-LEVEL 'spring' KEY
   main:
@@ -31,9 +31,20 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
     redis:
       host: localhost # Or the IP address/hostname of your Redis server if not local
       port: 6379     # Or the port your Redis server is listening on if not default
-      
+      #password:  ${redis.password} # Leave empty if no password, or provide your Redis password      
+  
+  config:
+    import: "vault://secret/aliwudi-marketplace"
+    
   # Spring Cloud Gateway Configuration
   cloud:
+    vault:
+      uri: http://localhost:8200
+      token: root
+      kv:
+        enabled: true
+        backend: secret # Keep this to explicitly state the KV engine mount path
+    
     gateway:
       discovery:
         locator:

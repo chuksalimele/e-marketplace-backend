@@ -3,6 +3,24 @@
 server:
   port: 8761 # Default port for Eureka Server
 
+truststore:
+  path: classpath:backend_truststore.p12
+  password: ${truststore.password} # -> microservicetrustpass@123+@+
+  
+spring:
+  application:
+    name: eureka-server
+  config:
+    import: "vault://secret/aliwudi-marketplace"
+    
+  cloud:
+    vault:
+      uri: http://localhost:8200
+      token: root
+      kv:
+        enabled: true
+        backend: secret # Keep this to explicitly state the KV engine mount path
+           
 logging:
  level:
   org.springframework.security: DEBUG

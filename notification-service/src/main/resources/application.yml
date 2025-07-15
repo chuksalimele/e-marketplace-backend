@@ -11,11 +11,21 @@ logging:
 
 truststore:
   path: classpath:backend_truststore.p12
-  password: microservicetrustpass@123+@+
+  password: ${truststore.password} # -> microservicetrustpass@123+@+
   
 spring:
   application:
     name: notification-service # The unique name of this service, used by Eureka
+  config:
+    import: "vault://secret/aliwudi-marketplace"
+    
+  cloud:
+    vault:
+      uri: http://localhost:8200
+      token: root
+      kv:
+        enabled: true
+        backend: secret # Keep this to explicitly state the KV engine mount path
     
   security:
     oauth2:
@@ -29,51 +39,38 @@ spring:
           # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
-  autoconfigure:
-    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we do not need it
-    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-
+          
 
   # RabbitMQ Connection Details for user-service
   rabbitmq:
     host: localhost # Change if RabbitMQ is on a different host
-  rabbitmq:
     port: 5672
-  rabbitmq:
-    username: guest # TODO
-  rabbitmq:
-    password: guest #TODO
+    # Rabbitmq username and password loaded from Vault
+    username: ${rabbitmq.username} # -> guest # TODO
+    password: ${rabbitmq.password} # -> guest #TODO
+          
+  autoconfigure:
+    # Disable Auto Security Configuration for this microservice if Spring Security is in class path - we do not need it
+    exclude: org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
 
-  # spring.rabbitmq.virtual-host=/ # Uncomment if using a specific virtual host
-  # Spring Mail SMTP Configuration (REQUIRED for SmtpEmailSenderService)
-  # Replace with your actual SMTP server details. For production, use a dedicated email service.
-  #mail:
-  #  host: smtp.gmail.com # Example: smtp.sendgrid.net, email-smtp.us-east-1.amazonaws.com
-  #  port: 587 # Standard for TLS. Use 465 for SSL.
-  #  username: your-email@gmail.com # Your email address for sending
-  #  password: YOUR_EMAIL_APP_PASSWORD # IMPORTANT: Use an app password for Gmail, not your main password. For other providers, use the generated SMTP password.
-  #  properties:
-  #    mail.smtp.auth: true
-  #    mail.smtp.starttls.enable: true # Enable STARTTLS
-  #    mail.smtp.starttls.required: true # Require STARTTLS
-  #  test-connection: true # Test connection on application startup  
   
-  #FOR TESTING - Email Configuration fo local development 
+  # Email Configuration 
   mail:
-    host: localhost
+    host: localhost # Example: smtp.gmail.com, smtp.sendgrid.net, email-smtp.us-east-1.amazonaws.com
     port: 1025
-    username: ""
-    password: ""
+    username: {mail.username}
+    password: {mail.password}
     properties:
-      mail.smtp.auth: false
-      mail.smtp.starttls.enable: false
+      mail.smtp.auth: false # 
+      mail.smtp.starttls.enable: false # Enable STARTTLS
+      mail.smtp.starttls.required: false # Require STARTTLS
     test-connection: true
     
 twilio:
   account:
-    sid: ACa55281758aa4d1730cf023a08dd91213
+    sid: {twilio.account-sid} # -> ACa55281758aa4d1730cf023a08dd91213
   auth:
-    token: f0a468ec9e6bde02de081e61ec7c5bcf
+    token: {twilio.auth-token} # -> f0a468ec9e6bde02de081e61ec7c5bcf
   phone:
     number: +15077347433 # Your Twilio phone number
     

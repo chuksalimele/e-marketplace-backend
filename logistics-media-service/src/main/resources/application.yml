@@ -11,11 +11,21 @@ logging:
 
 truststore:
   path: classpath:backend_truststore.p12
-  password: microservicetrustpass@123+@+
+  password: ${truststore.password} # -> microservicetrustpass@123+@+
   
 spring:
   application:
     name: logistics-media-service # The unique name of this service, used by Eureka
+  config:
+    import: "vault://secret/aliwudi-marketplace"
+    
+  cloud:
+    vault:
+      uri: http://localhost:8200
+      token: root
+      kv:
+        enabled: true
+        backend: secret # Keep this to explicitly state the KV engine mount path
     
   security:
     oauth2:
@@ -29,6 +39,16 @@ spring:
           # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
           # This should point to the JWK Set endpoint of your Authorization Server.
           jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+          
+  # RabbitMQ Connection Details for user-service
+  rabbitmq:
+    host: localhost # Change if RabbitMQ is on a different host
+    port: 5672
+    # Rabbitmq username and password loaded from Vault
+    username: ${rabbitmq.username} # -> guest # TODO
+    password: ${rabbitmq.password} # -> guest #TODO
+
+          
 eureka:
   client:
     service-url:
