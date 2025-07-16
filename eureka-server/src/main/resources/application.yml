@@ -19,7 +19,7 @@ spring:
       token: root
       kv:
         enabled: true
-        backend: secret # Keep this to explicitly state the KV engine mount path
+        
            
 logging:
  level:

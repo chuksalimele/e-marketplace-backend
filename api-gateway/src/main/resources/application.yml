@@ -40,10 +40,10 @@ spring: # ONLY ONE TOP-LEVEL 'spring' KEY
   cloud:
     vault:
       uri: http://localhost:8200
-      token: root
+      token-file: ./vault-token
       kv:
         enabled: true
-        backend: secret # Keep this to explicitly state the KV engine mount path
+        
     
     gateway:
       discovery:
