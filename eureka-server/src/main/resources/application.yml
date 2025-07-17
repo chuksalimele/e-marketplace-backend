@@ -1,37 +1,27 @@
-## YAML Template.
----
-server:
-  port: 8761 # Default port for Eureka Server
+# Server Configuration
+server.port: 8761
 
-truststore:
-  path: classpath:backend_truststore.p12
-  password: ${truststore.password} # -> microservicetrustpass@123+@+
-  
-spring:
-  application:
-    name: eureka-server
-  config:
-    import: "vault://secret/aliwudi-marketplace"
-    
-  cloud:
-    vault:
-      uri: http://localhost:8200
-      token: root
-      kv:
-        enabled: true
-        
-           
-logging:
- level:
-  org.springframework.security: DEBUG
+# Truststore Configuration
+truststore.path: classpath:backend_truststore.p12
+truststore.password: ${truststore.password} # -> microservicetrustpass@123+@+
 
-eureka:
-  instance:
-    hostname: localhost # Hostname of the Eureka server
-    ip-address: 127.0.0.1 # Explicitly force the loopback IP
-    prefer-ip-address: true # Keep this, but it will now use the specified ip-address    
-  client:
-    register-with-eureka: false # Eureka server itself should not register with Eureka
-    fetch-registry: false       # Eureka server should not fetch registry from itself
-    service-url:
-      defaultZone: http://localhost:8761/eureka/ # URL for Eureka client to connect to
+# Spring Application
+spring.application.name: eureka-server
+spring.config.import: vault://secret/aliwudi-marketplace
+
+# Vault Configuration
+spring.cloud.vault.uri: http://localhost:8200
+spring.cloud.vault.token: root
+spring.cloud.vault.kv.enabled: true
+
+# Logging Configuration (REMOVE OR INCREASE LEVEL IN PRODUCTION)
+logging.level.org.springframework.security: DEBUG
+
+# Eureka Server Configuration
+eureka.instance.hostname: localhost
+eureka.instance.ip-address: 127.0.0.1
+eureka.instance.prefer-ip-address: true
+
+eureka.client.register-with-eureka: false
+eureka.client.fetch-registry: false
+eureka.client.service-url.defaultZone: http://localhost:8761/eureka/

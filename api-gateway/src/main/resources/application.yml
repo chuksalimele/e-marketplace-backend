@@ -1,318 +1,231 @@
-## YAML Template.
+## Hybrid YAML-Properties Template
 ---
-server:
-  port: 7000 # Default port for the API Gateway
 
-logging:
-  level:
-    # Set logging levels to INFO for production to avoid excessive logs
-    root: INFO
-    org.springframework.security: DEBUG # In production do not use DEBUG
-    org.springframework.cloud.gateway: DEBUG # In production do not use DEBUG
-    reactor.netty: INFO # Netty specific logs
-    # For debugging, you can temporarily set to DEBUG:
-    # org.springframework.security: DEBUG
-    # org.springframework.cloud.gateway: DEBUG
+# ================================
+# ✅ Basic Server Configuration
+# ================================
+server.port: 7000 # Port on which the API Gateway server runs
 
-truststore:
-  path: classpath:backend_truststore.p12
-  password: ${truststore.password} # -> microservicetrustpass@123+@+
-  
-spring: # ONLY ONE TOP-LEVEL 'spring' KEY
-  main:
-    web-application-type: REACTIVE # Crucial for Spring Cloud Gateway
-  application:
-    name: api-gateway # Name of the API Gateway service for Eureka
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration
-      
-  data:
-    redis:
-      host: localhost # Or the IP address/hostname of your Redis server if not local
-      port: 6379     # Or the port your Redis server is listening on if not default
-      #password:  ${redis.password} # Leave empty if no password, or provide your Redis password      
-  
-  config:
-    import: "vault://secret/aliwudi-marketplace"
-    
-  # Spring Cloud Gateway Configuration
-  cloud:
-    vault:
-      uri: http://localhost:8200
-      token-file: ./vault-token
-      kv:
-        enabled: true
-        
-    
-    gateway:
-      discovery:
-        locator:
-          enabled: true # Enables the DiscoveryClientRouteDefinitionLocator
-          lower-case-service-id: true # Converts service IDs to lowercase for routing
-      httpclient:
-          connect-timeout: 10000 # 10 seconds for connection establishment (adjust as needed)
-          response-timeout: 30s # 30 seconds for the full response (adjust as needed, 's' for seconds, 'ms' for milliseconds)          
-      default-filters:
-        # Deduplicate common response headers (e.g., from multiple services)
-        - name: DedupeResponseHeader
-          args:
-            headers: Vary Access-Control-Allow-Origin
-            strategy: RETAIN_FIRST
-          order: -500 # A very early order
-        # Prevent internal services from setting cookies directly on the client
-        #- name: RemoveResponseHeader
-        #  args:
-        #    name: Set-Cookie
-        #  order: -499 # Run immediately after DedupeResponseHeader
-        # Automatically relays the JWT from the client to downstream services (if using OAuth2TokenRelay filter bean)
-        # This is an alternative/complement to CustomAuthenticationHeaderFilter
-        # - TokenRelay=
-        # Apply rate limiting globally to all routes (unless overridden per route)
-        - name: RequestRateLimiter
-          args:
-            key-resolver: '#{@userKeyResolver}' # Use the user-based resolver defined as a bean
-            # Requires a running Redis instance of Rate Limiter to function
-            redis-rate-limiter.replenishRate: 10 # Number of requests allowed per second
-            redis-rate-limiter.burstCapacity: 20 # Max number of requests allowed in a burst
-            redis-rate-limiter.requestedTokens: 1 # Number of tokens to consume per request
-        # Apply a default Circuit Breaker to all routes (unless overridden per route)
-        #- name: CircuitBreaker
-        #  args:
-        #    name: globalCircuitBreaker # A generic name for the global circuit breaker
-        #    fallbackUri: forward:/fallback # Default fallback endpoint
+# ================================
+# ✅ Logging Configuration
+# ================================
+logging.level.root: INFO # Base logging level
+logging.level.org.springframework.security: DEBUG # Log security-related events (disable in prod)
+logging.level.org.springframework.cloud.gateway: DEBUG # Logs gateway routing (disable in prod)
+logging.level.reactor.netty: INFO # Log level for Netty HTTP client/server
 
-      routes:
-        # Route for 'product-catalog-service'
-        - id: product-catalog-service-route
-          uri: lb://product-catalog-service # 'lb' for load balancing, uses service ID from Eureka
-          predicates:
-            - Path=/products/** # Routes requests starting with /products/ to product-service
-          filters:
-            - RewritePath=/products/(?<segment>.*), /${segment} # Rewrites path to remove /products/
-            # Specific Circuit Breaker for this route (overrides global if different config needed)
-            - name: CircuitBreaker
-              args:
-                name: productCatalogCircuitBreaker # Unique name for this circuit breaker
-                fallbackUri: forward:/fallback/products # Custom fallback for products
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+# ================================
+# ✅ Truststore (SSL) Configuration
+# ================================
+truststore.path: classpath:backend_truststore.p12 # Path to SSL truststore file
+truststore.password: ${truststore.password} # Password for truststore (externalized)
 
+# ================================
+# ✅ Spring Boot Main Settings
+# ================================
+spring.main.web-application-type: REACTIVE # Must be REACTIVE for Spring Cloud Gateway
+spring.application.name: api-gateway # Used for Eureka service registration
+spring.autoconfigure.exclude[0]: org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration # Disable R2DBC autoconfig
 
-        # Route for 'order-processing-service'
-        - id: order-processing-service-route
-          uri: lb://order-processing-service
-          predicates:
-            - Path=/orders/**
-          filters:
-            - RewritePath=/orders/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: orderProcessingCircuitBreaker
-                fallbackUri: forward:/fallback/orders
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+# ================================
+# ✅ Redis Configuration (Rate Limiting, etc.)
+# ================================
+spring.data.redis.host: localhost # Redis host (can be remote)
+spring.data.redis.port: 6379 # Redis port
+#spring.data.redis.password: ${redis.password} # Optional: Redis auth (commented out)
 
-        # Route for 'user-service'
-        - id: user-service-route
-          uri: lb://user-service
-          predicates:
-            - Path=/users/**
-          filters:
-            - RewritePath=/users/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: userCircuitBreaker
-                fallbackUri: forward:/fallback/users
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+# ================================
+# ✅ Vault Configuration (for secrets)
+# ================================
+spring.config.import: "vault://secret/aliwudi-marketplace" # Import externalized config from Vault
 
-        # Route for 'logistics' part of logistics-media-service
-        - id: logistics-service-route
-          uri: lb://logistics-media-service
-          predicates:
-            - Path=/logistics/**
-          filters:
-            - RewritePath=/logistics/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: logisticsCircuitBreaker
-                fallbackUri: forward:/fallback/logistics
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+spring.cloud.vault.uri: http://localhost:8200 # Vault URI
+spring.cloud.vault.token: root # Vault token (do NOT use root in production)
+spring.cloud.vault.kv.enabled: true # Enable KV secrets engine
 
-        # Route for 'media' part of logistics-media-service
-        - id: media-service-route
-          uri: lb://logistics-media-service
-          predicates:
-            - Path=/media/**
-          filters:
-            - RewritePath=/media/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: mediaCircuitBreaker
-                fallbackUri: forward:/fallback/media
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+# ================================
+# ✅ Service Discovery Configuration (Eureka)
+# ================================
+spring.cloud.gateway.discovery.locator.enabled: true # Discover routes automatically using Eureka
+spring.cloud.gateway.discovery.locator.lower-case-service-id: true # Convert service IDs to lowercase for consistency
 
-        # Route for 'notification-service'
-        - id: notification-service-route
-          uri: lb://notification-service
-          predicates:
-            - Path=/notifications/**
-          filters:
-            - RewritePath=/notifications/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: notificationCircuitBreaker
-                fallbackUri: forward:/fallback/notifications
-            # Retry mechanism for this route
-            - name: Retry
-              args:
-                retries: 3 # Number of retries
-                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT # Retry on these HTTP statuses
-                methods: GET # Only retry idempotent methods (GET, HEAD, OPTIONS)
+# ================================
+# ✅ Gateway HTTP Client Timeouts
+# ================================
+spring.cloud.gateway.httpclient.connect-timeout: 10000 # Connection timeout (in ms)
+spring.cloud.gateway.httpclient.response-timeout: 30s # Total response timeout
 
-  # Spring Security OAuth2 Resource Server configuration for JWT validation (MOVED HERE)
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # IMPORTANT: Replace with the actual JWK Set URI of your Authorization Server (e.g., Keycloak, Auth0)
-          # Spring Security will use this to fetch public keys for JWT signature verification.
-          jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+# ================================
+# ✅ OAuth2 JWT Validation Configuration
+# ================================
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs
+# URI from which to fetch public keys for validating JWT tokens
 
-# Eureka Client Configuration
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/ # URL of the Eureka Server
-  instance:
-    hostname: localhost # Hostname for this gateway instance
+# ================================
+# ✅ Eureka Server Location
+# ================================
+eureka.client.service-url.defaultZone: http://localhost:8761/eureka/ # Eureka server URL
+eureka.instance.hostname: localhost # Hostname for this service instance
 
-# Actuator and Tracing for Observability
-management:
-  endpoints:
-    web:
-      exposure:
-        # In production, expose only necessary endpoints and secure them
-        # E.g., "health,info,metrics,prometheus"
-        include: "*" # For development, include all. For production, restrict!
-  metrics:
-    export:
-      prometheus:
-        enabled: true # Enable Prometheus endpoint for metrics scraping
-  tracing:
-    enabled: false # Disable tracing for now - We will enable later when zipkin server is available
-    sampling:
-      probability: 1.0 # Sampling rate for traces (1.0 = 100% for development, adjust for prod)
-    service:
-      name: api-gateway # Service name that will appear in tracing tools (e.g., Zipkin)
-    zipkin:
-      sender:
-        type: http
-        base-url: http://localhost:9411 # Your Zipkin server URL (e.g., where Zipkin is running)
-        
-# Add/Modify the Resilience4j configuration
-resilience4j: # This is the top-level configuration key for all Resilience4j properties.
-  timelimiter: # Configuration for the TimeLimiter component.
-    instances: # Defines specific instances of TimeLimiters.
-      # The 'default' TimeLimiter instance.
-      # This configuration applies to any circuit breaker or time limiter that
-      # is used in a route but doesn't have a specific instance name configured.
-      default:
-        # If an operation (e.g., a call to a downstream microservice) doesn't
-        # complete within this duration, it's considered a timeout.
-        # This directly addresses the 'GATEWAY_TIMEOUT' error.
-        # Setting it to 30 seconds provides a reasonable default buffer.
-        timeout-duration: 30s
-        # Recommended for reactive applications (like Spring Cloud Gateway).
-        # If an operation times out, this setting attempts to cancel the
-        # underlying reactive stream. This helps to free up resources
-        # (e.g., HTTP connections, threads) that might still be tied up
-        # by the slow downstream call.
-        cancel-running-future: true
+# ================================
+# ✅ Actuator and Tracing Settings
+# ================================
+management.endpoints.web.exposure.include: "*" # Expose all actuator endpoints (restrict in prod)
+management.metrics.export.prometheus.enabled: true # Enable Prometheus metrics endpoint
+management.tracing.enabled: false # Disable distributed tracing (Zipkin)
+management.tracing.sampling.probability: 1.0 # 100% sampling for development
+management.tracing.service.name: api-gateway # Service name shown in tracing tools
+management.tracing.zipkin.sender.type: http # Send traces via HTTP
+management.tracing.zipkin.sender.base-url: http://localhost:9411 # Zipkin server endpoint
 
-      # A specific TimeLimiter instance named 'userCircuitBreaker'.
-      # This name matches the 'name' parameter you use in your Gateway route filter:
-      # `- SpringCloudCircuitBreakerResilience4jFilterFactory name = 'userCircuitBreaker'`
-      # This configuration overrides the 'default' one for routes explicitly
-      # using 'userCircuitBreaker'.
-      userCircuitBreaker:
-        # Sets a specific timeout duration for the 'userCircuitBreaker'.
-        # This was the direct fix for the 1000ms timeout error.
-        timeout-duration: 40s
-        # Same as above, highly recommended for reactive streams to ensure
-        # resources are released on timeout.
-        cancel-running-future: true
+# ================================
+# ✅ Resilience4j TimeLimiter Settings
+# ================================
+resilience4j.timelimiter.instances.default.timeout-duration: 30s # Default timeout per call
+resilience4j.timelimiter.instances.default.cancel-running-future: true # Cancel slow operations
+resilience4j.timelimiter.instances.userCircuitBreaker.timeout-duration: 40s # Specific timeout for user service
+resilience4j.timelimiter.instances.userCircuitBreaker.cancel-running-future: true
 
-  circuitbreaker: # Configuration for the Circuit Breaker component.
-    instances: # Defines specific instances of Circuit Breakers.
-      # The 'default' Circuit Breaker instance.
-      # This configuration applies to any circuit breaker that doesn't
-      # have a specific instance name configured in a route.
-      default:
-        # Defines the size of the sliding window (number of recent calls)
-        # that the circuit breaker observes to determine the health of the service.
-        # In this case, it looks at the last 10 calls.
-        sliding-window-size: 10
-        # The percentage of failed calls within the sliding window that will
-        # cause the circuit to transition from CLOSED to OPEN.
-        # If 50% or more of the last 10 calls fail (i.e., 5 failures), the circuit opens.
-        failure-rate-threshold: 50
-        # The duration (in seconds) that the circuit will stay in the OPEN state.
-        # While OPEN, all requests are immediately rejected without attempting to
-        # call the downstream service, preventing further overload.
-        wait-duration-in-open-state: 60s
-        # When the 'wait-duration-in-open-state' expires, the circuit transitions
-        # to the HALF_OPEN state. In this state, only a limited number of requests
-        # (here, 3) are allowed to pass through to the downstream service.
-        # If these 3 calls are successful, the circuit closes. If they fail, it re-opens.
-        permitted-number-of-calls-in-half-open-state: 3
+# ================================
+# ✅ Resilience4j CircuitBreaker Settings
+# ================================
+resilience4j.circuitbreaker.instances.default.sliding-window-size: 10 # Evaluate last 10 calls
+resilience4j.circuitbreaker.instances.default.failure-rate-threshold: 50 # 50% failure rate to open circuit
+resilience4j.circuitbreaker.instances.default.wait-duration-in-open-state: 60s # Wait time before retry
+resilience4j.circuitbreaker.instances.default.permitted-number-of-calls-in-half-open-state: 3 # Test requests allowed
 
-      # A specific Circuit Breaker instance named 'userCircuitBreaker'.
-      # This name should match the one used in your gateway filter for user-service.
-      userCircuitBreaker:
-        # Sets a larger sliding window for the user-service (20 calls).
-        # This means it observes more historical calls before making a decision.
-        sliding-window-size: 20
-        # A higher failure rate threshold (70%). The circuit for user-service
-        # will only open if 70% or more of the last 20 calls fail. This makes
-        # the circuit for this service less sensitive to transient failures.
-        failure-rate-threshold: 70
-        # The circuit for user-service will stay open for a shorter duration (30 seconds)
-        # before attempting to transition to HALF_OPEN.
-        wait-duration-in-open-state: 30s
-        # (Implicitly uses default for permitted-number-of-calls-in-half-open-state if not specified,
-        # or you can add it here if you want a different value for this specific instance.)
-        
-      # TODO - other circuit breaker instance goes here e.g orderCircuitBreaker e.t.c
-      
+resilience4j.circuitbreaker.instances.userCircuitBreaker.sliding-window-size: 20
+resilience4j.circuitbreaker.instances.userCircuitBreaker.failure-rate-threshold: 70
+resilience4j.circuitbreaker.instances.userCircuitBreaker.wait-duration-in-open-state: 30s
 
-jwt:
-  auth:
-    converter:
-      resource-id: emaketplace-app
-      principle-attribute: preferred_username
-      
-      
+# ================================
+# ✅ JWT Claims Conversion Settings
+# ================================
+jwt.auth.converter.resource-id: emaketplace-app # Resource ID in the access token
+jwt.auth.converter.principle-attribute: preferred_username # Use this claim as principal identity
+
+# ================================
+# ✅ Global Gateway Filters (Apply to All Routes)
+# ================================
+spring.cloud.gateway.default-filters:
+  # 🔄 Remove duplicate response headers
+  - name: DedupeResponseHeader
+    args:
+      headers: Vary Access-Control-Allow-Origin
+      strategy: RETAIN_FIRST
+    order: -500
+
+  # ⏳ Apply Rate Limiting globally
+  - name: RequestRateLimiter
+    args:
+      key-resolver: '#{@userKeyResolver}' # Use user-based resolver
+      redis-rate-limiter.replenishRate: 10 # requests per second
+      redis-rate-limiter.burstCapacity: 20 # max burst capacity
+      redis-rate-limiter.requestedTokens: 1 # tokens per request
+
+# ================================
+# ✅ Gateway Routes per Microservice
+# ================================
+
+# -- Product Catalog Service Route
+spring.cloud.gateway.routes:
+  - id: product-catalog-service-route
+    uri: lb://product-catalog-service
+    predicates:
+      - Path=/products/**
+    filters:
+      - RewritePath=/products/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: productCatalogCircuitBreaker
+          fallbackUri: forward:/fallback/products
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
+
+# -- Order Processing Service Route
+  - id: order-processing-service-route
+    uri: lb://order-processing-service
+    predicates:
+      - Path=/orders/**
+    filters:
+      - RewritePath=/orders/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: orderProcessingCircuitBreaker
+          fallbackUri: forward:/fallback/orders
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
+
+# -- User Service Route
+  - id: user-service-route
+    uri: lb://user-service
+    predicates:
+      - Path=/users/**
+    filters:
+      - RewritePath=/users/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: userCircuitBreaker
+          fallbackUri: forward:/fallback/users
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
+
+# -- Logistics Sub-route (from logistics-media-service)
+  - id: logistics-service-route
+    uri: lb://logistics-media-service
+    predicates:
+      - Path=/logistics/**
+    filters:
+      - RewritePath=/logistics/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: logisticsCircuitBreaker
+          fallbackUri: forward:/fallback/logistics
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
+
+# -- Media Sub-route (from logistics-media-service)
+  - id: media-service-route
+    uri: lb://logistics-media-service
+    predicates:
+      - Path=/media/**
+    filters:
+      - RewritePath=/media/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: mediaCircuitBreaker
+          fallbackUri: forward:/fallback/media
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
+
+# -- Notification Service Route
+  - id: notification-service-route
+    uri: lb://notification-service
+    predicates:
+      - Path=/notifications/**
+    filters:
+      - RewritePath=/notifications/(?<segment>.*), /${segment}
+      - name: CircuitBreaker
+        args:
+          name: notificationCircuitBreaker
+          fallbackUri: forward:/fallback/notifications
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+          methods: GET
