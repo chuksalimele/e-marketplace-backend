@@ -13,10 +13,13 @@ dependencies {
 
         implementation 'org.springframework.security:spring-security-oauth2-jose'
 
+        implementation 'org.yaml:snakeyaml:2.2'
+
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
 	annotationProcessor 'org.projectlombok:lombok'
+
 
         // Spring Boot Starter WebFlux for WebClient (reactive HTTP client)
         implementation 'org.springframework.boot:spring-boot-starter-webflux'

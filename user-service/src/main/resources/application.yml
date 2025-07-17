@@ -22,9 +22,12 @@ spring.application.name: user-service
 spring.config.import: vault://secret/aliwudi-marketplace
 
 # Vault Configuration
-spring.cloud.vault.uri: http://localhost:8200
-spring.cloud.vault.token: hvs.SbS1ZmzXbiKQRMyFQEqphskk
-spring.cloud.vault.kv.enabled: true
+spring.cloud.vault.uri: http://127.0.0.1:8200
+spring.cloud.vault.authentication: APPROLE
+spring.cloud.vault.app-role.role-id: ${VAULT_ROLE_ID}
+spring.cloud.vault.app-role.secret-id: ${VAULT_SECRET_ID}
+spring.cloud.vault.app-role.role: aliwudi-marketplace-role
+spring.cloud.vault.app-role.app-role-path: approle
 
 # Spring Security OAuth2 (JWT Resource Server)
 spring.security.oauth2.resourceserver.jwt.issuer-uri: https://localhost:8443/realms/chuks-emaketplace-realm
