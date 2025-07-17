@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.notification; // Or the appropriate base package for your notification service
 
+import com.aliwudi.marketplace.backend.common.config.CliOptionsBootstrapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -19,6 +20,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement; /
 public class NotificationServiceApplication {
 
     public static void main(String[] args) {
+        
+        CliOptionsBootstrapper.check(NotificationServiceApplication.class, args);
+        
         SpringApplication.run(NotificationServiceApplication.class, args);
     }
 }

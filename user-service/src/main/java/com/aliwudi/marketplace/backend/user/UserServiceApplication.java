@@ -4,6 +4,7 @@
  */
 package com.aliwudi.marketplace.backend.user;
 
+import com.aliwudi.marketplace.backend.common.config.CliOptionsBootstrapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -24,6 +25,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 public class UserServiceApplication {
 
     public static void main(String[] args) {
+        
+        CliOptionsBootstrapper.check(UserServiceApplication.class, args);
+        
         SpringApplication.run(UserServiceApplication.class, args);
     } 
 

@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.api.gateway;
 
+import com.aliwudi.marketplace.backend.common.config.CliOptionsBootstrapper;
 import static com.aliwudi.marketplace.backend.common.enumeration.BasicAuthHeaders.*;
 import com.aliwudi.marketplace.backend.common.enumeration.JwtClaims;
 import com.aliwudi.marketplace.backend.common.util.JwtAuthConverter;
@@ -57,6 +58,7 @@ public class APIGatewayApplication {
     private String resourceId;
     
     public static void main(String[] args) {
+        CliOptionsBootstrapper.check(APIGatewayApplication.class, args);
         SpringApplication.run(APIGatewayApplication.class, args);
     }
 

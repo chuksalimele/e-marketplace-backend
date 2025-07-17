@@ -2,11 +2,11 @@ description = 'eureka-server'
 
 
 dependencies {
+        implementation project(':mcsv-common-lib')
+        implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-
-    // Spring Cloud Netflix Eureka Server dependency
-    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-server:4.2.1")
+        // Spring Cloud Netflix Eureka Server dependency
+        implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-server:4.2.1")
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'io.projectreactor:reactor-test'
