@@ -1,5 +1,6 @@
 package com.aliwudi.marketplace.backend.common.config;
 
+import com.aliwudi.marketplace.backend.common.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.BufferedReader;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,11 +88,11 @@ public class CliOptionsBootstrapper {
         return null;
     }
 
-    private static Object getPropertyValue(String filePath, String key) throws IOException {
+    private static Object getPropertyValue(String filePath, String key) throws IOException, ResourceNotFoundException {
         InputStream input = clazzBooting.getClassLoader().getResourceAsStream(filePath);
 
         if (input == null) {
-            return null;
+            throw new ResourceNotFoundException("Properties file path not found");
         }
 
         Properties prop = new Properties();
@@ -99,10 +101,10 @@ public class CliOptionsBootstrapper {
 
     }
 
-    public static Object getYamlValue(String filePath, String keyPath) throws IOException {
+    public static Object getYamlValue(String filePath, String keyPath) throws IOException, ResourceNotFoundException {
         InputStream input = clazzBooting.getClassLoader().getResourceAsStream(filePath);
         if (input == null) {
-            return null;
+            throw new ResourceNotFoundException("Yaml file path not found");
         }
 
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
@@ -160,7 +162,7 @@ public class CliOptionsBootstrapper {
         try {
             roleIdParam = getYamlValue(applicationFileYml, pathRoleId);
             secretIdParma = getYamlValue(applicationFileYml, pathSecretId);
-        } catch (IOException ex) {
+        } catch (IOException|ResourceNotFoundException ex) {
             errMsg1 = ex.getMessage();
         }
         try {
@@ -169,14 +171,14 @@ public class CliOptionsBootstrapper {
             }
 
             if (secretIdParma == null) {
-                secretIdParma = getPropertyValue(applicationFileYml, pathSecretId);
+                secretIdParma = getPropertyValue(applicationFileProp, pathSecretId);
             }
-        } catch (IOException ex) {
+        } catch (IOException|ResourceNotFoundException ex) {
             errMsg2 = ex.getMessage();
         }
 
         if (errMsg1 != null && errMsg2 != null) {
-            exitWithError("Error checking onfiguration file - application.yml or application.properties");
+            exitWithError("Error checking onfiguration file - application.yml or application.properties\n"+errMsg1+"\n"+errMsg2);
             return;
         }
 
