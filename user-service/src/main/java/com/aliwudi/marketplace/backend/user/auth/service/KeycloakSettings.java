@@ -29,9 +29,13 @@ public class KeycloakSettings {
     @Value("${keycloak.client-secret:}") // @Value with default empty string for optional secret
     private String clientSecret;
     
-    @Value("${keycloak.username}") 
-    private String username;
+    
+    @Value("${keycloak.grant_type}") 
+    private String grantType;
+    
+    //@Value("${keycloak.username}") 
+    //private String username;
 
-    @Value("${keycloak.password}") 
-    private String password;    
+    //@Value("${keycloak.password}") 
+    //private String password;    
 }

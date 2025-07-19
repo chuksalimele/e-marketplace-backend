@@ -36,16 +36,16 @@ spring.autoconfigure.exclude: org.springframework.boot.autoconfigure.security.se
 # Email Configuration
 spring.mail.host: localhost
 spring.mail.port: 1025
-spring.mail.username: {mail.username}
-spring.mail.password: {mail.password}
+spring.mail.username: ${mail.username}
+spring.mail.password: ${mail.password}
 spring.mail.properties.mail.smtp.auth: false
 spring.mail.properties.mail.smtp.starttls.enable: false
 spring.mail.properties.mail.smtp.starttls.required: false
 spring.mail.test-connection: true
 
 # Twilio Configuration
-twilio.account.sid: {twilio.account-sid} # -> ACa55281758aa4d1730cf023a08dd91213
-twilio.auth.token: {twilio.auth-token}   # -> f0a468ec9e6bde02de081e61ec7c5bcf
+twilio.account.sid: ${twilio.account-sid} # -> ACa55281758aa4d1730cf023a08dd91213
+twilio.auth.token: ${twilio.auth-token}   # -> f0a468ec9e6bde02de081e61ec7c5bcf
 twilio.phone.number: +15077347433
 
 # Eureka Client Configuration

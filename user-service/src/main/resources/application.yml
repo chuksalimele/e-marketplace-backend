@@ -50,9 +50,10 @@ spring.data.redis.database: 0
 keycloak.url: https://localhost:8443
 keycloak.realm: chuks-emaketplace-realm
 keycloak.resource: user-service-admin-client
+keycloak.grant_type: client_credentials
 keycloak.client-secret: ${keycloak.client-secret}
-keycloak.username: ${keycloak.username}
-keycloak.password: ${keycloak.password}
+#keycloak.username: ${keycloak.username}
+#keycloak.password: ${keycloak.password}
 
 # Keycloak Admin Client Configuration
 keycloak.admin.url: https://localhost:8443

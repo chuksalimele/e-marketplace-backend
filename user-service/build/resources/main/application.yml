@@ -1,55 +1,72 @@
 ## YAML Template.
 ---
-# src/main/resources/application.yml for Product Service
-server:
-  port: 5001 # A unique port for this microservice 
+# Server
+server.port: 5001
 
-truststore:
-  path: classpath:backend_truststore.p12
-  password: microservicetrustpass@123+@+
-  
-spring:
-  application:
-    name: user-service # The unique name of this service, used by Eureka
+# App Base Host
+app.host: https://localhost
 
+# Social Login Redirect URIs
+app.social.google.redirect-uri: https://localhost/api/auth/google/callback
+app.social.facebook.redirect-uri: https://localhost/api/auth/facebook/callback
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # This issuer-uri is good for matching the 'iss' claim in the JWT.
-          # It also allows Spring to attempt discovery of JWKS via .well-known/openid-configuration if available.
-          issuer-uri: https://localhost:8443 # Replace with your Auth Server's actual issuer URI
+# Frontend Redirect Scheme
+app.frontend.redirect-scheme: your-native-app-scheme://auth
 
-          # THIS IS CRUCIAL FOR SIGNATURE VERIFICATION.
-          # It tells Spring Security where to fetch the public keys (JWKS) to validate the JWT's signature.
-          # This should point to the JWK Set endpoint of your Authorization Server.
-          jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs # Example for Keycloak
+# Truststore Settings
+truststore.path: classpath:backend_truststore.p12
+truststore.password: ${truststore.password} # microservicetrustpass@123+@+
 
-keycloak:
-  auth-server-url: https://localhost:8443 # Your Keycloak URL
-  realm: chuks-emaketplace-realm         # Your application realm
-  admin-cli-client-id: admin-cli         # Default client for admin access
-  admin-username: admin                  # Your Keycloak admin username
-  admin-password: admin                  # Your Keycloak admin password (CHANGE FOR PRODUCTION!)
-  
-  admin-auth-server-url: https://localhost:8443
-  admin-realm: chuks-emaketplace-realm
-  admin-client-id: user-service-admin-client     # Client ID for user-service's admin client
-  admin-client-secret: YOUR_GENERATED_USER_SERVICE_ADMIN_CLIENT_SECRET # Secret for user-service's admin client
+# Spring Application
+spring.application.name: user-service
+spring.config.import: vault://secret/aliwudi-marketplace
 
-# ... other configurations ...
+# Vault Configuration
+spring.cloud.vault.uri: http://127.0.0.1:8200
+spring.cloud.vault.authentication: APPROLE
+spring.cloud.vault.app-role.role-id: ${VAULT_ROLE_ID}
+spring.cloud.vault.app-role.secret-id: ${VAULT_SECRET_ID}
+spring.cloud.vault.app-role.role: aliwudi-marketplace-role
+spring.cloud.vault.app-role.app-role-path: approle
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/ # Pointing to your Eureka Server
-  instance:
-    hostname: localhost # For local development, use localhost
-    prefer-ip-address: true # Optional: Register with IP address instead of hostname (good for containerized envs)
+# Spring Security OAuth2 (JWT Resource Server)
+spring.security.oauth2.resourceserver.jwt.issuer-uri: https://localhost:8443/realms/chuks-emaketplace-realm
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri: https://localhost:8443/realms/chuks-emaketplace-realm/protocol/openid-connect/certs
 
-jwt:
-  auth:
-    converter:
-      resource-id: emaketplace-app
-      principle-attribute: preferred_username    
+# RabbitMQ
+spring.rabbitmq.host: localhost
+spring.rabbitmq.port: 5672
+spring.rabbitmq.username: ${rabbitmq.username} # guest
+spring.rabbitmq.password: ${rabbitmq.password} # guest
+
+# Redis
+spring.data.redis.host: localhost
+spring.data.redis.port: 6379
+spring.data.redis.timeout: 5s
+spring.data.redis.database: 0
+# spring.data.redis.password: ${redis.password} # Optional if Redis is secured
+
+# Keycloak Settings
+keycloak.url: https://localhost:8443
+keycloak.realm: chuks-emaketplace-realm
+keycloak.resource: user-service-admin-client
+keycloak.grant_type: client_credentials
+keycloak.client-secret: ${keycloak.client-secret}
+#keycloak.username: ${keycloak.username}
+#keycloak.password: ${keycloak.password}
+
+# Keycloak Admin Client Configuration
+keycloak.admin.url: https://localhost:8443
+keycloak.admin.realm: master
+keycloak.admin.client-id: admin-cli
+keycloak.admin.client-secret: ${keycloak.admin-client-secret}
+
+# Eureka Client
+eureka.client.service-url.defaultZone: http://localhost:8761/eureka/
+eureka.instance.hostname: localhost
+eureka.instance.prefer-ip-address: true
+
+# JWT Auth Converter
+jwt.auth.converter.resource-id: emaketplace-app
+jwt.auth.converter.principle-attribute: preferred_username
+

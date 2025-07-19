@@ -37,24 +37,32 @@ public class CliOptionsBootstrapper {
     private static String SECRET_PATH;
     private static String DEFAULT_ROLE_ID_PATH;
     private static String DEFAULT_SECRET_ID_PATH;
+    private static String DEFAULT_SECRET_PATH_DESC;
     private static final String ROOT_PATH_ENV = "ROOT_PATH";
     private static final String STRICT_SECURITY_ENV = "STRICT_SECURITY"; // New environment variable
     private static final String VAULT_ROLE_ID = "VAULT_ROLE_ID";
     private static final String VAULT_SECRET_ID = "VAULT_SECRET_ID";
+    private static final String ROLE_ID_FILE = "role-id.txt";
+    private static final String SECRET_ID_FILE = "secret-id.txt";
+
     private static Class clazzBooting;
 
     /**
-     * Initializes the CLI configuration for the specified class with the given arguments.
-     * Configures the root path, parses CLI arguments, and sets Vault credentials as system properties.
+     * Initializes the CLI configuration for the specified class with the given
+     * arguments. Configures the root path, parses CLI arguments, and sets Vault
+     * credentials as system properties.
      *
      * @param clazz The class being bootstrapped.
-     * @param args  Command-line arguments.
+     * @param args Command-line arguments.
      */
     static public void check(Class clazz, String[] args) {
         clazzBooting = clazz;
         gaurdRail();
         logger = LoggerFactory.getLogger(clazz);
 
+        String default_path = clazz.getSimpleName() + "/secret";
+        DEFAULT_SECRET_PATH_DESC = "[ROOT_PATH]/" + default_path;
+        
         // Set ROOT path: CLI > Environment Variable > Working Directory
         ROOT = getRootPath(args);
         ROOT = ROOT.replace('\\', '/');
@@ -62,9 +70,12 @@ public class CliOptionsBootstrapper {
             ROOT += "/";
         }
 
-        SECRET_PATH = ROOT + clazz.getSimpleName() + "/secret";
-        DEFAULT_ROLE_ID_PATH = SECRET_PATH + "/role-id.txt";
-        DEFAULT_SECRET_ID_PATH = SECRET_PATH + "/secret-id.txt";
+        
+        SECRET_PATH = ROOT + default_path;
+        DEFAULT_ROLE_ID_PATH = SECRET_PATH + "/" + ROLE_ID_FILE;
+        DEFAULT_SECRET_ID_PATH = SECRET_PATH + "/" + SECRET_ID_FILE;
+
+        
 
         parse(args);
         if (helpRequested) {
@@ -91,7 +102,8 @@ public class CliOptionsBootstrapper {
     }
 
     /**
-     * Determines the root path from CLI arguments, environment variables, or the working directory.
+     * Determines the root path from CLI arguments, environment variables, or
+     * the working directory.
      *
      * @param args Command-line arguments to parse for root path.
      * @return The resolved root path.
@@ -128,12 +140,12 @@ public class CliOptionsBootstrapper {
     }
 
     /**
-     * Retrieves the input path from CLI, environment variable, or prompt.
-     * In non-interactive mode, fails if no input is provided instead of prompting.
+     * Retrieves the input path from CLI, environment variable, or prompt. In
+     * non-interactive mode, fails if no input is provided instead of prompting.
      *
-     * @param label       The label for the input (e.g., "Role ID").
-     * @param cliValue    The value from CLI arguments.
-     * @param envVar      The environment variable name.
+     * @param label The label for the input (e.g., "Role ID").
+     * @param cliValue The value from CLI arguments.
+     * @param envVar The environment variable name.
      * @param defaultPath The default path to use.
      * @return The resolved path.
      */
@@ -161,7 +173,7 @@ public class CliOptionsBootstrapper {
     /**
      * Prompts the user for a file path interactively.
      *
-     * @param label       The label for the input (e.g., "Role ID").
+     * @param label The label for the input (e.g., "Role ID").
      * @param defaultPath The default path to suggest.
      * @return The user-provided or default path.
      */
@@ -178,10 +190,12 @@ public class CliOptionsBootstrapper {
     }
 
     /**
-     * Reads the contents of a file into a string, checking for secure permissions.
+     * Reads the contents of a file into a string, checking for secure
+     * permissions.
      *
      * @param path The file path to read.
-     * @return The file contents, or null if an error occurs or permissions are insecure in strict mode.
+     * @return The file contents, or null if an error occurs or permissions are
+     * insecure in strict mode.
      */
     private static String readFile(String path) {
         Path filePath = Path.of(path);
@@ -243,7 +257,8 @@ public class CliOptionsBootstrapper {
     }
 
     /**
-     * Parses command-line arguments to extract role-id-path, secret-id-path, root-path, non-interactive, and strict-security flags.
+     * Parses command-line arguments to extract role-id-path, secret-id-path,
+     * root-path, non-interactive, and strict-security flags.
      *
      * @param args Command-line arguments.
      */
@@ -301,16 +316,21 @@ public class CliOptionsBootstrapper {
     }
 
     /**
-     * Prints usage information for the CLI, including root-path, non-interactive, and strict-security options.
+     * Prints usage information for the CLI, including root-path,
+     * non-interactive, and strict-security options.
      */
     public static void printUsage() {
         System.out.println("Usage: java -jar " + (clazzBooting != null ? clazzBooting.getSimpleName() : "Application") + ".jar [options]");
         System.out.println();
         System.out.println("Options:");
-        System.out.println("  -r,  -role-id-path     Path to Vault role ID file (default: " + DEFAULT_ROLE_ID_PATH + ")");
-        System.out.println("  -s,  -secret-id-path   Path to Vault secret ID file (default: " + DEFAULT_SECRET_ID_PATH + ")");
+        System.out.println("  -r,  -role-id-path     Path to Vault role ID file (default: " + DEFAULT_SECRET_PATH_DESC + '/' + ROLE_ID_FILE + ")");
+        System.out.println("  -s,  -secret-id-path   Path to Vault secret ID file (default: " + DEFAULT_SECRET_PATH_DESC + '/' + SECRET_ID_FILE + ")");
         System.out.println("  -p,  -root-path        Root path for secret files (default: working directory)");
-        System.out.println("  -n,  -non-interactive  Disable interactive prompts and fail if inputs are missing");
+        System.out.println("""
+                             -n,  -non-interactive  Disable interactive prompts and fail if inputs are missing.
+                                                    Set this flag to disable interactive prompts in non-interactive environments 
+                                                    where prompting may not be suitable (e.g., CI/CD pipelines or containers).
+                           """);
         System.out.println("  -strict-security       Fail if file permissions are insecure (e.g., world-readable)");
         System.out.println("  -h,  -help             Show this help message and exit");
         System.out.println();
@@ -346,7 +366,7 @@ public class CliOptionsBootstrapper {
     /**
      * Retrieves a static field value from a class using reflection.
      *
-     * @param clazz     The class containing the field.
+     * @param clazz The class containing the field.
      * @param fieldName The name of the field.
      * @return The field value, or null if an error occurs.
      */
@@ -371,7 +391,7 @@ public class CliOptionsBootstrapper {
      * Retrieves a property value from a properties file.
      *
      * @param filePath The path to the properties file.
-     * @param key      The property key to retrieve.
+     * @param key The property key to retrieve.
      * @return The property value, or null if not found.
      * @throws IOException If an I/O error occurs.
      * @throws ResourceNotFoundException If the file is not found.
@@ -391,7 +411,7 @@ public class CliOptionsBootstrapper {
      * Retrieves a value from a YAML file using a dot-separated key path.
      *
      * @param filePath The path to the YAML file.
-     * @param keyPath  The dot-separated key path (e.g., "spring.cloud.vault").
+     * @param keyPath The dot-separated key path (e.g., "spring.cloud.vault").
      * @return The value, or null if not found.
      * @throws IOException If an I/O error occurs.
      * @throws ResourceNotFoundException If the file is not found.
@@ -414,7 +434,7 @@ public class CliOptionsBootstrapper {
      * Supports nested maps, lists, and non-string keys.
      *
      * @param prefix The current key prefix (e.g., "spring.cloud").
-     * @param value  The object to flatten (map, list, or primitive).
+     * @param value The object to flatten (map, list, or primitive).
      * @param result The flat map to store key-value pairs.
      */
     private static void flattenMap(String prefix, Object value, Map<String, Object> result) {
@@ -531,8 +551,8 @@ public class CliOptionsBootstrapper {
                   As a guard rail requirement to prevent bugs by future codebase
                   management we enforce certain field definitions.
                   It is mandatory %s field and its mandatory value is explicitly defined in
-                  %s class as it is used to ensure vault %s parameter ${%s}
-                  is set and assigned value in application.yml or application.properties
+                  %s class as it is used to ensure vault %s parameter placeholder 
+                  ${%s} is set and assigned value in application.yml or application.properties
 
                   Define this field as so in %s class:
 

@@ -113,9 +113,9 @@ public class KeycloakAdminServiceImpl implements IAdminService { // Implements t
                         return KeycloakBuilder.builder()
                                 .serverUrl(kcSettings.getUrl())
                                 .realm(kcSettings.getRealm())
-                                .username(kcSettings.getUsername())
-                                .password(kcSettings.getPassword())
                                 .clientId(kcSettings.getClientId())
+                                .grantType(kcSettings.getGrantType())
+                                .clientSecret(kcSettings.getClientSecret())
                                 .resteasyClient(
                                         new ResteasyClientBuilderImpl()
                                                 .connectionPoolSize(10)
